@@ -1,0 +1,29 @@
+# Python
+Backend_db/venv/
+models/.venv/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment secrets
+.env
+.env.local
+Backend_db/.env
+
+# Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploaded files (stay on disk/server, not in repo)
+/media/
+
+# Logs
+*.log
+npm-debug.log*

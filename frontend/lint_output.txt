@@ -1,0 +1,18 @@
+
+/home/fia/Downloads/clinic_related/frontend/app/patients/page.tsx
+  16:5  warning  'Dialog' is defined but never used         @typescript-eslint/no-unused-vars
+  17:5  warning  'DialogContent' is defined but never used  @typescript-eslint/no-unused-vars
+  18:5  warning  'DialogHeader' is defined but never used   @typescript-eslint/no-unused-vars
+  19:5  warning  'DialogTitle' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/fia/Downloads/clinic_related/frontend/components/PatientDetailsView.tsx
+    8:5   warning  'DialogHeader' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+    9:5   warning  'DialogTitle' is defined but never used                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   26:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   27:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   28:40  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   35:8   warning  React Hook useEffect has a missing dependency: 'loadTabData'. Either include it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+  114:61  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+✖ 11 problems (3 errors, 8 warnings)
+

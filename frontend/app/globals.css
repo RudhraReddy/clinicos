@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* ClinicOS Palette - Clean Medical Professional */
+
+  /* Primary: Deep Slate Blue (HSL: 222.2 47.4% 11.2%) */
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+
+  /* Backgrounds */
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+
+  /* Secondary: Muted Gray/Blue for less emphasis */
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  /* Muted: For subtitles/tertiary */
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  /* Accent: For hover states etc */
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  /* Destructive */
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  /* Borders & Inputs */
+  /* Subtle light gray (HSL: 214.3 31.8% 91.4%) */
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 47.4% 11.2%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 0 0% 12.2%;
+  /* #1f1f1f */
+  --foreground: 0 0% 80%;
+  /* #CCCCCC */
+
+  --card: 0 0% 12.2%;
+  /* #1f1f1f */
+  --card-foreground: 0 0% 80%;
+  /* #CCCCCC */
+
+  --popover: 0 0% 12.2%;
+  /* #1f1f1f */
+  --popover-foreground: 0 0% 80%;
+  /* #CCCCCC */
+
+  --primary: 0 0% 80%;
+  /* #CCCCCC */
+  --primary-foreground: 0 0% 12.2%;
+
+  --secondary: 0 0% 16.9%;
+  /* #2B2B2B */
+  --secondary-foreground: 0 0% 80%;
+
+  --muted: 0 0% 16.9%;
+  /* #2B2B2B */
+  --muted-foreground: 225 4.1% 38.8%;
+  /* #5F6167 */
+
+  --accent: 0 0% 16.9%;
+  /* #2B2B2B */
+  --accent-foreground: 0 0% 80%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 80%;
+
+  --border: 0 0% 75%;
+  /* #BFBFBF - Light Gray */
+  --input: 0 0% 75%;
+  --ring: 0 0% 80%;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-geist-sans);
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only, .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+    z-index: 9999;
+  }
+  @page {
+    size: auto;
+    margin: 5mm; /* Small margin to avoid hardware cropping */
+  }
+}

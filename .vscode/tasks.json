@@ -1,0 +1,40 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start Backend",
+            "type": "shell",
+            "command": "source ./venv/bin/activate && python3 ./app.py",
+            "options": {
+                "cwd": "${env:HOME}/Downloads/clinic_related/Backend_db"
+            },
+            "presentation": {
+                "group": "servers",
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Start Frontend",
+            "type": "shell",
+            "command": "npm install && npm run dev",
+            "options": {
+                "cwd": "${env:HOME}/Downloads/clinic_related/frontend"
+            },
+            "presentation": {
+                "group": "servers",
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Start All Servers",
+            "dependsOn": ["Start Backend", "Start Frontend"],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
