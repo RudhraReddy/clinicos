@@ -1,0 +1,38 @@
+databases:
+  - name: clinicos-db
+    plan: free
+    databaseName: clinic_db
+    user: clinicos
+
+services:
+  - type: web
+    name: clinicos-api
+    runtime: python
+    plan: free
+    rootDir: Backend_db
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clinicos-db
+          property: connectionString
+      - key: UPLOAD_BASE_DIR
+        value: /tmp/clinic_uploads
+      - key: FLASK_DEBUG
+        value: false
+      - key: CORS_ORIGINS
+        value: https://clinicos-frontend.onrender.com
+
+  - type: web
+    name: clinicos-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: BACKEND_URL
+        value: https://clinicos-api.onrender.com
+      - key: NODE_VERSION
+        value: 20
