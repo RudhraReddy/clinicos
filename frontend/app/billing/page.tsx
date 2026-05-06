@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect, useMemo, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { api, type Patient, type InventoryItem, type InventorySearchResult } from "@/lib/api"
-import { Loader2, Search, Plus, Trash2, Printer, CheckCircle2, AlertCircle, FileCheck, Smartphone } from "lucide-react"
+import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
+import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 import { PatientSearch } from "@/components/PatientSearch"
-import { InvoicePrint } from "@/components/InvoicePrint"
+import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import {
     Table,
@@ -30,97 +30,116 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { format } from "date-fns"
-
-interface SubItem {
-    id: string;
-    name: string;
-    qty: number;
-}
-
-interface SearchItem extends InventoryItem {
-    substitutes?: SubItem[];
-    gst_rate?: number;
-    generic_tags?: string;
-    total_qty?: number;
-}
+import { toast } from "sonner"
 
 export interface BillItem {
     item_id: string;
     item_name: string;
-    batch_number: string; // "Auto-FIFO" for display initially? Or we just show name.
+    batch_number: string;
     qty: number;
-    mrp: number; // Estimated
+    mrp: number;
     gst: number;
     total: number;
 }
 
 function BillingContent() {
     const searchParams = useSearchParams()
-    const router = useRouter()
     const [showQR, setShowQR] = useState(false)
 
-    // State
+    // Tab
     const [activeTab, setActiveTab] = useState("new")
-    const [patientId, setPatientId] = useState(searchParams.get("patient_id") || "")
-    const [visitId, setVisitId] = useState(searchParams.get("visit_id") || "")
-    const [patient, setPatient] = useState<Patient | null>(null)
-    const [loadingPatient, setLoadingPatient] = useState(false)
 
-    // Item Search
+    // Patient
+    const [patientId, setPatientId] = useState(searchParams.get("patient_id") || "")
+    const [visitId] = useState(searchParams.get("visit_id") || "")
+    const [patient, setPatient] = useState<Patient | null>(null)
+
+    // Item search
     const [itemQuery, setItemQuery] = useState("")
     const [searchResults, setSearchResults] = useState<InventorySearchResult[]>([])
-    const [searching, setSearching] = useState(false)
 
-    // Bill Items
+    // Bill items
     const [billItems, setBillItems] = useState<BillItem[]>([])
     const [submitting, setSubmitting] = useState(false)
-    const [lastBillId, setLastBillId] = useState<string | null>(null)
-    const [printData, setPrintData] = useState<any>(null) // Holds data for printing
+
+    // Payment type
+    const [paymentType, setPaymentType] = useState<"CASH" | "CARD" | "INSURANCE">("CASH")
+
     // History
-    const [history, setHistory] = useState<any[]>([])
+    const [history, setHistory] = useState<BillingHistoryEntry[]>([])
     const [loadingHistory, setLoadingHistory] = useState(false)
 
-    // Load Patient if ID present
+    // History filters
+    const [filterDateFrom, setFilterDateFrom] = useState('')
+    const [filterDateTo, setFilterDateTo] = useState('')
+    const [filterPaymentType, setFilterPaymentType] = useState('')
+    const [historyPage, setHistoryPage] = useState(1)
+    const [historyTotal, setHistoryTotal] = useState(0)
+    const [historyTotalPages, setHistoryTotalPages] = useState(1)
+
+    // Print dialog
+    const [printDialogOpen, setPrintDialogOpen] = useState(false)
+    const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
+
+    // Clinic settings (persisted in localStorage)
+    const [clinicName, setClinicName] = useState("MediCare Clinic")
+    const [clinicAddress, setClinicAddress] = useState("")
+    const [settingsOpen, setSettingsOpen] = useState(false)
+    const [settingsNameDraft, setSettingsNameDraft] = useState("")
+    const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
+
+    // Load clinic settings from localStorage
+    useEffect(() => {
+        const storedName = localStorage.getItem("clinic_name")
+        const storedAddress = localStorage.getItem("clinic_address")
+        if (storedName) setClinicName(storedName)
+        if (storedAddress !== null) setClinicAddress(storedAddress)
+    }, [])
+
+    // Load patient if ID present in URL
     useEffect(() => {
         if (patientId) {
-            setLoadingPatient(true)
             api.getPatient(patientId)
                 .then(setPatient)
                 .catch(() => setPatient(null))
-                .finally(() => setLoadingPatient(false))
         }
     }, [patientId])
 
-    // Load History when tab changes
-    useEffect(() => {
-        if (activeTab === 'history') {
-            loadHistory()
-        }
-    }, [activeTab])
-
-    const loadHistory = async () => {
+    const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
         try {
-            const data = await api.getBillingHistory()
-            setHistory(data)
+            const data = await api.getBillingHistory({
+                date_from: filterDateFrom || undefined,
+                date_to: filterDateTo || undefined,
+                payment_type: filterPaymentType || undefined,
+                page,
+                limit: 25,
+            })
+            setHistory(data.bills)
+            setHistoryPage(data.page)
+            setHistoryTotal(data.total)
+            setHistoryTotalPages(data.pages)
         } catch (e) {
             console.error(e)
         } finally {
             setLoadingHistory(false)
         }
-    }
+    }, [filterDateFrom, filterDateTo, filterPaymentType])
 
-    // Search Inventory
+    // Load history when tab changes
+    useEffect(() => {
+        if (activeTab === 'history') {
+            loadHistory(1)
+        }
+    }, [activeTab, loadHistory])
+
+    // Search inventory
     useEffect(() => {
         const timer = setTimeout(() => {
             if (itemQuery.length > 2) {
-                setSearching(true)
-                // Use the new API
                 api.searchInventory(itemQuery)
                     .then(data => setSearchResults(data))
                     .catch(console.error)
-                    .finally(() => setSearching(false))
             } else {
                 setSearchResults([])
             }
@@ -128,28 +147,24 @@ function BillingContent() {
         return () => clearTimeout(timer)
     }, [itemQuery])
 
-    const addToBill = (item: InventorySearchResult) => { // Type as InventorySearchResult
-        // We now have price from backend
+    const addToBill = (item: InventorySearchResult) => {
         const newItem: BillItem = {
             item_id: item.id.toString(),
             item_name: item.item_name,
             batch_number: "Auto-FIFO",
             qty: 1,
-            mrp: item.price || 0, // From Search
+            mrp: item.price || 0,
             gst: item.gst_rate || 0,
-            total: 0
+            total: 0,
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
         setSearchResults([])
     }
 
-
-
     const updateQty = (index: number, newQty: number) => {
         const newItems = [...billItems]
         newItems[index].qty = newQty
-        // Recalculate total if we had MRP? 
         newItems[index].total = newItems[index].mrp * newQty
         setBillItems(newItems)
     }
@@ -166,22 +181,31 @@ function BillingContent() {
             const payload = {
                 patient_id: patientId,
                 visit_id: visitId || undefined,
-                payment_type: "CASH", // Default for now
+                payment_type: paymentType,
                 items_used: billItems.map(i => ({
                     item_id: i.item_id,
-                    quantity: i.qty
-                }))
+                    quantity: i.qty,
+                })),
             }
 
             const data = await api.createBill(payload)
-            setLastBillId(data.invoice_id)
             setBillItems([])
-            // Show Success Dialog or Reset
-            alert(`Bill Created! ID: ${data.invoice_id}, Total: ${data.total}`)
+            toast.success(`Bill created! Invoice #${data.invoice_id}`)
             setActiveTab('history')
-        } catch (e) {
+            setPrintInvoiceId(data.invoice_id)
+            setPrintDialogOpen(true)
+        } catch (e: unknown) {
             console.error(e)
-            alert("Failed to create bill")
+            let errorMessage = "Failed to create bill"
+            if (e instanceof Error) {
+                try {
+                    const parsed = JSON.parse(e.message) as { error?: string }
+                    if (parsed?.error) errorMessage = parsed.error
+                } catch {
+                    errorMessage = e.message
+                }
+            }
+            toast.error(errorMessage)
         } finally {
             setSubmitting(false)
         }
@@ -191,51 +215,6 @@ function BillingContent() {
         return billItems.reduce((acc, item) => acc + (item.qty * (item.mrp || 0)), 0)
     }
 
-    const handlePrint = async (invoiceId: string | null = null) => {
-        // If invoiceId provided (History), fetch details
-        // If null, we print CURRENT state (New Bill Draft)
-
-        if (invoiceId) {
-            try {
-                const data = await api.getBillDetails(invoiceId)
-                // Map backend response to InvoicePrint format
-                setPrintData({
-                    patient: typeof data.patient === 'object' ? {
-                        patient_id: data.patient.id,
-                        name: data.patient.name,
-                        phone_number: data.patient.phone
-                    } : null,
-                    billItems: data.items.map((i: any) => ({
-                        item_name: i.item_name,
-                        batch_number: i.batch_number,
-                        qty: i.quantity,
-                        mrp: i.mrp
-                        // ... other fields if needed
-                    })),
-                    invoiceId: data.invoice_id,
-                    total: data.total_amount,
-                    date: new Date(data.created_at)
-                })
-                // Allow state update then print
-                setTimeout(() => window.print(), 300)
-            } catch (e) {
-                console.error(e)
-                alert("Failed to load bill for printing")
-            }
-        } else {
-            // Print Current Draft
-            if (!patient || billItems.length === 0) return
-            setPrintData({
-                patient: patient,
-                billItems: billItems,
-                invoiceId: "DRAFT", // or lastBillId if just generated?
-                total: calculateTotal(),
-                date: new Date()
-            })
-            setTimeout(() => window.print(), 100)
-        }
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -243,6 +222,62 @@ function BillingContent() {
                     <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
                     <p className="text-muted-foreground">Create invoices and manage history.</p>
                 </div>
+                <Dialog open={settingsOpen} onOpenChange={(open) => {
+                    setSettingsOpen(open)
+                    if (open) {
+                        setSettingsNameDraft(clinicName)
+                        setSettingsAddressDraft(clinicAddress)
+                    }
+                }}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Clinic Settings
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Clinic Settings</DialogTitle>
+                            <DialogDescription>
+                                These values appear on printed invoices and are saved locally in your browser.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-2">
+                            <div className="space-y-1">
+                                <Label htmlFor="settings-clinic-name">Clinic Name</Label>
+                                <Input
+                                    id="settings-clinic-name"
+                                    value={settingsNameDraft}
+                                    onChange={(e) => setSettingsNameDraft(e.target.value)}
+                                    placeholder="MediCare Clinic"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="settings-clinic-address">Clinic Address</Label>
+                                <Textarea
+                                    id="settings-clinic-address"
+                                    value={settingsAddressDraft}
+                                    onChange={(e) => setSettingsAddressDraft(e.target.value)}
+                                    placeholder="123 Health St, Medical District, City"
+                                    rows={3}
+                                />
+                            </div>
+                            <Button
+                                className="w-full"
+                                onClick={() => {
+                                    localStorage.setItem("clinic_name", settingsNameDraft)
+                                    localStorage.setItem("clinic_address", settingsAddressDraft)
+                                    setClinicName(settingsNameDraft)
+                                    setClinicAddress(settingsAddressDraft)
+                                    setSettingsOpen(false)
+                                    toast.success("Clinic settings saved")
+                                }}
+                            >
+                                Save
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -269,7 +304,6 @@ function BillingContent() {
                                 />
                                 {patient && (
                                     <div className="flex justify-end gap-2">
-
                                         <Button variant="secondary" size="sm" onClick={() => setShowQR(true)}>
                                             <Smartphone className="mr-2 h-4 w-4" />
                                             Upload via QR
@@ -284,7 +318,7 @@ function BillingContent() {
                         onOpenChange={setShowQR}
                         contextType="patient"
                         contextId={patientId}
-                        onSuccess={() => alert("Images uploaded! Check gallery.")}
+                        onSuccess={() => toast.success("Images uploaded! Check gallery.")}
                     />
 
                     {/* Bill Items */}
@@ -293,7 +327,7 @@ function BillingContent() {
                             <CardTitle className="text-base">Items</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 flex flex-col gap-4">
-                            {/* Left Aligned Item Search */}
+                            {/* Item search */}
                             <div className="relative w-full max-w-md">
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -319,11 +353,10 @@ function BillingContent() {
                                                 <div className="text-xs text-muted-foreground">
                                                     {item.manufacturer} | GST: {item.gst_rate || 0}%
                                                 </div>
-                                                {/* Substitutes */}
                                                 {item.substitutes && item.substitutes.length > 0 && (
                                                     <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
                                                         <span className="font-semibold text-yellow-700">Substitutes: </span>
-                                                        {item.substitutes.map(s => `${s.name} (${s.qty})`).join(', ')}
+                                                        {item.substitutes.map((s: { name: string; qty: number }) => `${s.name} (${s.qty})`).join(', ')}
                                                     </div>
                                                 )}
                                             </div>
@@ -334,12 +367,13 @@ function BillingContent() {
                                     Type to search inventory. Click to add to bill.
                                 </p>
                             </div>
+
                             {/* Table */}
                             <div className="border rounded-md flex-1">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[50px]">To</TableHead>
+                                            <TableHead className="w-[50px]">No.</TableHead>
                                             <TableHead>Product Name</TableHead>
                                             <TableHead>Batch</TableHead>
                                             <TableHead className="w-[100px]">Qty</TableHead>
@@ -383,11 +417,33 @@ function BillingContent() {
                                 </Table>
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-4">
-                                <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill}>
-                                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Create Bill
-                                </Button>
+                            <div className="flex justify-between items-center gap-3 mt-4">
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="payment-type" className="text-sm font-medium whitespace-nowrap">
+                                        Payment Method
+                                    </Label>
+                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "INSURANCE")}>
+                                        <SelectTrigger id="payment-type" className="w-[160px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="CASH">Cash</SelectItem>
+                                            <SelectItem value="CARD">Card</SelectItem>
+                                            <SelectItem value="INSURANCE">Insurance</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {billItems.length > 0 && (
+                                        <span className="text-sm font-medium">
+                                            Total: ₹{calculateTotal().toFixed(2)}
+                                        </span>
+                                    )}
+                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill}>
+                                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Bill
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -398,58 +454,153 @@ function BillingContent() {
                         <CardHeader>
                             <CardTitle>Billing History</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Invoice ID</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Patient</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Payment</TableHead>
-                                        <TableHead>Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {history.map(bill => (
-                                        <TableRow key={bill.invoice_id}>
-                                            <TableCell className="font-mono">{bill.invoice_id}</TableCell>
-                                            <TableCell>{bill.date}</TableCell>
-                                            <TableCell>{bill.patient_name}</TableCell>
-                                            <TableCell>${bill.total_amount.toFixed(2)}</TableCell>
-                                            <TableCell>{bill.payment_type}</TableCell>
-                                            <TableCell>
-                                                <Button variant="outline" size="sm" onClick={() => handlePrint(bill.invoice_id)}>
-                                                    <Printer className="h-4 w-4 mr-1" />
-                                                    Print
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {history.length === 0 && (
+                        <CardContent className="space-y-4">
+                            {/* Filter bar */}
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="filter-date-from" className="text-xs">From</Label>
+                                    <Input
+                                        id="filter-date-from"
+                                        type="date"
+                                        className="w-[160px]"
+                                        value={filterDateFrom}
+                                        onChange={(e) => setFilterDateFrom(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="filter-date-to" className="text-xs">To</Label>
+                                    <Input
+                                        id="filter-date-to"
+                                        type="date"
+                                        className="w-[160px]"
+                                        value={filterDateTo}
+                                        onChange={(e) => setFilterDateTo(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Payment Type</Label>
+                                    <Select value={filterPaymentType || "ALL"} onValueChange={(val) => setFilterPaymentType(val === "ALL" ? "" : val)}>
+                                        <SelectTrigger className="w-[140px]">
+                                            <SelectValue placeholder="All" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ALL">All</SelectItem>
+                                            <SelectItem value="CASH">Cash</SelectItem>
+                                            <SelectItem value="CARD">Card</SelectItem>
+                                            <SelectItem value="INSURANCE">Insurance</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button onClick={() => { setHistoryPage(1); loadHistory(1) }}>
+                                    <Search className="h-4 w-4 mr-2" />
+                                    Search
+                                </Button>
+                                {(filterDateFrom || filterDateTo || filterPaymentType) && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setFilterDateFrom('')
+                                            setFilterDateTo('')
+                                            setFilterPaymentType('')
+                                            setHistoryPage(1)
+                                            loadHistory(1)
+                                        }}
+                                    >
+                                        Clear
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* History table */}
+                            {loadingHistory ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                No history found.
-                                            </TableCell>
+                                            <TableHead>Invoice ID</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Patient</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Payment</TableHead>
+                                            <TableHead>Action</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {history.map(bill => (
+                                            <TableRow key={bill.invoice_id}>
+                                                <TableCell className="font-mono">{bill.invoice_id}</TableCell>
+                                                <TableCell>{bill.date}</TableCell>
+                                                <TableCell>{bill.patient_name}</TableCell>
+                                                <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
+                                                <TableCell>{bill.payment_type}</TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setPrintInvoiceId(bill.invoice_id)
+                                                            setPrintDialogOpen(true)
+                                                        }}
+                                                    >
+                                                        <Printer className="h-4 w-4 mr-1" />
+                                                        Print
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {history.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                    No bills found.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            )}
+
+                            {/* Pagination */}
+                            <div className="flex items-center justify-between mt-4">
+                                <p className="text-sm text-muted-foreground">{historyTotal} total bills</p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={historyPage <= 1 || loadingHistory}
+                                        onClick={() => loadHistory(historyPage - 1)}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                        Previous
+                                    </Button>
+                                    <span className="text-sm">Page {historyPage} of {historyTotalPages}</span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={historyPage >= historyTotalPages || loadingHistory}
+                                        onClick={() => loadHistory(historyPage + 1)}
+                                    >
+                                        Next
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
 
-            {/* Hidden Print Template */}
-            <InvoicePrint
-                clinicName="MediCare Clinic"
-                clinicAddress="123 Health St, Medical District, City"
+            {/* Print invoice dialog */}
+            <PrintInvoiceDialog
+                open={printDialogOpen}
+                onOpenChange={setPrintDialogOpen}
+                invoiceId={printInvoiceId}
+                clinicName={clinicName}
+                clinicAddress={clinicAddress}
                 clinicPhone="+91 98765 43210"
-                patient={printData?.patient || patient} // Fallback to current if printData null (should rely on printData mainly)
-                billItems={printData?.billItems || []}
-                invoiceId={printData?.invoiceId}
-                total={printData?.total || 0}
-                date={printData?.date}
             />
         </div>
     )

@@ -37,7 +37,6 @@ export default function VisitsPage() {
         patient_id: "",
         visit_date: new Date().toISOString().split('T')[0],
         reason: "",
-        prescription: "",
         notes: "",
     })
 
@@ -76,8 +75,6 @@ export default function VisitsPage() {
                 patient_id: formData.patient_id,
                 visit_date: formData.visit_date,
                 reason: formData.reason || undefined,
-                prescription: formData.prescription || undefined,
-
             })
 
             // Reset form
@@ -85,7 +82,6 @@ export default function VisitsPage() {
                 patient_id: "",
                 visit_date: new Date().toISOString().split('T')[0],
                 reason: "",
-                prescription: "",
                 notes: "",
             })
 
@@ -233,18 +229,6 @@ export default function VisitsPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label htmlFor="prescription" className="text-sm font-medium">
-                                        Prescription
-                                    </label>
-                                    <Input
-                                        id="prescription"
-                                        value={formData.prescription}
-                                        onChange={(e) => setFormData({ ...formData, prescription: e.target.value })}
-                                        placeholder="Enter prescription"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
                                     <label htmlFor="notes" className="text-sm font-medium">
                                         Notes
                                     </label>
@@ -297,7 +281,7 @@ export default function VisitsPage() {
                         <div className="text-center py-12 text-muted-foreground">
                             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                             <p>No visits recorded yet</p>
-                            <p className="text-sm mt-2">Click "Add Visit" to create your first visit record</p>
+                            <p className="text-sm mt-2">Click &quot;Add Visit&quot; to create your first visit record</p>
                         </div>
                     ) : (
                         <Table>

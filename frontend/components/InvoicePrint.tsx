@@ -1,16 +1,24 @@
-import { type BillItem } from "@/app/billing/page" // We might need to share this type or import carefully
 import { type Patient } from "@/lib/api"
 import { format } from "date-fns"
+
+interface PrintableBillItem {
+    item_name: string
+    batch_number?: string
+    qty: number
+    mrp?: number
+    [key: string]: unknown
+}
 
 interface InvoicePrintProps {
     clinicName: string
     clinicAddress: string
     clinicPhone: string
     patient: Patient | null
-    billItems: any[] // Using any to avoid circular dependency issues if types aren't shared well. Ideally use BillItem type.
+    billItems: PrintableBillItem[]
     invoiceId?: string
     total: number
     date?: Date
+    className?: string
 }
 
 export function InvoicePrint({
@@ -21,12 +29,13 @@ export function InvoicePrint({
     billItems,
     invoiceId,
     total,
-    date = new Date()
+    date = new Date(),
+    className = "hidden print:block print-only bg-white p-8 text-black"
 }: InvoicePrintProps) {
     if (!patient || billItems.length === 0) return null
 
     return (
-        <div className="hidden print:block print-only bg-white p-8 text-black">
+        <div id="invoice-print-region" className={className}>
             {/* Header */}
             <div className="border-b-2 border-black pb-4 mb-6">
                 <div className="flex justify-between items-start">

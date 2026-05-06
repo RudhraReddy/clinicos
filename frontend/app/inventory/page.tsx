@@ -13,8 +13,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns } from "lucide-react"
-import { api, type InventoryItem } from "@/lib/api"
+import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History } from "lucide-react"
+import { api, type InventoryItem, type InventoryHistoryEntry } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { UploadInventoryReportDialog } from "@/components/UploadInventoryReportDialog"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
@@ -23,6 +23,7 @@ import { ViewBatchesDialog } from "@/components/ViewBatchesDialog"
 import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import Link from 'next/link'
 
 export default function InventoryPage() {
@@ -49,6 +50,39 @@ export default function InventoryPage() {
     const [filterGST, setFilterGST] = useState<Set<string>>(new Set())
     const [filterHSN, setFilterHSN] = useState<Set<string>>(new Set())
     const [filterMinStock, setFilterMinStock] = useState<[number, number] | null>(null)
+
+    // Low-stock alert banner
+    const [stockAlertDismissed, setStockAlertDismissed] = useState(false)
+
+    // History drawer state
+    const [historyOpen, setHistoryOpen] = useState(false)
+    const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null)
+    const [historyEntries, setHistoryEntries] = useState<InventoryHistoryEntry[]>([])
+    const [historyLoading, setHistoryLoading] = useState(false)
+
+    const openHistory = async (item: InventoryItem) => {
+        setHistoryItem(item)
+        setHistoryEntries([])
+        setHistoryOpen(true)
+        setHistoryLoading(true)
+        try {
+            const res = await api.getInventoryHistory(item.id)
+            setHistoryEntries(res.history)
+        } catch {
+            setHistoryEntries([])
+        } finally {
+            setHistoryLoading(false)
+        }
+    }
+
+    const formatHistoryTimestamp = (ts: string) => {
+        try {
+            const d = new Date(ts)
+            return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        } catch {
+            return ts
+        }
+    }
 
     const loadData = async () => {
         setLoading(true)
@@ -184,6 +218,9 @@ export default function InventoryPage() {
         { id: 'total_value', label: 'Total Value' },
     ]
 
+    const lowCount = inventory.filter(i => i.status.includes("LOW STOCK")).length
+    const outCount = inventory.filter(i => i.status.includes("OUT OF STOCK")).length
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -259,6 +296,26 @@ export default function InventoryPage() {
                 </Popover>
             </div>
 
+
+            {!stockAlertDismissed && !loading && (lowCount > 0 || outCount > 0) && (
+                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 flex items-center gap-3 text-yellow-700 dark:text-yellow-400">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <p className="flex-1 text-sm font-medium">
+                        {lowCount > 0 && outCount > 0
+                            ? `${lowCount} item(s) low on stock, ${outCount} item(s) out of stock`
+                            : lowCount > 0
+                                ? `${lowCount} item(s) low on stock`
+                                : `${outCount} item(s) out of stock`}
+                    </p>
+                    <button
+                        onClick={() => setStockAlertDismissed(true)}
+                        className="shrink-0 rounded p-1 hover:bg-yellow-500/20 transition-colors"
+                        aria-label="Dismiss alert"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
 
             {
                 error && (
@@ -527,6 +584,15 @@ export default function InventoryPage() {
                                                 </TableCell>}
                                                 <TableCell>
                                                     <div className="flex items-center gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            title="View movement history"
+                                                            onClick={() => openHistory(item)}
+                                                        >
+                                                            <History className="h-4 w-4" />
+                                                        </Button>
                                                         <ViewBatchesDialog item={item} />
                                                         <EditInventoryDialog item={item} onSuccess={loadData} />
                                                     </div>
@@ -540,6 +606,70 @@ export default function InventoryPage() {
                     )}
                 </CardContent>
             </Card>
+            {/* History Drawer */}
+            <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+                <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+                    <SheetHeader className="mb-4">
+                        <SheetTitle>
+                            Movement History{historyItem ? ` — ${historyItem.item_name}` : ''}
+                        </SheetTitle>
+                    </SheetHeader>
+                    {historyLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : historyEntries.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-12">No history yet.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date / Time</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Change</TableHead>
+                                        <TableHead>Batch ID</TableHead>
+                                        <TableHead>Bill ID</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {historyEntries.map(entry => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                                {formatHistoryTimestamp(entry.timestamp)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={cn(
+                                                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                                                    entry.type === 'PURCHASE' && "bg-green-500/10 text-green-600",
+                                                    entry.type === 'SALE' && "bg-blue-500/10 text-blue-600",
+                                                    entry.type === 'ADJUSTMENT' && "bg-yellow-500/10 text-yellow-600",
+                                                    entry.type === 'EXPIRED' && "bg-red-500/10 text-red-600",
+                                                    entry.type === 'RETURN' && "bg-purple-500/10 text-purple-600",
+                                                )}>
+                                                    {entry.type}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className={cn(
+                                                "font-medium tabular-nums",
+                                                entry.change_amount > 0 ? "text-green-600" : "text-red-600"
+                                            )}>
+                                                {entry.change_amount > 0 ? `+${entry.change_amount}` : entry.change_amount}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {entry.batch_id ?? '-'}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground font-mono">
+                                                {entry.bill_id ?? '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </SheetContent>
+            </Sheet>
         </div >
     )
 }

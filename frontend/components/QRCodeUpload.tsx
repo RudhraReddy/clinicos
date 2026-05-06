@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import { Loader2, CheckCircle2, FileText, RefreshCw, Smartphone, Image as ImageIcon } from "lucide-react"
 
+interface UploadedFile {
+    filename: string
+    tag: string
+}
+
 interface QRCodeUploadProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -26,19 +31,8 @@ export function QRCodeUpload({ open, onOpenChange, contextType, contextId, onSuc
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [uploadUrl, setUploadUrl] = useState<string>("")
     const [status, setStatus] = useState<string>("WAITING") // WAITING, UPLOADED, COMPLETED
-    const [files, setFiles] = useState<any[]>([])
+    const [files, setFiles] = useState<UploadedFile[]>([])
     const [generated, setGenerated] = useState(false)
-
-    // Reset when dialog opens
-    useEffect(() => {
-        if (open && !generated) {
-            initSession()
-        }
-        if (!open) {
-            // Cleanup or reset?
-            // setGenerated(false) // If we want fresh session every time
-        }
-    }, [open])
 
     const initSession = async () => {
         try {
@@ -63,6 +57,14 @@ export function QRCodeUpload({ open, onOpenChange, contextType, contextId, onSuc
             alert("Failed to generate QR session")
         }
     }
+
+    // Reset when dialog opens
+    useEffect(() => {
+        if (open && !generated) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            void initSession()
+        }
+    }, [open])
 
     // Polling
     useEffect(() => {

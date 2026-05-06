@@ -66,11 +66,11 @@ export default function MobileUploadPage() {
 
             if (frontFile) {
                 filesToUpload.push(frontFile)
-                tagsToUpload.push("Prescription - Front")
+                tagsToUpload.push("Image - Front")
             }
             if (backFile) {
                 filesToUpload.push(backFile)
-                tagsToUpload.push("Prescription - Back")
+                tagsToUpload.push("Image - Back")
             }
 
             await api.uploadMobileFiles(sessionId, filesToUpload, tagsToUpload, notes)
@@ -105,7 +105,7 @@ export default function MobileUploadPage() {
             <div className="flex h-screen flex-col items-center justify-center p-4 text-center bg-green-50 dark:bg-green-900/10">
                 <CheckCircle2 className="h-16 w-16 text-green-600 mb-4" />
                 <h1 className="text-2xl font-bold text-green-700">Upload Successful!</h1>
-                <p className="text-green-600 mb-8">Your prescription images have been sent.</p>
+                <p className="text-green-600 mb-8">Your images have been sent.</p>
                 <Button onClick={() => setSuccess(false)} variant="outline">Upload More</Button>
             </div>
         )
@@ -114,16 +114,16 @@ export default function MobileUploadPage() {
     return (
         <div className="container max-w-md mx-auto py-6 px-4 space-y-6">
             <div className="text-center space-y-1">
-                <h1 className="text-2xl font-bold">Upload Prescription</h1>
-                <p className="text-muted-foreground text-sm">Upload front and back images of the prescription.</p>
+                <h1 className="text-2xl font-bold">Upload Images</h1>
+                <p className="text-muted-foreground text-sm">Upload images for this visit.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-                {/* Front Side Card */}
+                {/* Image 1 Card */}
                 <Card className={frontFile ? "border-green-500/50 bg-green-50/10" : ""}>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex justify-between items-center">
-                            <span>Front Side</span>
+                            <span>Image 1</span>
                             {frontFile && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                         </CardTitle>
                     </CardHeader>
@@ -133,7 +133,7 @@ export default function MobileUploadPage() {
                                 <Label htmlFor="front-upload" className="cursor-pointer block">
                                     <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
                                         <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                        <span className="text-sm font-medium text-muted-foreground">Tap to Capture Front</span>
+                                        <span className="text-sm font-medium text-muted-foreground">Tap to Select Image</span>
                                     </div>
                                 </Label>
                                 <Input
@@ -164,11 +164,11 @@ export default function MobileUploadPage() {
                     </CardContent>
                 </Card>
 
-                {/* Back Side Card */}
+                {/* Image 2 Card */}
                 <Card className={backFile ? "border-green-500/50 bg-green-50/10" : ""}>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex justify-between items-center">
-                            <span>Back Side</span>
+                            <span>Image 2</span>
                             {backFile && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                         </CardTitle>
                     </CardHeader>
@@ -178,7 +178,7 @@ export default function MobileUploadPage() {
                                 <Label htmlFor="back-upload" className="cursor-pointer block">
                                     <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
                                         <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                        <span className="text-sm font-medium text-muted-foreground">Tap to Capture Back</span>
+                                        <span className="text-sm font-medium text-muted-foreground">Tap to Select Image</span>
                                     </div>
                                 </Label>
                                 <Input
@@ -230,7 +230,7 @@ export default function MobileUploadPage() {
                 disabled={(!frontFile && !backFile) || submitting}
             >
                 {submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                Upload {frontFile && backFile ? 'Both Sides' : 'Selected Side'}
+                Upload {frontFile && backFile ? 'Both Images' : 'Selected Image'}
             </Button>
         </div>
     )

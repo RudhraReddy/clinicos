@@ -24,16 +24,13 @@ export default function GalleryPage() {
 
     useEffect(() => {
         if (!searchQuery) {
-            // Exclude prescriptions from the main "Patient Images" tab
-            setFilteredImages(images.filter(img => !img.tag || !img.tag.startsWith('Prescription')))
+            setFilteredImages(images)
         } else {
             const lower = searchQuery.toLowerCase()
             setFilteredImages(images.filter(img =>
-                (!img.tag || !img.tag.startsWith('Prescription')) && (
-                    img.patient_name?.toLowerCase().includes(lower) ||
-                    img.patient_id?.toLowerCase().includes(lower) ||
-                    img.notes?.toLowerCase().includes(lower)
-                )
+                img.patient_name?.toLowerCase().includes(lower) ||
+                img.patient_id?.toLowerCase().includes(lower) ||
+                img.notes?.toLowerCase().includes(lower)
             ))
         }
     }, [searchQuery, images])
@@ -59,32 +56,11 @@ export default function GalleryPage() {
         }
     }, [invoiceQuery, invoiceImages])
 
-    const [filteredPrescriptions, setFilteredPrescriptions] = useState<any[]>([])
-    const [prescriptionQuery, setPrescriptionQuery] = useState("")
-
-    useEffect(() => {
-        // Prescriptions Logic (already correct)
-        if (!prescriptionQuery) {
-            setFilteredPrescriptions(images.filter(img => img.tag && img.tag.startsWith('Prescription')))
-        } else {
-            const lower = prescriptionQuery.toLowerCase()
-            setFilteredPrescriptions(images.filter(img =>
-                img.tag && img.tag.startsWith('Prescription') && (
-                    img.patient_name?.toLowerCase().includes(lower) ||
-                    img.patient_id?.toLowerCase().includes(lower) ||
-                    img.notes?.toLowerCase().includes(lower)
-                )
-            ))
-        }
-    }, [prescriptionQuery, images])
-
     const loadImages = async () => {
         try {
             const data = await api.getAllPatientImages()
             setImages(data)
-            // Initial split
-            setFilteredImages(data.filter((img: any) => !img.tag || !img.tag.startsWith('Prescription')))
-            setFilteredPrescriptions(data.filter((img: any) => img.tag && img.tag.startsWith('Prescription')))
+            setFilteredImages(data)
         } catch (error) {
             console.error(error)
         } finally {
@@ -118,93 +94,13 @@ export default function GalleryPage() {
                 </div>
             </div>
 
-            <Tabs defaultValue="prescriptions" className="space-y-4">
+            <Tabs defaultValue="images" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="patients">Patient Images</TabsTrigger>
-                    <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
+                    <TabsTrigger value="images">Patient Images</TabsTrigger>
                     <TabsTrigger value="invoices">Invoice Images</TabsTrigger>
                 </TabsList>
 
-
-                <TabsContent value="prescriptions">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center gap-4">
-                                <div className="relative flex-1 max-w-sm">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search prescriptions..."
-                                        className="pl-9"
-                                        value={prescriptionQuery}
-                                        onChange={(e) => setPrescriptionQuery(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[100px]">Image</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Patient</TableHead>
-                                        <TableHead>Side</TableHead>
-                                        <TableHead>Notes</TableHead>
-                                        <TableHead className="text-right">Visit ID</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
-                                        </TableRow>
-                                    ) : filteredPrescriptions.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                No prescriptions found.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        filteredPrescriptions.map((img) => (
-                                            <TableRow key={img.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setViewImage(img)}>
-                                                <TableCell>
-                                                    <div className="h-12 w-12 rounded overflow-hidden bg-muted border">
-                                                        <img
-                                                            src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
-                                                            alt="Thumbnail"
-                                                            className="h-full w-full object-cover"
-                                                        />
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="font-medium whitespace-nowrap">
-                                                    {new Date(img.timestamp).toLocaleDateString()}
-                                                    <div className="text-xs text-muted-foreground">{new Date(img.timestamp).toLocaleTimeString()}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">{img.patient_name}</div>
-                                                    <div className="text-xs text-muted-foreground">ID: {img.patient_id}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {img.tag?.includes('Front') ? 'Front' : img.tag?.includes('Back') ? 'Back' : 'Standard'}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="max-w-xs truncate text-muted-foreground">
-                                                    {img.notes || "-"}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                                    {img.visit_id || "-"}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="patients">
+                <TabsContent value="images">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-4">

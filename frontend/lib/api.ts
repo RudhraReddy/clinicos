@@ -23,7 +23,6 @@ export interface Visit {
     visit_time: string;
     status: string;
     reason?: string;
-    prescription?: string;
     created_at?: string;
     phone_number?: string;
     dob?: string;
@@ -72,21 +71,9 @@ export interface CreateVisitData {
     visit_time?: string;
     status?: string;
     reason?: string;
-    prescription?: string;
     visiting_fee?: number;
     amount_paid?: number;
     payment_status?: string;
-}
-
-export interface PrescriptionItem {
-    id?: number;
-    product_id?: string;
-    item_name: string;
-    quantity: number;
-    dosage_instructions?: string;
-    duration?: string;
-    notes?: string;
-    dosage?: string; // from inventory
 }
 
 export interface InventorySearchResult {
@@ -98,6 +85,41 @@ export interface InventorySearchResult {
     total_qty: number;
     price: number;
     substitutes: any[];
+}
+
+export interface InventoryHistoryEntry {
+    id: number;
+    type: string;
+    change_amount: number;
+    batch_id: number | null;
+    bill_id: string | null;
+    timestamp: string;
+}
+
+export interface BillingHistoryEntry {
+    invoice_id: string;
+    date: string;
+    patient_name: string;
+    patient_id: string;
+    total_amount: number;
+    payment_type: string;
+    visit_id?: string;
+}
+
+export interface BillingHistoryFilters {
+    date_from?: string;
+    date_to?: string;
+    payment_type?: string;
+    page?: number;
+    limit?: number;
+}
+
+export interface BillingHistoryResponse {
+    bills: BillingHistoryEntry[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
 }
 
 export interface UploadInventoryResponse {
@@ -148,8 +170,8 @@ export const api = {
     },
 
     // Patient APIs
-    async getPatients(): Promise<Patient[]> {
-        return fetchApi('/api/patients');
+    async getPatients(page = 1, limit = 50): Promise<Patient[]> {
+        return fetchApi(`/api/patients?page=${page}&limit=${limit}`);
     },
 
     async getPatient(id: string): Promise<Patient> {
@@ -250,6 +272,10 @@ export const api = {
         return fetchApi(`/api/inventory/invoices/${id}`);
     },
 
+    async getInventoryHistory(productId: string, page = 1, limit = 50): Promise<{ history: InventoryHistoryEntry[]; page: number; limit: number }> {
+        return fetchApi(`/api/inventory/${encodeURIComponent(productId)}/history?page=${page}&limit=${limit}`);
+    },
+
     // Visit APIs
     async getVisits(patientId?: string): Promise<Visit[]> {
         const endpoint = patientId ? `/api/visits/patient/${patientId}` : '/api/visits';
@@ -258,14 +284,6 @@ export const api = {
 
     async getVisit(id: string): Promise<Visit> {
         return fetchApi(`/api/visits/${id}`);
-    },
-
-    async getPatientPrescriptionHistory(patientId: string): Promise<any[]> {
-        return fetchApi(`/api/patients/${patientId}/prescriptions`);
-    },
-
-    async getAllPrescriptions(): Promise<any[]> {
-        return fetchApi('/api/prescriptions');
     },
 
     async createVisit(data: CreateVisitData): Promise<Visit> {
@@ -289,8 +307,15 @@ export const api = {
     },
 
     // Billing APIs
-    async getBillingHistory(): Promise<any[]> {
-        return fetchApi('/api/billing/history');
+    async getBillingHistory(filters?: BillingHistoryFilters): Promise<BillingHistoryResponse> {
+        const params = new URLSearchParams()
+        if (filters?.date_from) params.set('date_from', filters.date_from)
+        if (filters?.date_to) params.set('date_to', filters.date_to)
+        if (filters?.payment_type) params.set('payment_type', filters.payment_type)
+        if (filters?.page != null) params.set('page', String(filters.page))
+        if (filters?.limit != null) params.set('limit', String(filters.limit))
+        const qs = params.toString()
+        return fetchApi(`/api/billing/history${qs ? `?${qs}` : ''}`)
     },
 
     async getPatientBillingHistory(patientId: string): Promise<any[]> {
@@ -306,24 +331,6 @@ export const api = {
 
     async getBillDetails(invoiceId: string): Promise<any> {
         return fetchApi(`/api/billing/${invoiceId}`);
-    },
-
-    // Prescription APIs
-    async getPrescription(visitId: string): Promise<PrescriptionItem[]> {
-        return fetchApi(`/api/visits/${visitId}/prescription`);
-    },
-
-    async savePrescription(visitId: string, items: Partial<PrescriptionItem>[]): Promise<{ message: string; count: number }> {
-        return fetchApi(`/api/visits/${visitId}/prescription`, {
-            method: 'POST',
-            body: JSON.stringify({ items }),
-        });
-    },
-
-    async deletePrescriptionItem(visitId: string, itemId: number): Promise<void> {
-        return fetchApi(`/api/visits/${visitId}/prescription/${itemId}`, {
-            method: 'DELETE',
-        });
     },
 
     // Billing Search

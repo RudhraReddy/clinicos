@@ -1,4 +1,6 @@
 
+import math
+
 from flask import Blueprint, request, jsonify
 from extensions import db, get_ist_now
 from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory
@@ -21,21 +23,27 @@ def create_bill():
     patient = Patient.query.filter_by(patient_id=data['patient_id']).first()
     if not patient:
         return jsonify({'error': 'Patient not found'}), 404
-    
+
+    visit_id = data.get('visit_id')
+    if visit_id:
+        existing_bill = Bill.query.filter_by(visit_id=visit_id).first()
+        if existing_bill:
+            return jsonify({'error': 'A bill already exists for this visit'}), 400
+
     invoice_id = generate_invoice_id()
     
     new_bill = Bill(
         invoice_id=invoice_id,
         patient_id=patient.patient_id,
-        visit_id=data.get('visit_id'),
+        visit_id=visit_id,
         payment_type=data.get('payment_type', 'CASH'),
-        total_amount=0 
+        total_amount=0
     )
     db.session.add(new_bill)
-    db.session.flush() 
-    
-    if data.get('visit_id'):
-        visit = Visit.query.get(data['visit_id'])
+    db.session.flush()
+
+    if visit_id:
+        visit = Visit.query.get(visit_id)
         if visit:
             visit.invoice_id = invoice_id
             visit.status = 'done' 
@@ -108,19 +116,63 @@ def create_bill():
 
 @billing.route('/billing/history', methods=['GET'])
 def get_billing_history():
-    bills = Bill.query.order_by(Bill.created_at.desc()).limit(50).all()
-    results = []
-    for b in bills:
-        p = Patient.query.get(b.patient_id)
-        results.append({
-            'invoice_id': b.invoice_id,
-            'date': b.created_at.strftime('%Y-%m-%d %H:%M'),
+    date_from    = request.args.get('date_from')
+    date_to      = request.args.get('date_to')
+    payment_type = request.args.get('payment_type')
+    patient_id   = request.args.get('patient_id')
+
+    try:
+        page  = max(1, int(request.args.get('page', 1)))
+        limit = max(1, min(int(request.args.get('limit', 25)), 200))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'page and limit must be integers'}), 400
+
+    query = (
+        db.session.query(Bill, Patient)
+        .join(Patient, Bill.patient_id == Patient.patient_id, isouter=True)
+        .order_by(Bill.created_at.desc())
+    )
+
+    if date_from:
+        try:
+            query = query.filter(func.date(Bill.created_at) >= date_from)
+        except Exception:
+            return jsonify({'error': 'Invalid date_from format, expected YYYY-MM-DD'}), 400
+
+    if date_to:
+        try:
+            query = query.filter(func.date(Bill.created_at) <= date_to)
+        except Exception:
+            return jsonify({'error': 'Invalid date_to format, expected YYYY-MM-DD'}), 400
+
+    if payment_type:
+        query = query.filter(Bill.payment_type == payment_type.upper())
+
+    if patient_id:
+        query = query.filter(Bill.patient_id == patient_id)
+
+    total = query.count()
+    rows  = query.offset((page - 1) * limit).limit(limit).all()
+
+    bills = []
+    for b, p in rows:
+        bills.append({
+            'invoice_id':   b.invoice_id,
+            'date':         b.created_at.strftime('%Y-%m-%d %H:%M'),
             'patient_name': p.name if p else 'Unknown',
-            'patient_id': b.patient_id,
+            'patient_id':   b.patient_id,
             'total_amount': float(b.total_amount),
-            'payment_type': b.payment_type
+            'payment_type': b.payment_type,
+            'visit_id':     b.visit_id,
         })
-    return jsonify(results), 200
+
+    return jsonify({
+        'bills':  bills,
+        'total':  total,
+        'page':   page,
+        'limit':  limit,
+        'pages':  math.ceil(total / limit) if total else 0,
+    }), 200
 
 @billing.route('/billing/patient/<patient_id>', methods=['GET'])
 def get_patient_billing_history(patient_id):

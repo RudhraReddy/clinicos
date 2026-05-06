@@ -6,6 +6,7 @@ import { api, type Visit } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ArrowLeft, User, Calendar, Clock } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 
 export default function VisitDetailPage() {
@@ -67,7 +68,39 @@ export default function VisitDetailPage() {
                                 <label className="text-sm font-medium text-muted-foreground">Reason</label>
                                 <div className="text-sm">{visit.reason || "None"}</div>
                             </div>
-
+                            {(visit.visiting_fee != null || visit.amount_paid != null || visit.payment_status) && (
+                                <div className="border-t pt-4 space-y-3">
+                                    <p className="text-sm font-medium text-muted-foreground">Financials</p>
+                                    {visit.visiting_fee != null && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Fee</label>
+                                            <div className="font-medium">₹{visit.visiting_fee}</div>
+                                        </div>
+                                    )}
+                                    {visit.amount_paid != null && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Paid</label>
+                                            <div className="font-medium">₹{visit.amount_paid}</div>
+                                        </div>
+                                    )}
+                                    {visit.payment_status && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Payment</label>
+                                            <div className="mt-1">
+                                                <Badge className={
+                                                    visit.payment_status === "full"
+                                                        ? "border-transparent bg-green-500/10 text-green-600 hover:bg-green-500/20"
+                                                        : visit.payment_status === "partial"
+                                                            ? "border-transparent bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20"
+                                                            : "border-transparent bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                                                }>
+                                                    {visit.payment_status.charAt(0).toUpperCase() + visit.payment_status.slice(1)}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

@@ -35,21 +35,23 @@ def create_patient():
 def get_patients():
     query_str = request.args.get('q', '').lower().strip()
     phone = request.args.get('phone_number')
-    
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 50))
+
     q = Patient.query
-    
+
     if phone:
         # Normalize search: remove hyphens and spaces
         clean_phone = phone.replace('-', '').replace(' ', '')
         q = q.filter(func.replace(func.replace(Patient.phone_number, '-', ''), ' ', '').contains(clean_phone))
     elif query_str:
         q = q.filter(
-            (func.lower(Patient.name).contains(query_str)) | 
+            (func.lower(Patient.name).contains(query_str)) |
             (Patient.phone_number.contains(query_str)) |
             (Patient.patient_id.contains(query_str.upper()))
         )
-    
-    patients_list = q.limit(50).all()
+
+    patients_list = q.offset((page - 1) * limit).limit(limit).all()
         
     results = []
     for p in patients_list:

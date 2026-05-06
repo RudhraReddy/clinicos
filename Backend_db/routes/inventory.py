@@ -91,6 +91,46 @@ def get_inventory():
         })
     return jsonify(results), 200
 
+@inventory.route('/inventory/<string:product_id>/history', methods=['GET'])
+def get_inventory_history(product_id):
+    """Returns paginated movement history for a specific inventory item"""
+    product = ProductMaster.query.get(product_id)
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        return jsonify({'error': 'Invalid page or limit parameter'}), 400
+
+    records = (
+        InventoryHistory.query
+        .filter_by(product_id=product_id)
+        .order_by(InventoryHistory.timestamp.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    history = []
+    for r in records:
+        history.append({
+            'id': r.id,
+            'type': r.type,
+            'change_amount': r.change_amount,
+            'batch_id': r.batch_id,
+            'bill_id': r.bill_id,
+            'timestamp': r.timestamp.isoformat() if r.timestamp else None,
+        })
+
+    return jsonify({
+        'product_id': product_id,
+        'history': history,
+        'page': page,
+        'limit': limit,
+    }), 200
+
 @inventory.route('/inventory/<string:id>/batches', methods=['GET'])
 def get_inventory_batches(id):
     """Returns all active batches for a specific inventory item"""
