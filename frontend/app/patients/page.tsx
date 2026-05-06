@@ -13,13 +13,17 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle } from "lucide-react"
+import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { api, type Patient } from "@/lib/api"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
 import { PatientDetailsView } from "@/components/PatientDetailsView"
+import { useAuth } from "@/lib/auth_context"
+
+const PAGE_LIMIT = 50
 
 export default function PatientsPage() {
+    const { role } = useAuth()
     const [patients, setPatients] = useState<Patient[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -27,16 +31,17 @@ export default function PatientsPage() {
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+    const [page, setPage] = useState(1)
 
     const [searchQuery, setSearchQuery] = useState("")
 
 
 
-    const loadData = async () => {
+    const loadData = async (pageNum = page) => {
         setLoading(true)
         setError(null)
         try {
-            const data = await api.getPatients()
+            const data = await api.getPatients(pageNum, PAGE_LIMIT)
             setPatients(data)
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load patients")
@@ -46,8 +51,8 @@ export default function PatientsPage() {
     }
 
     useEffect(() => {
-        loadData()
-    }, [])
+        loadData(page)
+    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -73,7 +78,7 @@ export default function PatientsPage() {
                     onOpenChange={setDialogOpen}
                     onSuccess={() => {
                         setDialogOpen(false)
-                        loadData()
+                        loadData(page)
                     }}
                     trigger={
                         <Button>
@@ -90,15 +95,17 @@ export default function PatientsPage() {
                             onOpenChange={setEditDialogOpen}
                             patient={selectedPatient}
                             onSuccess={() => {
-                                loadData()
+                                loadData(page)
                                 setEditDialogOpen(false)
                             }}
                         />
-                        <PatientDetailsView
-                            open={viewDialogOpen}
-                            onOpenChange={setViewDialogOpen}
-                            patient={selectedPatient}
-                        />
+                        {role === 'doctor' && (
+                            <PatientDetailsView
+                                open={viewDialogOpen}
+                                onOpenChange={setViewDialogOpen}
+                                patient={selectedPatient}
+                            />
+                        )}
                     </>
                 )}
             </div>
@@ -113,7 +120,7 @@ export default function PatientsPage() {
                             Make sure your backend is running and CORS is enabled.
                         </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={loadData} className="border-red-500/20 hover:bg-red-500/20">
+                    <Button variant="outline" size="sm" onClick={() => loadData(page)} className="border-red-500/20 hover:bg-red-500/20">
                         Retry
                     </Button>
                 </div>
@@ -121,7 +128,7 @@ export default function PatientsPage() {
 
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                    <CardTitle className="text-lg font-medium">Patient List ({patients.length})</CardTitle>
+                    <CardTitle className="text-lg font-medium">Patient List — Page {page}</CardTitle>
                     <div className="relative w-72">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -138,57 +145,87 @@ export default function PatientsPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Public ID</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Phone</TableHead>
-                                    <TableHead>Date of Birth</TableHead>
-                                    <TableHead>Joined</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredPatients.length === 0 ? (
+                        <>
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                            No patients found.
-                                        </TableCell>
+                                        <TableHead>Public ID</TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Phone</TableHead>
+                                        <TableHead>Date of Birth</TableHead>
+                                        <TableHead>Joined</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ) : (
-                                    filteredPatients.map((patient, index) => (
-                                        <TableRow key={`${patient.patient_id}-${index}`}>
-                                            <TableCell className="font-medium font-mono text-xs text-muted-foreground">
-                                                {patient.patient_id}
-                                            </TableCell>
-                                            <TableCell className="font-semibold">{patient.name}</TableCell>
-                                            <TableCell>{patient.phone_number}</TableCell>
-                                            <TableCell>{patient.dob ? new Date(patient.dob).toLocaleDateString() : "N/A"}</TableCell>
-                                            <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                        setSelectedPatient(patient)
-                                                        setViewDialogOpen(true)
-                                                    }}>
-                                                        <Eye className="h-4 w-4" />
-                                                        <span className="sr-only">View</span>
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                        setSelectedPatient(patient)
-                                                        setEditDialogOpen(true)
-                                                    }}>
-                                                        <Edit className="h-4 w-4" />
-                                                        <span className="sr-only">Edit</span>
-                                                    </Button>
-                                                </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredPatients.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                No patients found.
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                    ) : (
+                                        filteredPatients.map((patient, index) => (
+                                            <TableRow key={`${patient.patient_id}-${index}`}>
+                                                <TableCell className="font-medium font-mono text-xs text-muted-foreground">
+                                                    {patient.patient_id}
+                                                </TableCell>
+                                                <TableCell className="font-semibold">{patient.name}</TableCell>
+                                                <TableCell>{patient.phone_number}</TableCell>
+                                                <TableCell>{patient.dob ? new Date(patient.dob).toLocaleDateString() : "N/A"}</TableCell>
+                                                <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        {role === 'doctor' && (
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                                setSelectedPatient(patient)
+                                                                setViewDialogOpen(true)
+                                                            }}>
+                                                                <Eye className="h-4 w-4" />
+                                                                <span className="sr-only">View</span>
+                                                            </Button>
+                                                        )}
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                            setSelectedPatient(patient)
+                                                            setEditDialogOpen(true)
+                                                        }}>
+                                                            <Edit className="h-4 w-4" />
+                                                            <span className="sr-only">Edit</span>
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                            {/* Pagination controls */}
+                            <div className="flex items-center justify-between pt-4 border-t mt-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Page {page} &middot; {patients.length} records
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => p - 1)}
+                                        disabled={page === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-1" />
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => p + 1)}
+                                        disabled={patients.length < PAGE_LIMIT}
+                                    >
+                                        Next
+                                        <ChevronRight className="h-4 w-4 ml-1" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>

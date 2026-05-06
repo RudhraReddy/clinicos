@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Pill, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User } from 'lucide-react'
+import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User } from 'lucide-react'
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
@@ -205,7 +205,6 @@ export default function DoctorDashboard() {
 
     return (
         <div className="h-[calc(100vh-60px)] flex bg-background overflow-hidden relative">
-
             {/* MAIN CONTENT AREA (Left, ~75%) */}
             <div className="flex-1 flex flex-col min-w-0 p-6 gap-6 overflow-hidden">
                 {selectedVisit ? (
@@ -247,24 +246,10 @@ export default function DoctorDashboard() {
                         </div>
 
                         {/* Content Grid */}
-                        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+                        <div className="flex-1 flex flex-col gap-6 min-h-0">
 
-                            <Card className="h-full flex flex-col min-h-0">
-                                <CardHeader className="pb-2 py-3 px-4 border-b bg-muted/10">
-                                    <CardTitle className="text-sm font-medium opacity-80 flex items-center gap-2">
-                                        <Pill className="h-4 w-4" /> Latest Prescription
-                                    </CardTitle>
-                                </CardHeader>
-                                <div className="flex-1 overflow-hidden p-4 flex flex-col items-center justify-center relative bg-black/5">
-                                    <PrescriptionCarousel
-                                        patientImages={patientImages}
-                                        onViewImage={(img, context) => setLightboxState({ image: img, context })}
-                                    />
-                                </div>
-                            </Card>
-
-                            {/* Right: Pictures & Timeline */}
-                            <div className="flex flex-col gap-6 h-full min-h-0">
+                            {/* Pictures & Timeline */}
+                            <div className="flex flex-col gap-6 flex-1 min-h-0">
                                 <Card className="flex-1 flex flex-col min-h-0">
                                     <CardHeader className="pb-2 py-3 px-4 border-b bg-muted/10 flex flex-row items-center justify-between">
                                         <CardTitle className="text-sm font-medium opacity-80 flex items-center gap-2">
@@ -627,92 +612,7 @@ export default function DoctorDashboard() {
                 </Card >
 
             </div >
-        </div >
-    )
-}
 
-function PrescriptionCarousel({ patientImages, onViewImage }: { patientImages: any[], onViewImage: (img: any, context: any[]) => void }) {
-    const [currentIndex, setCurrentIndex] = useState(0)
-
-    // Find latest images
-    const frontRx = patientImages.find(img => img.tag === 'Prescription - Front');
-    const backRx = patientImages.find(img => img.tag === 'Prescription - Back');
-
-    // Fallback logic
-    const genericRx = !frontRx && !backRx ? patientImages.find(img =>
-        img.tag === 'Prescription' ||
-        (img.notes && img.notes.toLowerCase().includes('prescription'))
-    ) : null;
-
-    // Collect available images
-    const images: any[] = []
-    if (frontRx) images.push({ ...frontRx, label: 'Front' })
-    if (backRx) images.push({ ...backRx, label: 'Back' })
-    if (genericRx) images.push({ ...genericRx, label: 'Prescription' }) // Only added if front/back missing
-
-    if (images.length === 0) {
-        return (
-            <div className="text-muted-foreground text-sm flex flex-col items-center justify-center opacity-50">
-                <Pill className="h-8 w-8 mb-2" />
-                No prescription uploaded
-            </div>
-        );
-    }
-
-    const currentImage = images[currentIndex]
-
-    const nextImage = (e: React.MouseEvent) => {
-        e.stopPropagation()
-        setCurrentIndex((prev) => (prev + 1) % images.length)
-    }
-
-    const prevImage = (e: React.MouseEvent) => {
-        e.stopPropagation()
-        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
-    }
-
-    return (
-        <div className="w-full h-full relative group" onClick={() => onViewImage(currentImage, images)}>
-            <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                    src={`${API_BASE_URL}/api/patients/images/${currentImage.id}/file`}
-                    alt={`Prescription ${currentImage.label}`}
-                    className="w-full h-full object-contain"
-                />
-            </div>
-
-            <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full">
-                {currentImage.label} {images.length > 1 && `(${currentIndex + 1}/${images.length})`}
-            </div>
-
-            {/* Hover overlay with Enlarge button */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center pointer-events-none">
-                <div className="bg-background/90 text-foreground text-xs px-3 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm border font-medium">
-                    Click to Enlarge
-                </div>
-            </div>
-
-            {/* Navigation Arrows */}
-            {images.length > 1 && (
-                <>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/50 hover:bg-background/80 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                        onClick={prevImage}
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/50 hover:bg-background/80 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                        onClick={nextImage}
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                </>
-            )}
         </div>
     )
 }

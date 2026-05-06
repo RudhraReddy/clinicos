@@ -2,44 +2,26 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth_context"
 import { ProfileSwitcher } from "@/components/profile-switcher"
 
-const navItems = [
-    {
-        title: "Dashboard",
-        href: "/",
-        icon: LayoutDashboard,
-    },
-    {
-        title: "Patients",
-        href: "/patients",
-        icon: Users,
-    },
-    {
-        title: "Inventory",
-        href: "/inventory",
-        icon: Package,
-    },
-    {
-        title: "Gallery",
-        href: "/gallery",
-        icon: ImageIcon,
-    },
-    {
-        title: "Billing",
-        href: "/billing",
-        icon: CreditCard,
-    },
-    {
-        title: "Prescriptions",
-        href: "/prescriptions",
-        icon: Stethoscope,
-    },
+const staffNavItems = [
+    { title: "Dashboard", href: "/", icon: LayoutDashboard },
+    { title: "Patients", href: "/patients", icon: Users },
+    { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Billing", href: "/billing", icon: CreditCard },
+]
+
+const doctorNavItems = [
+    { title: "Dashboard", href: "/doctor", icon: LayoutDashboard },
+    { title: "Patients", href: "/patients", icon: Users },
+    { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Gallery", href: "/gallery", icon: ImageIcon },
+    { title: "Status", href: "/status", icon: BarChart2 },
 ]
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
@@ -48,23 +30,7 @@ export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname()
     const { role } = useAuth()
 
-    // Define Role Accessibility
-    // Frontdesk/Admin: All
-    // Doctor: Dashboard (Special Doctor View) + Patients (Maybe?) + Settings?
-    // Let's filter navItems based on role.
-
-    const filteredNavItems = navItems.filter(item => {
-        if (role === 'doctor') {
-            // Doctors usually only need Patient list or Appointments
-            // We'll create a special "Doctor Dashboard" link later, but for now:
-            if (item.href === '/') return true; // Their dashboard
-            if (item.href === '/patients') return true;
-            if (item.href === '/doctor/dashboard') return true; // We might move dashboard here
-            if (item.href === '/prescriptions') return true;
-            return false;
-        }
-        return true; // Frontdesk/Admin see all
-    })
+    const filteredNavItems = role === 'doctor' ? doctorNavItems : staffNavItems
 
     return (
         <div className={cn("pb-0 min-h-screen border-r bg-white dark:bg-[#181818] flex flex-col justify-between", className)}>
@@ -80,7 +46,7 @@ export function Sidebar({ className }: SidebarProps) {
                         {filteredNavItems.map((item) => (
                             <Button
                                 key={item.href}
-                                variant={pathname === item.href ? "secondary" : "ghost"}
+                                variant={pathname === item.href || (item.href === '/doctor' && pathname === '/doctor') ? "secondary" : "ghost"}
                                 className={cn(
                                     "w-full justify-start",
                                     pathname === item.href && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"

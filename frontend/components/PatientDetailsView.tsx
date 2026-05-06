@@ -9,9 +9,19 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog"
-import { api, Patient, API_BASE_URL } from "@/lib/api"
-import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2 } from "lucide-react"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import { api, Patient, API_BASE_URL, Visit } from "@/lib/api"
+import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2, ChevronDown, ChevronUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
+import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
 
 interface PatientDetailsViewProps {
     patient: Patient
@@ -25,13 +35,47 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [timelineData, setTimelineData] = useState<any[]>([])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [selectedImage, setSelectedImage] = useState<any | null>(null)
+    const [lightboxState, setLightboxState] = useState<{ image: any; context: any[] } | null>(null)
+    const [invoiceId, setInvoiceId] = useState<string | null>(null)
+    const [invoiceOpen, setInvoiceOpen] = useState(false)
+
+    // Visit History collapsible state
+    const [visitHistoryOpen, setVisitHistoryOpen] = useState(false)
+    const [visits, setVisits] = useState<Visit[]>([])
+    const [visitsLoading, setVisitsLoading] = useState(false)
+    const [visitsLoaded, setVisitsLoaded] = useState(false)
 
     useEffect(() => {
         if (open && patient) {
             loadAllData()
+            // Reset visit history when dialog opens with a new patient
+            setVisitHistoryOpen(false)
+            setVisits([])
+            setVisitsLoaded(false)
         }
     }, [open, patient]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadVisitHistory = async () => {
+        if (visitsLoaded) return
+        setVisitsLoading(true)
+        try {
+            const data = await api.getVisits(patient.patient_id)
+            setVisits(data)
+            setVisitsLoaded(true)
+        } catch (err) {
+            console.error("Failed to load visit history", err)
+        } finally {
+            setVisitsLoading(false)
+        }
+    }
+
+    const toggleVisitHistory = () => {
+        const next = !visitHistoryOpen
+        setVisitHistoryOpen(next)
+        if (next) {
+            loadVisitHistory()
+        }
+    }
 
     const loadAllData = async () => {
         setLoading(true)
@@ -132,6 +176,78 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
 
                 {/* Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-6 bg-muted/10">
+                    {/* Visit History collapsible section */}
+                    <div className="max-w-5xl mx-auto mb-6">
+                        <button
+                            onClick={toggleVisitHistory}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-card border rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors"
+                        >
+                            <span className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                Visit History
+                            </span>
+                            {visitHistoryOpen ? (
+                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </button>
+
+                        {visitHistoryOpen && (
+                            <div className="mt-2 bg-card border rounded-lg overflow-hidden">
+                                {visitsLoading ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : visits.length === 0 ? (
+                                    <div className="py-8 text-center text-sm text-muted-foreground">
+                                        No visits yet.
+                                    </div>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Reason</TableHead>
+                                                <TableHead>Payment Status</TableHead>
+                                                <TableHead className="text-right">Amount Paid</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {visits.map((visit) => (
+                                                <TableRow key={visit.visit_id}>
+                                                    <TableCell className="text-sm">
+                                                        {visit.visit_date
+                                                            ? new Date(visit.visit_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                                                            : "—"}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">{visit.reason || "—"}</TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                visit.payment_status === "full"
+                                                                    ? "border-green-500 text-green-600"
+                                                                    : visit.payment_status === "partial"
+                                                                    ? "border-yellow-500 text-yellow-600"
+                                                                    : "border-muted-foreground text-muted-foreground"
+                                                            }
+                                                        >
+                                                            {visit.payment_status ?? "unpaid"}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-sm">
+                                                        {visit.amount_paid != null ? `₹${visit.amount_paid.toFixed(2)}` : "—"}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     {loading ? (
                         <div className="h-full flex items-center justify-center">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -161,10 +277,8 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
 
                                             {/* Center: Timeline Line */}
                                             <div className="flex flex-col items-center shrink-0 relative">
-                                                {/* Dot - Color based on content? Default primary if visit, else gray */}
                                                 <div className={`w-3 h-3 rounded-full border-2 z-10 ${group.visits.length > 0 ? 'bg-primary border-primary' : 'bg-background border-muted-foreground'
                                                     }`} />
-                                                {/* Line */}
                                                 <div className="w-px bg-border flex-1 -my-1 group-last:hidden" />
                                             </div>
 
@@ -199,7 +313,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                                                                     <div
                                                                         key={img.id}
                                                                         className="aspect-square bg-black/5 rounded-md overflow-hidden border cursor-pointer hover:ring-2 ring-primary/50 transition-all relative group/img"
-                                                                        onClick={() => setSelectedImage(img)}
+                                                                        onClick={() => setLightboxState({ image: img, context: group.images })}
                                                                     >
                                                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                         <img
@@ -226,7 +340,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                                                             <div className="space-y-2">
                                                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                 {group.bills.map((bill: any) => (
-                                                                    <div key={bill.invoice_id} className="bg-card border rounded-md p-3 text-sm flex justify-between items-center shadow-sm">
+                                                                    <div key={bill.invoice_id} className="bg-card border rounded-md p-3 text-sm flex justify-between items-center shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors" onClick={() => { setInvoiceId(bill.invoice_id); setInvoiceOpen(true) }}>
                                                                         <div>
                                                                             <div className="font-mono text-xs text-muted-foreground">{bill.invoice_id}</div>
                                                                             <div className="font-medium">{bill.payment_type}</div>
@@ -234,7 +348,6 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                                                                         <div className="text-right">
                                                                             <div className="font-bold">₹{bill.total_amount.toFixed(2)}</div>
                                                                             <div className="text-xs text-muted-foreground">
-                                                                                {/* Time fallback if date has time */}
                                                                                 {bill.date.includes(' ') ? bill.date.split(' ')[1] : ''}
                                                                             </div>
                                                                         </div>
@@ -253,28 +366,29 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                     )}
                 </div>
 
-                {/* Image Lightbox */}
-                {selectedImage && (
-                    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-                        <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col items-center">
-                            <Button variant="ghost" size="icon" className="absolute -top-10 right-0 text-white hover:bg-white/20" onClick={() => setSelectedImage(null)}>
-                                <X className="h-6 w-6" />
-                            </Button>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={getImageUrl(selectedImage)}
-                                alt="Full View"
-                                className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl"
-                                onClick={(e) => e.stopPropagation()} // Prevent close on image click
-                            />
-                            {selectedImage.notes && (
-                                <div className="mt-4 bg-white/10 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-                                    {selectedImage.notes}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                <ImagePreviewDialog
+                    image={lightboxState?.image}
+                    isOpen={!!lightboxState}
+                    onClose={() => setLightboxState(null)}
+                    allImages={lightboxState?.context ?? []}
+                    onNavigate={(dir) => {
+                        if (!lightboxState) return
+                        const { image, context } = lightboxState
+                        const idx = context.findIndex((i: any) => i.id === image.id)
+                        if (dir === 'next' && idx < context.length - 1) setLightboxState({ image: context[idx + 1], context })
+                        if (dir === 'prev' && idx > 0) setLightboxState({ image: context[idx - 1], context })
+                    }}
+                    fullScreen={true}
+                />
+
+                <PrintInvoiceDialog
+                    open={invoiceOpen}
+                    onOpenChange={(v) => { setInvoiceOpen(v); if (!v) setInvoiceId(null) }}
+                    invoiceId={invoiceId}
+                    clinicName="MediCare Clinic"
+                    clinicAddress=""
+                    clinicPhone=""
+                />
             </DialogContent>
         </Dialog>
     )
