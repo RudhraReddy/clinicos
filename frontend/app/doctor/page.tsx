@@ -331,14 +331,18 @@ export default function DoctorDashboard() {
                                         <div className="flex gap-2">
                                             {!showTrash && (
                                                 <>
-                                                    <label htmlFor="image-upload-input" className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => document.getElementById('image-upload-input')?.click()}
+                                                        className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
+                                                    >
                                                         <Plus className="h-3 w-3" /> Add Image
-                                                    </label>
+                                                    </button>
                                                     <input
                                                         id="image-upload-input"
                                                         type="file"
                                                         accept="image/*"
-                                                        className="hidden"
+                                                        style={{ display: 'none' }}
                                                         onChange={handleImageUpload}
                                                     />
                                                     <button
