@@ -592,7 +592,7 @@ export default function DoctorDashboard() {
                                                                                 {/* Delete (trash) button */}
                                                                                 <button
                                                                                     type="button"
-                                                                                    className="absolute bottom-2 right-2 p-1 rounded-full bg-black/60 text-red-400 hover:bg-black/80 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                                                                    className="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-600 hover:text-white transition-colors z-10"
                                                                                     onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id) }}
                                                                                     title="Move to trash"
                                                                                 >
