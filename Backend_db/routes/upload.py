@@ -1,5 +1,5 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from extensions import db, get_ist_now
 from models import UploadSession, PatientImage
 import uuid
@@ -11,6 +11,18 @@ upload_bp = Blueprint('upload', __name__)
 
 UPLOAD_FOLDER = os.path.join(os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads'), 'temp')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@upload_bp.route('/temp/file/<session_id>/<filename>', methods=['GET'])
+def get_temp_file(session_id, filename):
+    file_path = os.path.join(UPLOAD_FOLDER, session_id, filename)
+    real_upload_folder = os.path.realpath(UPLOAD_FOLDER)
+    real_file_path = os.path.realpath(file_path)
+    if not real_file_path.startswith(real_upload_folder + os.sep):
+        return jsonify({'error': 'Forbidden'}), 403
+    if not os.path.isfile(real_file_path):
+        return jsonify({'error': 'File not found'}), 404
+    return send_file(real_file_path)
+
 
 @upload_bp.route('/upload/session', methods=['POST'])
 def create_session():
