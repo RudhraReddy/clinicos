@@ -6,6 +6,7 @@ import uuid
 import json
 import os
 from werkzeug.utils import secure_filename
+from routes.inventory import _run_ocr, _transform_ocr_result
 
 upload_bp = Blueprint('upload', __name__)
 
@@ -120,12 +121,32 @@ def finalize_session(session_id):
     if not session:
         return jsonify({'error': 'Session not found'}), 404
         
-    uploaded_files = json.loads(session.files)
+    uploaded_files = json.loads(session.files) if session.files else []
     
-    # Optional Invoice ID if finalizing from Billing
-    # Not yet passed from frontend in this flow, but useful to have.
-    # Actually context_id is patient_id for "patient" type.
-    
+    # ── Inventory path ──────────────────────────────────────────────────────
+    if session.context_type == 'inventory':
+        if not uploaded_files:
+            return jsonify({'error': 'No files in session'}), 400
+
+        # Use the first file only (invoice scans are one image)
+        first_file = uploaded_files[0]
+        filepath = first_file.get('path', '')
+
+        if not filepath or not os.path.exists(filepath):
+            return jsonify({'error': 'Uploaded file not found on disk'}), 500
+
+        ocr_result = _run_ocr(filepath)
+
+        session.status = 'COMPLETED'
+        db.session.commit()
+
+        return jsonify({
+            'message': 'File processed successfully',
+            'path': filepath,
+            'ocr_data': _transform_ocr_result(ocr_result),
+        }), 200
+
+    # ── Patient path ─────────────────────────────────────────────────────────
     final_images = []
     
     if session.context_type == 'patient':

@@ -12,8 +12,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Loader2, Upload, CheckCircle2, AlertCircle } from "lucide-react"
+import { Loader2, Upload, CheckCircle2, AlertCircle, QrCode } from "lucide-react"
 import { api } from "@/lib/api"
+import { QRCodeUpload } from "./QRCodeUpload"
 
 
 interface UploadInventoryReportDialogProps {
@@ -22,9 +23,40 @@ interface UploadInventoryReportDialogProps {
 
 export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDialogProps) {
     const [open, setOpen] = useState(false)
+    const [qrOpen, setQrOpen] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [file, setFile] = useState<File | null>(null)
     const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string; data?: unknown } | null>(null)
+
+    const processOCRResponse = (response: any) => {
+        // Check for OCR functional error (processed but returned error state)
+        const ocrData = response.ocr_data as any
+        if (ocrData?.error === "BLURRED") {
+            setSubmitResult({
+                success: false,
+                message: ocrData.message || "Image is too blurry. Please try again."
+            })
+            return
+        }
+
+        // Check for Empty Data (Failed Extraction)
+        const products = ocrData.product_details || []
+        if (products.length === 0) {
+            setSubmitResult({
+                success: false,
+                message: "Could not handle this image properly. Please reupload a clearer image."
+            })
+            return
+        }
+
+        // Success Redirect
+        const sessionData = {
+            ...(ocrData || {}),
+            image_path: response.path
+        }
+        sessionStorage.setItem("currentInvoice", JSON.stringify(sessionData))
+        window.location.href = "/inventory/invoice_edit"
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -34,35 +66,7 @@ export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDi
         setSubmitResult(null)
         try {
             const response = await api.uploadInventoryReport(file)
-
-            // Check for OCR functional error (processed but returned error state)
-            const ocrData = response.ocr_data as any
-            if (ocrData?.error === "BLURRED") {
-                setSubmitResult({
-                    success: false,
-                    message: ocrData.message || "Image is too blurry. Please try again."
-                })
-                return
-                return
-            }
-
-            // Check for Empty Data (Failed Extraction)
-            const products = ocrData.product_details || []
-            if (products.length === 0) {
-                setSubmitResult({
-                    success: false,
-                    message: "Could not handle this image properly. Please reupload a clearer image."
-                })
-                return
-            }
-
-            // Success Redirect
-            const sessionData = {
-                ...(ocrData || {}),
-                image_path: response.path
-            }
-            sessionStorage.setItem("currentInvoice", JSON.stringify(sessionData))
-            window.location.href = "/inventory/invoice_edit"
+            processOCRResponse(response)
 
         } catch (err) {
             console.error("Upload failed", err)
@@ -156,8 +160,8 @@ export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDi
                                 </p>
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button type="submit" disabled={submitting || !file}>
+                        <DialogFooter className="flex-col sm:flex-col gap-2">
+                            <Button type="submit" disabled={submitting || !file} className="w-full">
                                 {submitting ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -170,10 +174,35 @@ export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDi
                                     </>
                                 )}
                             </Button>
+                            
+                            <div className="relative flex justify-center text-xs uppercase my-2">
+                                <span className="bg-background px-2 text-muted-foreground">Or</span>
+                            </div>
+
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                className="w-full"
+                                onClick={() => setQrOpen(true)}
+                            >
+                                <QrCode className="mr-2 h-4 w-4" />
+                                Upload via Mobile
+                            </Button>
                         </DialogFooter>
                     </form>
                 )}
             </DialogContent>
+
+            <QRCodeUpload
+                open={qrOpen}
+                onOpenChange={setQrOpen}
+                contextType="inventory"
+                contextId="inventory_upload"
+                onSuccess={(res) => {
+                    setQrOpen(false)
+                    if (res) processOCRResponse(res)
+                }}
+            />
         </Dialog>
     )
 }

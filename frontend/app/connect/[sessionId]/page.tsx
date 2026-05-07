@@ -19,6 +19,7 @@ export default function MobileUploadPage() {
     const [sessionValid, setSessionValid] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [success, setSuccess] = useState(false)
+    const [contextType, setContextType] = useState<string>("")
 
     // Form State
     const [frontFile, setFrontFile] = useState<File | null>(null)
@@ -34,6 +35,7 @@ export default function MobileUploadPage() {
             const res = await api.getUploadSession(sessionId)
             if (res.status !== 'COMPLETED') {
                 setSessionValid(true)
+                if (res.context_type) setContextType(res.context_type)
             }
         } catch (e) {
             console.error(e)
@@ -114,8 +116,12 @@ export default function MobileUploadPage() {
     return (
         <div className="container max-w-md mx-auto py-6 px-4 space-y-6">
             <div className="text-center space-y-1">
-                <h1 className="text-2xl font-bold">Upload Images</h1>
-                <p className="text-muted-foreground text-sm">Upload images for this visit.</p>
+                <h1 className="text-2xl font-bold">
+                    {contextType === 'inventory' ? 'Upload Report Image' : 'Upload Images'}
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                    {contextType === 'inventory' ? 'Upload an image of your inventory report.' : 'Upload images for this visit.'}
+                </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
@@ -164,7 +170,8 @@ export default function MobileUploadPage() {
                     </CardContent>
                 </Card>
 
-                {/* Image 2 Card */}
+                {/* Image 2 Card (Hidden for inventory) */}
+                {contextType !== 'inventory' && (
                 <Card className={backFile ? "border-green-500/50 bg-green-50/10" : ""}>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex justify-between items-center">
@@ -208,6 +215,7 @@ export default function MobileUploadPage() {
                         )}
                     </CardContent>
                 </Card>
+                )}
             </div>
 
             <Card>

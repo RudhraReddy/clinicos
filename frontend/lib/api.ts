@@ -401,7 +401,7 @@ export const api = {
         return res.json()
     },
 
-    async finalizeUploadSession(sessionId: string): Promise<{ message: string; count: number }> {
+    async finalizeUploadSession(sessionId: string): Promise<any> {
         return fetchApi(`/api/upload/session/${sessionId}/finalize`, {
             method: 'POST'
         })

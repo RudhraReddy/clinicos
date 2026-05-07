@@ -24,7 +24,7 @@ interface QRCodeUploadProps {
     onOpenChange: (open: boolean) => void
     contextType: 'patient' | 'inventory'
     contextId: string
-    onSuccess?: () => void
+    onSuccess?: (res?: any) => void
 }
 
 export function QRCodeUpload({ open, onOpenChange, contextType, contextId, onSuccess }: QRCodeUploadProps) {
@@ -88,9 +88,9 @@ export function QRCodeUpload({ open, onOpenChange, contextType, contextId, onSuc
     const handleFinalize = async () => {
         if (!sessionId) return
         try {
-            await api.finalizeUploadSession(sessionId)
+            const res = await api.finalizeUploadSession(sessionId)
             setStatus('COMPLETED')
-            if (onSuccess) onSuccess()
+            if (onSuccess) onSuccess(res)
             setTimeout(() => onOpenChange(false), 1500)
         } catch (e) {
             console.error(e)
