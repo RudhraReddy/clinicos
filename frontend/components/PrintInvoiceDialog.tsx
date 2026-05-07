@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api, type Patient } from "@/lib/api"
+import { api } from "@/lib/api"
 import { InvoicePrint } from "@/components/InvoicePrint"
 import {
     Dialog,
@@ -16,14 +16,19 @@ import { toast } from "sonner"
 
 interface PrintBillItem {
     item_name: string
-    batch_number: string
     qty: number
     mrp: number
-    [key: string]: unknown
+}
+
+interface PrintInvoicePatient {
+    name: string
+    phone_number: string
+    age?: number | null
+    sex?: string | null
 }
 
 interface PrintInvoiceData {
-    patient: Patient
+    patient: PrintInvoicePatient
     billItems: PrintBillItem[]
     invoiceId: string
     total: number
@@ -42,10 +47,10 @@ interface PrintInvoiceDialogProps {
 function printElement(elementId: string) {
     const el = document.getElementById(elementId)
     if (!el) return
-    const win = window.open('', '_blank', 'width=800,height=700')
+    const win = window.open('', '_blank', 'width=600,height=850')
     if (!win) return
-    win.document.write(`<html><head><title>Invoice</title>
-    <style>body{font-family:sans-serif;margin:0;padding:0}</style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
+    <style>body{margin:0;padding:0}@page{size:A5 portrait;margin:8mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
     win.document.close()
     win.focus()
@@ -74,19 +79,18 @@ export function PrintInvoiceDialog({
             setLoading(true)
             try {
                 const data = await api.getBillDetails(invoiceId as string)
-                const patient: Patient = {
-                    patient_id: data.patient.id,
+                const patient: PrintInvoicePatient = {
                     name: data.patient.name,
                     phone_number: data.patient.phone,
+                    age: data.patient.age ?? null,
+                    sex: data.patient.sex ?? null,
                 }
                 const billItems: PrintBillItem[] = data.items.map((i: {
                     item_name: string
-                    batch_number: string
                     quantity: number
                     mrp: number
                 }) => ({
                     item_name: i.item_name,
-                    batch_number: i.batch_number,
                     qty: i.quantity,
                     mrp: i.mrp,
                 }))

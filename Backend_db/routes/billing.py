@@ -212,7 +212,9 @@ def get_bill_details(invoice_id):
         'patient': {
             'name': patient.name if patient else 'Unknown',
             'phone': patient.phone_number if patient else '',
-            'id': bill.patient_id
+            'id': bill.patient_id,
+            'age': patient.age if patient else None,
+            'sex': patient.sex if patient else None,
         },
         'payment_type': bill.payment_type,
         'total_amount': float(bill.total_amount),
