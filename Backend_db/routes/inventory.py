@@ -27,6 +27,75 @@ def _run_ocr(filepath: str) -> dict:
     except Exception as e:
         return {'error': str(e)}
 
+_EMPTY_OCR: dict = {
+    'product_details': [],
+    'invoice_number': '',
+    'gst_number': '',
+    'total_amount': '',
+    'vendor_name': '',
+}
+
+def _transform_ocr_result(ocr_result: dict) -> dict:
+    """
+    Translate the OCR microservice response schema into the flat schema that
+    the frontend (UploadInventoryReportDialog / invoice_edit) expects.
+
+    OCR service returns:
+        {
+            "metadata": {"invoice_no": ..., "date": ..., "gst_no": ...},
+            "line_items": [{"product_name", "batch", "exp", "qty", "mrp",
+                            "rate", "free", "mfg", "pack", "hsn", "gst",
+                            "amount"}, ...],
+            "summary":   {"total_amount": ..., "net_payable": ...}
+        }
+
+    Frontend expects:
+        {
+            "product_details": [{"product_name", "batch", "expiry", "qty",
+                                 "mrp", "rate", "free", "mfg", "pack", "hsn",
+                                 "gst", "amount"}, ...],
+            "invoice_number": str,
+            "gst_number":     str,
+            "total_amount":   str,
+            "vendor_name":    str   (OCR cannot extract this)
+        }
+
+    Error dicts ({"error": "..."}) are passed through unchanged so the
+    frontend can surface the message to the user.
+    """
+    if not ocr_result:
+        return dict(_EMPTY_OCR)
+
+    # Pass error responses straight through.
+    if 'error' in ocr_result:
+        return ocr_result
+
+    metadata = ocr_result.get('metadata') or {}
+    line_items = ocr_result.get('line_items') or []
+    summary = ocr_result.get('summary') or {}
+
+    # Remap each line item: exp → expiry; all other fields kept as-is.
+    product_details = []
+    for item in line_items:
+        transformed = dict(item)
+        if 'exp' in transformed and 'expiry' not in transformed:
+            transformed['expiry'] = transformed.pop('exp')
+        product_details.append(transformed)
+
+    total_amount = (
+        summary.get('total_amount')
+        or summary.get('net_payable')
+        or ''
+    )
+
+    return {
+        'product_details': product_details,
+        'invoice_number': metadata.get('invoice_no') or '',
+        'gst_number': metadata.get('gst_no') or '',
+        'total_amount': str(total_amount) if total_amount != '' else '',
+        'vendor_name': '',
+    }
+
 inventory = Blueprint('inventory', __name__)
 
 @inventory.route('/inventory', methods=['GET'])
@@ -596,9 +665,9 @@ def upload_inventory_report():
         ocr_result = _run_ocr(filepath)
 
         return jsonify({
-            'message': 'File uploaded and processed successfully', 
-            'path': filepath, 
-            'ocr_data': ocr_result
+            'message': 'File uploaded and processed successfully',
+            'path': filepath,
+            'ocr_data': _transform_ocr_result(ocr_result)
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
