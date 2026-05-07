@@ -1,8 +1,9 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User } from 'lucide-react'
+import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone } from 'lucide-react'
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
+import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
@@ -136,6 +137,9 @@ export default function DoctorDashboard() {
 
 
 
+    // QR Upload State
+    const [showQR, setShowQR] = useState(false)
+
     // Image Gallery Filter State
     const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null)
 
@@ -266,6 +270,13 @@ export default function DoctorDashboard() {
                                                 className="hidden"
                                                 onChange={handleImageUpload}
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowQR(true)}
+                                                className="cursor-pointer bg-secondary/50 hover:bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
+                                            >
+                                                <Smartphone className="h-3 w-3" /> Upload via QR
+                                            </button>
                                         </div>
                                     </CardHeader>
                                     <div className="flex-1 flex overflow-hidden">
@@ -499,6 +510,21 @@ export default function DoctorDashboard() {
                                         </div>
                                     </DialogContent>
                                 </Dialog>
+
+                                {/* QR Upload Dialog */}
+                                {selectedVisit && (
+                                    <QRCodeUpload
+                                        open={showQR}
+                                        onOpenChange={setShowQR}
+                                        contextType="patient"
+                                        contextId={selectedVisit.patient_id}
+                                        onSuccess={async () => {
+                                            const imgs = await api.getPatientImages(selectedVisit.patient_id)
+                                            setPatientImages(imgs)
+                                            toast.success("Images uploaded via QR")
+                                        }}
+                                    />
+                                )}
 
                                 {/* View Image Dialog */}
                                 <ImagePreviewDialog

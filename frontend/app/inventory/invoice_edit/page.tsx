@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle } from "lucide-react"
+import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone } from "lucide-react"
 import { api, API_BASE_URL, InventoryItem } from "@/lib/api"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from 
 import { cn } from "@/lib/utils"
 // import { ImagePreviewDialog } from "@/components/ImagePreviewDialog" // Actually I'll let the user add it or I add it separately to be safe with line numbers
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
+import { QRCodeUpload } from "@/components/QRCodeUpload"
+import { toast } from "sonner"
 
 interface ProductRow {
     matched_id?: string
@@ -37,6 +39,8 @@ export default function InvoiceEditPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [viewImage, setViewImage] = useState(false)
+    const [showQR, setShowQR] = useState(false)
+    const [qrContextId] = useState<string>(() => crypto.randomUUID())
 
     // Invoice Header Data
     const [invoiceNo, setInvoiceNo] = useState("")
@@ -271,6 +275,17 @@ export default function InvoiceEditPage() {
                                 }
                             }
                         }}
+                    />
+                    <Button variant="outline" onClick={() => setShowQR(true)}>
+                        <Smartphone className="mr-2 h-4 w-4" />
+                        Upload via QR
+                    </Button>
+                    <QRCodeUpload
+                        open={showQR}
+                        onOpenChange={setShowQR}
+                        contextType="inventory"
+                        contextId={invoiceNo || qrContextId}
+                        onSuccess={() => toast.success("Image uploaded via QR — will be linked on save")}
                     />
                     {imagePath && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive ml-2" onClick={() => setImagePath("")} title="Remove Image">
