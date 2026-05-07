@@ -6,18 +6,26 @@ from sqlalchemy import func
 import io
 import csv
 import os
-import sys
-
-# Add models directory to path for invoice_ocr
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../models')))
-try:
-    from invoice_ocr import AIInvoiceScanner
-except ImportError:
-    print("Warning: invoice_ocr module not found. OCR features may fail.")
-    class AIInvoiceScanner:
-        def scan(self, path): return {'error': 'OCR module missing'}
+import requests as http_requests
 
 from utils import parse_expiry_date
+
+OCR_SERVICE_URL = os.environ.get('OCR_SERVICE_URL', '').rstrip('/')
+
+def _run_ocr(filepath: str) -> dict:
+    if not OCR_SERVICE_URL:
+        return {'error': 'OCR service not configured (set OCR_SERVICE_URL env var)'}
+    try:
+        with open(filepath, 'rb') as f:
+            resp = http_requests.post(
+                f'{OCR_SERVICE_URL}/ocr',
+                files={'image': f},
+                timeout=90
+            )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return {'error': str(e)}
 
 inventory = Blueprint('inventory', __name__)
 
@@ -585,12 +593,7 @@ def upload_inventory_report():
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
         
-        try:
-            scanner = AIInvoiceScanner()
-            ocr_result = scanner.scan(filepath) 
-        except Exception as ocr_error:
-            ocr_result = {'error': f"OCR Processing Failed: {str(ocr_error)}"}
-            print(f"OCR Error: {ocr_error}")
+        ocr_result = _run_ocr(filepath)
 
         return jsonify({
             'message': 'File uploaded and processed successfully', 
