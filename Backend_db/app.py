@@ -21,6 +21,9 @@ def create_app():
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
         raise RuntimeError("DATABASE_URL environment variable is not set")
+    # Render injects "postgres://" but SQLAlchemy 2.0 requires "postgresql://"
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -30,6 +33,7 @@ def create_app():
         from routes import blueprints
         for bp in blueprints:
              app.register_blueprint(bp, url_prefix='/api')
+        db.create_all()
 
     return app
 

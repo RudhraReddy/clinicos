@@ -14,14 +14,14 @@ services:
     startCommand: >-
       gunicorn --bind 0.0.0.0:$PORT
       --workers 1
-      --timeout 60
+      --timeout 120
       --max-requests 500
       --max-requests-jitter 50
       "app:create_app()"
     disk:
       name: clinic-uploads
       mountPath: /var/data/clinic_uploads
-      sizeGB: 1
+      sizeGB: 10
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -34,7 +34,9 @@ services:
       - key: CORS_ORIGINS
         value: https://clinicos-frontend.onrender.com
       - key: OCR_SERVICE_URL
-        value: ""
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.2"
 
   - type: web
     name: clinicos-frontend
@@ -45,6 +47,6 @@ services:
     startCommand: npm start
     envVars:
       - key: BACKEND_URL
-        value: https://clinicos-api.onrender.com
+        value: https://clinicos-api-69mw.onrender.com
       - key: NODE_VERSION
         value: 20

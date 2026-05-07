@@ -152,7 +152,65 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 
 ## Deployment
 
-Deployed on **Render** via `render.yaml` (root of repo). Two services: `clinicos-api` (Flask/gunicorn) and `clinicos-frontend` (Next.js). PostgreSQL database is provisioned by Render and injected as `DATABASE_URL`.
+### Architecture
+
+Three-service production stack, budget ~$24/month:
+
+| Service | Platform | Plan | RAM | Cost |
+|---|---|---|---|---|
+| `clinicos-api` | Render Starter | Python web | 512MB | $7/mo |
+| `clinicos-frontend` | Render Starter | Node web | 512MB | $7/mo |
+| `clinicos-db` | Render Starter | PostgreSQL | — | $7/mo |
+| `clinic-uploads` disk | Render | 10GB persistent | — | $1/mo |
+| `clinicos-ocr` | GCP Cloud Run | pay-per-use | 2GB | ~$2/mo |
+
+### Render
+
+Configured via `render.yaml` (root of repo). Deployed automatically on push to `main`.
+
+- Persistent disk mounted at `/var/data/clinic_uploads` (env `UPLOAD_BASE_DIR`)
+- Gunicorn timeout 120s (OCR calls can take 30-60s)
+- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml)
+- `DATABASE_URL` injected from Render PostgreSQL; `app.py` normalises `postgres://` → `postgresql://` on startup
+- `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
+
+### OCR (GCP Cloud Run)
+
+PaddleOCR runs as a separate microservice in `ocr_cloud/`. Models are baked into the Docker image at build time.
+
+- Deployed to `asia-south1`, 2GB RAM, 2 vCPU, min-instances 0 (scales to zero when idle)
+- Endpoint: `POST /ocr` (multipart `image` field) → returns parsed invoice rows as JSON
+- `GET /health` → `{"status": "ok"}`
+- Deploy command (from repo root, requires `gcloud` auth):
+  ```bash
+  gcloud builds submit ocr_cloud/ --tag gcr.io/YOUR_PROJECT/clinicos-ocr
+  gcloud run deploy clinicos-ocr \
+    --image gcr.io/YOUR_PROJECT/clinicos-ocr \
+    --memory 2Gi --cpu 2 \
+    --min-instances 0 --max-instances 3 \
+    --allow-unauthenticated --region asia-south1
+  ```
+- After deploy, copy the service URL and set it as `OCR_SERVICE_URL` in the Render dashboard for `clinicos-api`.
+
+### Environment Variables
+
+**`clinicos-api` (set in render.yaml or Render dashboard):**
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | injected from Render PostgreSQL |
+| `UPLOAD_BASE_DIR` | `/var/data/clinic_uploads` |
+| `FLASK_DEBUG` | `false` |
+| `CORS_ORIGINS` | `https://clinicos-frontend.onrender.com` |
+| `OCR_SERVICE_URL` | GCP Cloud Run URL (secret — set in dashboard) |
+| `PYTHON_VERSION` | `3.11.2` |
+
+**`clinicos-frontend`:**
+
+| Variable | Value |
+|---|---|
+| `BACKEND_URL` | `https://clinicos-api.onrender.com` |
+| `NODE_VERSION` | `20` |
 
 ---
 
