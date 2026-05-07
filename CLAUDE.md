@@ -162,7 +162,7 @@ Three-service production stack, budget ~$24/month:
 | `clinicos-frontend` | Render Starter | Node web | 512MB | $7/mo |
 | `clinicos-db` | Render Starter | PostgreSQL | — | $7/mo |
 | `clinic-uploads` disk | Render | 10GB persistent | — | $1/mo |
-| `clinicos-ocr` | GCP Cloud Run | pay-per-use | 2GB | ~$2/mo |
+| `clinicos-ocr` | Fly.io | pay-per-use | 2GB | ~$2/mo |
 
 ### Render
 
@@ -175,28 +175,26 @@ Configured via `render.yaml` (root of repo). Deployed automatically on push to `
 Notes:
 - Persistent disk mounted at `/var/data/clinic_uploads` (env `UPLOAD_BASE_DIR`)
 - Gunicorn timeout 120s (OCR calls can take 30-60s)
-- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml) — update to real Cloud Run URL after OCR deploy
+- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml) — set to `https://clinicos-ocr.fly.dev`
 - `DATABASE_URL` injected from Render PostgreSQL; `app.py` normalises `postgres://` → `postgresql://` on startup
 - `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
 - Both services are on **Free** plan (spin-down after 15 min idle). Upgrade to Starter ($7/mo each) for always-on.
 
-### OCR (GCP Cloud Run)
+### OCR (Fly.io)
 
 PaddleOCR runs as a separate microservice in `ocr_cloud/`. Models are baked into the Docker image at build time.
 
-- Deployed to `asia-south1`, 2GB RAM, 2 vCPU, min-instances 0 (scales to zero when idle)
+- App: `clinicos-ocr`, region `sin` (Singapore), 2GB RAM, 1 shared CPU, scales to zero when idle
+- **Live URL:** `https://clinicos-ocr.fly.dev`
 - Endpoint: `POST /ocr` (multipart `image` field) → returns parsed invoice rows as JSON
 - `GET /health` → `{"status": "ok"}`
-- Deploy command (from repo root, requires `gcloud` auth):
+- Deploy command (from `ocr_cloud/` dir, requires `flyctl` auth):
   ```bash
-  gcloud builds submit ocr_cloud/ --tag gcr.io/YOUR_PROJECT/clinicos-ocr
-  gcloud run deploy clinicos-ocr \
-    --image gcr.io/YOUR_PROJECT/clinicos-ocr \
-    --memory 2Gi --cpu 2 \
-    --min-instances 0 --max-instances 3 \
-    --allow-unauthenticated --region asia-south1
+  cd ocr_cloud
+  flyctl deploy --remote-only
   ```
-- After deploy, copy the service URL and set it as `OCR_SERVICE_URL` in the Render dashboard for `clinicos-api`.
+- Config: `ocr_cloud/fly.toml` — `auto_stop_machines = "stop"`, `auto_start_machines = true`
+- First request after idle may be slow (~30s) while machine wakes up; subsequent requests are fast.
 
 ### Environment Variables
 
@@ -208,14 +206,14 @@ PaddleOCR runs as a separate microservice in `ocr_cloud/`. Models are baked into
 | `UPLOAD_BASE_DIR` | `/var/data/clinic_uploads` |
 | `FLASK_DEBUG` | `false` |
 | `CORS_ORIGINS` | `https://clinicos-frontend.onrender.com` |
-| `OCR_SERVICE_URL` | GCP Cloud Run URL (secret — set in dashboard) |
+| `OCR_SERVICE_URL` | `https://clinicos-ocr.fly.dev` (secret — set in dashboard) |
 | `PYTHON_VERSION` | `3.11.2` |
 
 **`clinicos-frontend`:**
 
 | Variable | Value |
 |---|---|
-| `BACKEND_URL` | `https://clinicos-api.onrender.com` |
+| `BACKEND_URL` | `https://clinicos-api-69mw.onrender.com` |
 | `NODE_VERSION` | `20` |
 
 ---
