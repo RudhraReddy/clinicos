@@ -153,3 +153,80 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 ## Deployment
 
 Deployed on **Render** via `render.yaml` (root of repo). Two services: `clinicos-api` (Flask/gunicorn) and `clinicos-frontend` (Next.js). PostgreSQL database is provisioned by Render and injected as `DATABASE_URL`.
+
+---
+
+## Invoice Print System
+
+### Overview
+
+The invoice print flow uses a popup window (`window.open`) to render and print. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses **100% inline CSS** — no Tailwind class names inside the invoice markup.
+
+### Files
+
+- `frontend/components/InvoicePrint.tsx` — the invoice layout component
+- `frontend/components/PrintInvoiceDialog.tsx` — the dialog that fetches bill data and hosts the print trigger
+- `frontend/app/globals.css` — contains the `@page` rule for print media
+
+### Page size
+
+All three files are aligned to **A5 portrait, 8mm margin**:
+- `InvoicePrint.tsx` injects `<style>{'@page { size: A5 portrait; margin: 8mm }'}</style>` inside `#invoice-print-region`
+- `printElement()` in `PrintInvoiceDialog.tsx` writes `@page{size:A5 portrait;margin:8mm}` into the popup's `<style>` block
+- `globals.css` `@page` rule: `size: A5 portrait; margin: 8mm`
+
+### InvoicePrint props
+
+```ts
+interface InvoicePrintProps {
+  clinicName: string
+  clinicAddress: string
+  clinicPhone: string
+  patient: {
+    name: string
+    phone_number: string
+    age?: number | null
+    sex?: string | null
+  }
+  billItems: { item_name: string; qty: number; mrp: number }[]
+  invoiceId?: string
+  total: number
+  date?: Date
+  className?: string  // applied to outer wrapper only, for dialog preview styling
+}
+```
+
+### Layout sections (top to bottom)
+
+1. **Header** — serif font (`Georgia`). Clinic name large+bold+uppercase left. "INVOICE" right-aligned, invoice ID and formatted date below it. 2px solid black bottom border.
+2. **Patient row** — single flex line, `justify-content: space-between`. Fields: name (bold 9.5pt), phone, sex, age — each only rendered if the value is present. 1px `#ccc` bottom border.
+3. **Items table** — sans-serif. Headers ALL CAPS, 6.5pt, 0.6px letter-spacing, 2px black bottom border. Columns: `#` | `Item` | `Qty` | `MRP (₹)` | `Total (₹)`. Row dividers 1px `#ddd`. Row numbers in `#999`. **No batch number rendered.**
+4. **Totals** — right-aligned, 46% width. Subtotal: 7pt, `#555`, 1px `#ddd` bottom. Total: 10pt, bold 800, 2px black top border.
+5. **Follow-up strip** — commented out block labeled `{/* FOLLOW-UP: uncomment when follow_up_date is wired up */}` between totals and footer.
+6. **Footer** — "Thank you for visiting {clinicName}." left + "Authorised Signature ___________" right. 1px `#bbb` top border, 6.5pt, `#888`.
+
+### printElement function
+
+```ts
+function printElement(elementId: string) {
+  const el = document.getElementById(elementId)
+  if (!el) return
+  const win = window.open('', '_blank', 'width=600,height=850')
+  if (!win) return
+  win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
+    <style>body{margin:0;padding:0}@page{size:A5 portrait;margin:8mm}</style>
+    </head><body>${el.innerHTML}</body></html>`)
+  win.document.close()
+  win.focus()
+  win.print()
+  win.close()
+}
+```
+
+### Clinic name / address / phone — current state (known gap)
+
+These three strings are passed as props at two call sites and are currently hardcoded:
+- `frontend/app/billing/page.tsx` lines ~85–86, ~603 — `clinicName` and `clinicAddress` have local state; phone is hardcoded
+- `frontend/components/PatientDetailsView.tsx` lines ~388–390 — all three hardcoded
+
+**Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context. The settings edit UI should be admin-only.

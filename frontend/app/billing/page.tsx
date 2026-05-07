@@ -82,8 +82,8 @@ function BillingContent() {
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
 
     // Clinic settings (persisted in localStorage)
-    const [clinicName, setClinicName] = useState("MediCare Clinic")
-    const [clinicAddress, setClinicAddress] = useState("")
+    const [clinicName, setClinicName] = useState("Teja Reddy Clinic")
+    const [clinicAddress, setClinicAddress] = useState("#3145 Here and there, TS 500081")
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [settingsNameDraft, setSettingsNameDraft] = useState("")
     const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
