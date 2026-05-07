@@ -195,6 +195,18 @@ export default function DoctorDashboard() {
         }
     }
 
+    const handleDeleteVisit = async (visitId: string) => {
+        try {
+            await api.deleteVisit(visitId)
+            if (selectedVisitId === visitId) setSelectedVisitId(null)
+            setVisits(prev => prev.filter(v => v.visit_id !== visitId))
+            toast.success("Visit deleted")
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to delete visit")
+        }
+    }
+
     const getDaysAgo = (isoString: string): string => {
         const deleted = new Date(isoString)
         const now = new Date()
@@ -760,9 +772,19 @@ export default function DoctorDashboard() {
                                         </div>
                                     </div>
 
-                                    <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'} className="shrink-0 text-[10px] h-5 px-1.5 font-normal uppercase">
-                                        {visit.status}
-                                    </Badge>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'} className="text-[10px] h-5 px-1.5 font-normal uppercase">
+                                            {visit.status}
+                                        </Badge>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
+                                            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                            title={`Delete visit ${visit.visit_id}`}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))
                         )}
