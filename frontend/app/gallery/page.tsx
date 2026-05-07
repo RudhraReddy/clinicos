@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Image as ImageIcon, Calendar, User, FileText } from "lucide-react"
+import { Search, Image as ImageIcon, Calendar, User, FileText, Trash2, RotateCcw, X } from "lucide-react"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 
 export default function GalleryPage() {
@@ -79,11 +79,56 @@ export default function GalleryPage() {
         }
     }
 
-    // Reuse viewImage state for both types? 
+    // Reuse viewImage state for both types?
     // PatientImage has: id, patient_name, notes, timestamp.
     // InvoiceImage has: invoice_number, vendor_name, upload_date.
     // Let's make viewImage generic or check type.
     const [viewInvoice, setViewInvoice] = useState<any | null>(null)
+
+    // Trash tab state
+    const [trashImages, setTrashImages] = useState<any[]>([])
+    const [trashLoading, setTrashLoading] = useState(false)
+
+    const loadTrashImages = async () => {
+        try {
+            setTrashLoading(true)
+            const data = await api.getTrashImages()
+            setTrashImages(data)
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setTrashLoading(false)
+        }
+    }
+
+    const handleRestore = async (img: any) => {
+        try {
+            await api.restorePatientImage(img.id)
+            setTrashImages(prev => prev.filter(t => t.id !== img.id))
+            // Reload active images so restored image appears in Patient Images tab
+            loadImages()
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const handlePermanentDelete = async (imageId: number) => {
+        try {
+            await api.permanentDeleteImage(imageId)
+            setTrashImages(prev => prev.filter(t => t.id !== imageId))
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const getDaysAgo = (isoString: string): string => {
+        const deleted = new Date(isoString)
+        const now = new Date()
+        const days = Math.floor((now.getTime() - deleted.getTime()) / (1000 * 60 * 60 * 24))
+        if (days === 0) return "Today"
+        if (days === 1) return "1 day ago"
+        return `${days} days ago`
+    }
 
     return (
         <div className="container mx-auto py-6 space-y-6">
@@ -98,6 +143,9 @@ export default function GalleryPage() {
                 <TabsList>
                     <TabsTrigger value="images">Patient Images</TabsTrigger>
                     <TabsTrigger value="invoices">Invoice Images</TabsTrigger>
+                    <TabsTrigger value="trash" onClick={loadTrashImages}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Trash
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="images">
@@ -233,6 +281,87 @@ export default function GalleryPage() {
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">
                                                     ₹{inv.total_amount?.toFixed(2)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="trash">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base font-medium flex items-center gap-2">
+                                <Trash2 className="h-4 w-4" /> Deleted Images
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">Images are permanently deleted 30 days after being trashed.</p>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[80px]">Preview</TableHead>
+                                        <TableHead>Patient</TableHead>
+                                        <TableHead>Notes / Tag</TableHead>
+                                        <TableHead>Deleted</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {trashLoading ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                                        </TableRow>
+                                    ) : trashImages.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                Trash is empty.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        trashImages.map((img) => (
+                                            <TableRow key={img.id}>
+                                                <TableCell>
+                                                    <div className="h-10 w-10 rounded overflow-hidden bg-muted border">
+                                                        <img
+                                                            src={`/api/patients/images/${img.id}/file`}
+                                                            alt="Thumbnail"
+                                                            className="h-full w-full object-cover opacity-60"
+                                                        />
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium text-sm">{img.patient_name}</div>
+                                                    <div className="text-xs text-muted-foreground">ID: {img.patient_id}</div>
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                                                    {img.notes || img.tag || "-"}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-destructive whitespace-nowrap">
+                                                    {getDaysAgo(img.deleted_at)}
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {new Date(img.deleted_at).toLocaleDateString()}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRestore(img)}
+                                                            className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                                                        >
+                                                            <RotateCcw className="h-3 w-3" /> Restore
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePermanentDelete(img.id)}
+                                                            className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+                                                        >
+                                                            <X className="h-3 w-3" /> Delete Forever
+                                                        </button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))

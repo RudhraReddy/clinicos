@@ -58,6 +58,8 @@ export default function DoctorDashboard() {
     // History State
     const [patientHistory, setPatientHistory] = useState<Visit[]>([])
     const [patientImages, setPatientImages] = useState<any[]>([])
+    const [showTrash, setShowTrash] = useState(false)
+    const [trashImages, setTrashImages] = useState<any[]>([])
 
     // Load Notes and History when selection changes
     useEffect(() => {
@@ -143,10 +145,65 @@ export default function DoctorDashboard() {
     // Image Gallery Filter State
     const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null)
 
-    // Reset filter when changing patient
+    // Reset filter and trash view when changing patient
     useEffect(() => {
         setSelectedDateFilter(null)
+        setShowTrash(false)
+        setTrashImages([])
     }, [selectedVisit?.patient_id])
+
+    // Load trash images when trash view is toggled on
+    useEffect(() => {
+        if (showTrash && selectedVisit?.patient_id) {
+            api.getTrashImages(selectedVisit.patient_id)
+                .then(setTrashImages)
+                .catch(err => console.error("Failed to load trash images", err))
+        }
+    }, [showTrash, selectedVisit?.patient_id])
+
+    const handleDeleteImage = async (imageId: number) => {
+        try {
+            await api.deletePatientImage(imageId)
+            setPatientImages(prev => prev.filter(img => img.id !== imageId))
+            toast.success("Moved to trash")
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to delete image")
+        }
+    }
+
+    const handleRestoreImage = async (img: any) => {
+        try {
+            await api.restorePatientImage(img.id)
+            setTrashImages(prev => prev.filter(t => t.id !== img.id))
+            setPatientImages(prev => [img, ...prev])
+            toast.success("Image restored")
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to restore image")
+        }
+    }
+
+    const handlePermanentDelete = async (imageId: number) => {
+        try {
+            await api.permanentDeleteImage(imageId)
+            setTrashImages(prev => prev.filter(t => t.id !== imageId))
+            toast.success("Image permanently deleted")
+        } catch (err) {
+            console.error(err)
+            toast.error("Failed to permanently delete image")
+        }
+    }
+
+    const getDaysAgo = (isoString: string): string => {
+        const deleted = new Date(isoString)
+        const now = new Date()
+        const diffMs = now.getTime() - deleted.getTime()
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+        if (days === 0) return "Today"
+        if (days === 1) return "1 day ago"
+        return `${days} days ago`
+    }
 
     // Filter images logic hoisted for navigation context
     const filteredImages = useMemo(() => {
@@ -260,22 +317,33 @@ export default function DoctorDashboard() {
                                             <ImageIcon className="h-4 w-4" /> Patient Pictures
                                         </CardTitle>
                                         <div className="flex gap-2">
-                                            <label htmlFor="image-upload-input" className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors">
-                                                <Plus className="h-3 w-3" /> Add Image
-                                            </label>
-                                            <input
-                                                id="image-upload-input"
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handleImageUpload}
-                                            />
+                                            {!showTrash && (
+                                                <>
+                                                    <label htmlFor="image-upload-input" className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors">
+                                                        <Plus className="h-3 w-3" /> Add Image
+                                                    </label>
+                                                    <input
+                                                        id="image-upload-input"
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={handleImageUpload}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowQR(true)}
+                                                        className="cursor-pointer bg-secondary/50 hover:bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
+                                                    >
+                                                        <Smartphone className="h-3 w-3" /> Upload via QR
+                                                    </button>
+                                                </>
+                                            )}
                                             <button
                                                 type="button"
-                                                onClick={() => setShowQR(true)}
-                                                className="cursor-pointer bg-secondary/50 hover:bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
+                                                onClick={() => setShowTrash(prev => !prev)}
+                                                className={`cursor-pointer text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors ${showTrash ? 'bg-destructive/10 text-destructive hover:bg-destructive/20' : 'bg-muted/50 hover:bg-muted text-muted-foreground'}`}
                                             >
-                                                <Smartphone className="h-3 w-3" /> Upload via QR
+                                                <Trash2 className="h-3 w-3" /> {showTrash ? 'Back' : 'Trash'}
                                             </button>
                                         </div>
                                     </CardHeader>
@@ -346,7 +414,61 @@ export default function DoctorDashboard() {
 
                                         {/* Images Grid */}
                                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                                            {patientImages.length === 0 ? (
+                                            {showTrash ? (
+                                                /* Trash View */
+                                                trashImages.length === 0 ? (
+                                                    <div className="text-muted-foreground text-sm flex flex-col items-center justify-center h-full opacity-50">
+                                                        <Trash2 className="h-8 w-8 mb-2" />
+                                                        Trash is empty
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs text-muted-foreground px-1">Items are permanently deleted after 30 days.</p>
+                                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                                            {trashImages.map((img) => (
+                                                                <div key={img.id} className="relative rounded-md overflow-hidden border bg-muted/20 shadow-sm">
+                                                                    <div className="aspect-square">
+                                                                        <img
+                                                                            src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
+                                                                            alt="Trashed"
+                                                                            className="w-full h-full object-cover opacity-60"
+                                                                            loading="lazy"
+                                                                            onError={(e) => {
+                                                                                (e.target as HTMLImageElement).src = '/placeholder-image.png'
+                                                                                ;(e.target as HTMLImageElement).classList.add('opacity-30', 'p-4')
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="p-2 space-y-1 bg-background/80 backdrop-blur-sm">
+                                                                        <p className="text-[10px] text-muted-foreground truncate">
+                                                                            {img.notes || img.tag || "No notes"}
+                                                                        </p>
+                                                                        <p className="text-[10px] text-destructive font-medium">
+                                                                            Trashed {getDaysAgo(img.deleted_at)}
+                                                                        </p>
+                                                                        <div className="flex gap-1 pt-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreImage(img)}
+                                                                                className="flex-1 flex items-center justify-center gap-1 text-[10px] font-medium py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                                                                            >
+                                                                                <RotateCcw className="h-3 w-3" /> Restore
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handlePermanentDelete(img.id)}
+                                                                                className="flex-1 flex items-center justify-center gap-1 text-[10px] font-medium py-1 rounded bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+                                                                            >
+                                                                                <X className="h-3 w-3" /> Delete Forever
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            ) : patientImages.length === 0 ? (
                                                 <div className="text-muted-foreground text-sm flex flex-col items-center justify-center h-full opacity-50">
                                                     <ImageIcon className="h-8 w-8 mb-2" />
                                                     No images uploaded
@@ -466,6 +588,16 @@ export default function DoctorDashboard() {
                                                                                         {img.notes}
                                                                                     </div>
                                                                                 )}
+
+                                                                                {/* Delete (trash) button */}
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="absolute bottom-2 right-2 p-1 rounded-full bg-black/60 text-red-400 hover:bg-black/80 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id) }}
+                                                                                    title="Move to trash"
+                                                                                >
+                                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                                </button>
                                                                             </div>
                                                                         ))}
                                                                     </div>

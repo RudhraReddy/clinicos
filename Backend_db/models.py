@@ -179,11 +179,12 @@ class PatientImage(db.Model):
     patient_id = db.Column(db.String(10), db.ForeignKey('patients.patient_id'), nullable=False)
     visit_id = db.Column(db.String(50), db.ForeignKey('visits.visit_id'), nullable=True) # Optional link to visit
     invoice_id = db.Column(db.String(50), nullable=True) # Link to bill
-    
+
     image_path = db.Column(db.String(255), nullable=False)
     notes = db.Column(db.Text)
     tag = db.Column(db.String(50)) # e.g., 'Prescription', 'Lab', 'X-Ray'
     timestamp = db.Column(db.DateTime, default=get_ist_now)
+    deleted_at = db.Column(db.DateTime, nullable=True, default=None)
 
 class UploadSession(db.Model):
     """

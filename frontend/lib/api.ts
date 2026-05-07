@@ -405,7 +405,34 @@ export const api = {
         return fetchApi(`/api/upload/session/${sessionId}/finalize`, {
             method: 'POST'
         })
-    }
+    },
+
+    // Patient Image Trash
+    async deletePatientImage(imageId: number): Promise<void> {
+        return fetchApi(`/api/patients/images/${imageId}`, {
+            method: 'DELETE',
+        })
+    },
+
+    async getTrashImages(patientId?: string): Promise<any[]> {
+        const qs = patientId ? `?patient_id=${encodeURIComponent(patientId)}` : ''
+        return fetchApi(`/api/patients/images/trash${qs}`)
+    },
+
+    async restorePatientImage(imageId: number): Promise<void> {
+        return fetchApi(`/api/patients/images/${imageId}/restore`, {
+            method: 'POST',
+        })
+    },
+
+    async permanentDeleteImage(imageId: number): Promise<void> {
+        const url = `${API_BASE_URL}/api/patients/images/${imageId}/permanent`
+        const response = await fetch(url, { method: 'DELETE' })
+        if (!response.ok && response.status !== 204) {
+            const errorText = await response.text()
+            throw new ApiError(response.status, errorText || response.statusText)
+        }
+    },
 };
 
 export { ApiError };

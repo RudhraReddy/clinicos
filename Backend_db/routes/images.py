@@ -1,4 +1,5 @@
 
+from datetime import timedelta
 from flask import Blueprint, request, jsonify, send_file
 from extensions import db, get_ist_now
 from models import PatientImage, Patient
@@ -13,44 +14,50 @@ def upload_patient_image(patient_id):
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-        
+
     visit_id = request.form.get('visit_id')
     notes = request.form.get('notes')
-    
+
     base_folder = os.path.join(os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads'), 'patients')
     patient_folder = os.path.join(base_folder, patient_id)
-    
+
     try:
         if not os.path.exists(patient_folder):
             os.makedirs(patient_folder)
-            
+
         timestamp = int(get_ist_now().timestamp())
-        safe_filename = file.filename.replace(" ", "_") # Simple sanitization
+        safe_filename = file.filename.replace(" ", "_")
         filename = f"{timestamp}_{safe_filename}"
         filepath = os.path.join(patient_folder, filename)
-        
+
         file.save(filepath)
-        
-        # Save to DB
+
         image = PatientImage(
             patient_id=patient_id,
             visit_id=visit_id if visit_id else None,
             image_path=filepath,
             notes=notes,
-            tag=request.form.get('tag', 'Medical Record') # Default to Medical Record for Doctor uploads
+            tag=request.form.get('tag', 'Medical Record')
         )
         db.session.add(image)
         db.session.commit()
-        
+
         return jsonify({'message': 'Image uploaded successfully', 'id': image.id}), 201
-        
+
     except Exception as e:
         print(f"Error uploading image: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @images.route('/patients/<patient_id>/images', methods=['GET'])
 def get_patient_images(patient_id):
-    images_list = PatientImage.query.filter_by(patient_id=patient_id).order_by(PatientImage.timestamp.desc()).all()
+    images_list = (
+        PatientImage.query
+        .filter_by(patient_id=patient_id)
+        .filter(PatientImage.deleted_at == None)
+        .order_by(PatientImage.timestamp.desc())
+        .all()
+    )
     results = []
     for img in images_list:
         results.append({
@@ -63,6 +70,7 @@ def get_patient_images(patient_id):
         })
     return jsonify(results), 200
 
+
 @images.route('/patients/images/<int:image_id>/file', methods=['GET'])
 def get_patient_image_file(image_id):
     img = PatientImage.query.get_or_404(image_id)
@@ -70,12 +78,84 @@ def get_patient_image_file(image_id):
         return send_file(img.image_path)
     return jsonify({'error': 'Image file not found'}), 404
 
+
+# NOTE: /patients/images/trash must be registered BEFORE /patients/images/<int:image_id>
+# to avoid Flask interpreting "trash" as an integer image_id.
+
+@images.route('/patients/images/trash', methods=['GET'])
+def get_trash_images():
+    """
+    Return all soft-deleted patient images.
+    Optional ?patient_id= to filter by patient.
+    Lazily purges rows older than 30 days before returning results.
+    """
+    patient_id = request.args.get('patient_id')
+    now = get_ist_now()
+    cutoff = now - timedelta(days=30)
+
+    # --- Lazy purge: permanently delete rows trashed more than 30 days ago ---
+    purge_query = PatientImage.query.filter(
+        PatientImage.deleted_at != None,
+        PatientImage.deleted_at < cutoff
+    )
+    if patient_id:
+        purge_query = purge_query.filter_by(patient_id=patient_id)
+
+    for img in purge_query.all():
+        try:
+            if img.image_path and os.path.exists(img.image_path):
+                os.remove(img.image_path)
+        except Exception as e:
+            print(f"Warning: could not delete file {img.image_path}: {e}")
+        try:
+            db.session.delete(img)
+        except Exception as e:
+            print(f"Warning: could not delete DB row {img.id}: {e}")
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Warning: purge commit failed: {e}")
+
+    # --- Return remaining trashed rows ---
+    trash_query = (
+        db.session.query(PatientImage, Patient)
+        .join(Patient, PatientImage.patient_id == Patient.patient_id)
+        .filter(PatientImage.deleted_at != None)
+    )
+    if patient_id:
+        trash_query = trash_query.filter(PatientImage.patient_id == patient_id)
+
+    trash_query = trash_query.order_by(PatientImage.deleted_at.desc())
+
+    results = []
+    for img, patient in trash_query.all():
+        results.append({
+            'id': img.id,
+            'patient_id': img.patient_id,
+            'patient_name': patient.name,
+            'visit_id': img.visit_id,
+            'timestamp': img.timestamp.isoformat(),
+            'deleted_at': img.deleted_at.isoformat(),
+            'notes': img.notes,
+            'tag': img.tag,
+            'filename': os.path.basename(img.image_path)
+        })
+    return jsonify(results), 200
+
+
 @images.route('/patients/images', methods=['GET'])
 def get_all_patient_images():
-    """Fetch all patient images sorted by timestamp desc, joining with Patient info."""
-    # Join PatientImage with Patient
-    images_list = db.session.query(PatientImage, Patient).join(Patient, PatientImage.patient_id == Patient.patient_id).order_by(PatientImage.timestamp.desc()).all()
-    
+    """Fetch all non-deleted patient images sorted by timestamp desc, joining with Patient info."""
+    images_list = (
+        db.session.query(PatientImage, Patient)
+        .join(Patient, PatientImage.patient_id == Patient.patient_id)
+        .filter(PatientImage.deleted_at == None)
+        .order_by(PatientImage.timestamp.desc())
+        .all()
+    )
+
     results = []
     for img, patient in images_list:
         results.append({
@@ -90,15 +170,50 @@ def get_all_patient_images():
         })
     return jsonify(results), 200
 
+
 @images.route('/patients/images/<int:image_id>', methods=['PUT'])
 def update_patient_image(image_id):
     img = PatientImage.query.get_or_404(image_id)
     data = request.json
-    
+
     if 'notes' in data:
         img.notes = data['notes']
     if 'tag' in data:
         img.tag = data['tag']
-        
+
     db.session.commit()
     return jsonify({'message': 'Image updated successfully'}), 200
+
+
+@images.route('/patients/images/<int:image_id>', methods=['DELETE'])
+def soft_delete_patient_image(image_id):
+    """Move an image to trash (soft-delete)."""
+    img = PatientImage.query.get_or_404(image_id)
+    if img.deleted_at is not None:
+        return jsonify({'message': 'Image already in trash'}), 200
+    img.deleted_at = get_ist_now()
+    db.session.commit()
+    return jsonify({'message': 'moved to trash'}), 200
+
+
+@images.route('/patients/images/<int:image_id>/restore', methods=['POST'])
+def restore_patient_image(image_id):
+    """Restore an image from trash."""
+    img = PatientImage.query.get_or_404(image_id)
+    img.deleted_at = None
+    db.session.commit()
+    return jsonify({'message': 'restored'}), 200
+
+
+@images.route('/patients/images/<int:image_id>/permanent', methods=['DELETE'])
+def permanent_delete_patient_image(image_id):
+    """Permanently delete an image: removes the file and the DB row."""
+    img = PatientImage.query.get_or_404(image_id)
+    try:
+        if img.image_path and os.path.exists(img.image_path):
+            os.remove(img.image_path)
+    except Exception as e:
+        print(f"Warning: could not delete file {img.image_path}: {e}")
+    db.session.delete(img)
+    db.session.commit()
+    return '', 204
