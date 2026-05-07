@@ -34,8 +34,6 @@ services:
         value: https://clinicos-frontend.onrender.com
       - key: OCR_SERVICE_URL
         sync: false
-      - key: PYTHON_VERSION
-        value: "3.11.2"
 
   - type: web
     name: clinicos-frontend
