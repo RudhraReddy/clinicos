@@ -1,6 +1,5 @@
 databases:
   - name: clinicos-db
-    plan: starter
     databaseName: clinic_db
     user: clinicos
 
