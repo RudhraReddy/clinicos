@@ -168,11 +168,17 @@ Three-service production stack, budget ~$24/month:
 
 Configured via `render.yaml` (root of repo). Deployed automatically on push to `main`.
 
+**Live URLs:**
+- Frontend: `https://clinicos-frontend.onrender.com`
+- API: `https://clinicos-api-69mw.onrender.com`
+
+Notes:
 - Persistent disk mounted at `/var/data/clinic_uploads` (env `UPLOAD_BASE_DIR`)
 - Gunicorn timeout 120s (OCR calls can take 30-60s)
-- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml)
+- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml) — update to real Cloud Run URL after OCR deploy
 - `DATABASE_URL` injected from Render PostgreSQL; `app.py` normalises `postgres://` → `postgresql://` on startup
 - `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
+- Both services are on **Free** plan (spin-down after 15 min idle). Upgrade to Starter ($7/mo each) for always-on.
 
 ### OCR (GCP Cloud Run)
 
