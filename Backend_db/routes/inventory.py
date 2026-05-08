@@ -11,25 +11,34 @@ import requests as http_requests
 from utils import parse_expiry_date
 
 def _run_ocr(filepath: str) -> dict:
+    import time
     ocr_service_url = os.environ.get('OCR_SERVICE_URL', '').rstrip('/')
     if not ocr_service_url:
         return {'error': 'OCR service not configured — set OCR_SERVICE_URL in Render dashboard'}
-    try:
-        with open(filepath, 'rb') as f:
-            resp = http_requests.post(
-                f'{ocr_service_url}/ocr',
-                files={'image': f},
-                timeout=90
-            )
-        if resp.status_code != 200:
-            return {'error': f'OCR service error: {resp.status_code} {resp.text[:200]}'}
-        return resp.json()
-    except http_requests.Timeout:
-        return {'error': 'OCR service timed out (cold start may be slow — try again in 30s)'}
-    except http_requests.ConnectionError:
-        return {'error': 'Could not reach OCR service — check Fly.io machine status'}
-    except Exception as e:
-        return {'error': f'OCR error: {type(e).__name__}: {str(e)}'}
+    last_error = None
+    for attempt in range(3):
+        try:
+            with open(filepath, 'rb') as f:
+                resp = http_requests.post(
+                    f'{ocr_service_url}/ocr',
+                    files={'image': f},
+                    timeout=90
+                )
+            if resp.status_code == 502:
+                last_error = f'OCR service error: 502 — machine cold-starting, retry {attempt + 1}/3'
+                if attempt < 2:
+                    time.sleep(15)
+                continue
+            if resp.status_code != 200:
+                return {'error': f'OCR service error: {resp.status_code} {resp.text[:200]}'}
+            return resp.json()
+        except http_requests.Timeout:
+            return {'error': 'OCR service timed out (cold start may be slow — try again in 30s)'}
+        except http_requests.ConnectionError:
+            return {'error': 'Could not reach OCR service — check Fly.io machine status'}
+        except Exception as e:
+            return {'error': f'OCR error: {type(e).__name__}: {str(e)}'}
+    return {'error': last_error or 'OCR service unavailable after 3 retries'}
 
 _EMPTY_OCR: dict = {
     'product_details': [],
