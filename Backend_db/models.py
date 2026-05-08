@@ -59,6 +59,8 @@ class ProductMaster(db.Model):
     # New Fields for Billing/Product Master
     gst_rate = db.Column(db.Numeric(5, 2), default=0.0)
     generic_tags = db.Column(db.Text) # Comma Separated
+    # NOTE: New column — run ALTER TABLE product_master ADD COLUMN formula TEXT; in production
+    formula = db.Column(db.Text, nullable=True)
 
     # Relationships
     batches = db.relationship('InventoryBatch', backref='product', lazy=True)

@@ -1,297 +1,229 @@
 import { format } from "date-fns"
 
+interface BillItem {
+    item_name: string
+    qty: number
+    mrp: number
+    hsn_code?: string | null
+    manufacturer?: string | null
+    batch_number?: string | null
+    expiry_date?: string | null  // YYYY-MM-DD
+    gst_rate?: number | null
+}
+
 interface InvoicePrintProps {
     clinicName: string
     clinicAddress: string
     clinicPhone: string
+    clinicLicense?: string
     patient: {
         name: string
         phone_number: string
         age?: number | null
         sex?: string | null
+        reference?: string | null
     }
-    billItems: { item_name: string; qty: number; mrp: number }[]
+    billItems: BillItem[]
     invoiceId?: string
     total: number
     date?: Date
+    referenceDoctor?: string
     className?: string
+}
+
+function formatExpiry(dateStr: string | null | undefined): string {
+    if (!dateStr) return ""
+    try {
+        const d = new Date(dateStr)
+        const mm = String(d.getMonth() + 1).padStart(2, "0")
+        const yy = String(d.getFullYear()).slice(-2)
+        return `${mm}/${yy}`
+    } catch {
+        return dateStr
+    }
 }
 
 export function InvoicePrint({
     clinicName = "MediCare Clinic",
-    clinicAddress = "123 Health St, Medical District, City",
-    clinicPhone = "+91 98765 43210",
+    clinicAddress = "",
+    clinicPhone = "",
+    clinicLicense = "",
     patient,
     billItems,
     invoiceId,
     total,
     date = new Date(),
+    referenceDoctor,
     className,
 }: InvoicePrintProps) {
     if (!patient || billItems.length === 0) return null
 
+    const printTime = format(date, "HH:mm")
+    const printDate = format(date, "dd/MM/yyyy")
+
+    const cellStyle: React.CSSProperties = {
+        borderLeft: "1px solid black",
+        borderRight: "1px solid black",
+        padding: "4px 6px",
+        fontSize: "8pt",
+        fontFamily: "Arial, Helvetica, sans-serif",
+    }
+    const headerCellStyle: React.CSSProperties = {
+        ...cellStyle,
+        borderTop: "1px solid black",
+        borderBottom: "1px solid black",
+        fontWeight: "bold",
+        fontSize: "7.5pt",
+        textAlign: "center",
+        background: "#fff",
+    }
+
     return (
         <div id="invoice-print-region" className={className}>
-            <style>{'@page { size: A5 portrait; margin: 8mm }'}</style>
+            <style>{'@page { size: A4 landscape; margin: 8mm }'}</style>
 
-            {/* Header */}
+            {/* Clinic Name — centered */}
             <div style={{
-                borderBottom: "2px solid black",
-                paddingBottom: "10px",
-                marginBottom: "12px",
+                textAlign: "center",
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: "16pt",
+                fontWeight: "bold",
+                letterSpacing: "0.5px",
+                marginBottom: "6px",
+            }}>
+                {clinicName.toUpperCase()}
+            </div>
+
+            {/* Sub-header: address | phone | DL + time */}
+            <div style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "flex-start",
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: "8pt",
+                marginBottom: "8px",
             }}>
-                <div>
-                    <div style={{
-                        fontFamily: "Georgia, 'Times New Roman', serif",
-                        fontSize: "16pt",
-                        fontWeight: "bold",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        color: "#000",
-                    }}>
-                        {clinicName}
-                    </div>
-                    <div style={{
-                        fontFamily: "Georgia, 'Times New Roman', serif",
-                        fontSize: "7.5pt",
-                        color: "#444",
-                        marginTop: "3px",
-                        maxWidth: "220px",
-                        lineHeight: "1.4",
-                    }}>
-                        {clinicAddress}
-                    </div>
-                    <div style={{
-                        fontFamily: "Georgia, 'Times New Roman', serif",
-                        fontSize: "7.5pt",
-                        color: "#444",
-                        marginTop: "2px",
-                    }}>
-                        Tel: {clinicPhone}
-                    </div>
+                <div style={{ maxWidth: "38%", lineHeight: "1.5" }}>
+                    {clinicAddress}
                 </div>
-                <div style={{ textAlign: "right" }}>
-                    <div style={{
-                        fontFamily: "Georgia, 'Times New Roman', serif",
-                        fontSize: "14pt",
-                        fontWeight: "bold",
-                        color: "#000",
-                        letterSpacing: "1px",
-                    }}>
-                        INVOICE
-                    </div>
-                    <div style={{
-                        fontFamily: "Arial, Helvetica, sans-serif",
-                        fontSize: "7.5pt",
-                        color: "#333",
-                        marginTop: "3px",
-                    }}>
-                        {invoiceId || "DRAFT"}
-                    </div>
-                    <div style={{
-                        fontFamily: "Arial, Helvetica, sans-serif",
-                        fontSize: "7.5pt",
-                        color: "#555",
-                        marginTop: "2px",
-                    }}>
-                        {format(date, "dd MMM yyyy")}
-                    </div>
+                <div style={{ textAlign: "center" }}>
+                    {clinicPhone && `Ph. ${clinicPhone}`}
+                </div>
+                <div style={{ textAlign: "right", lineHeight: "1.5" }}>
+                    {clinicLicense && <div>D.L.No: {clinicLicense}</div>}
                 </div>
             </div>
 
-            {/* Patient Row */}
+            <hr style={{ border: "none", borderTop: "1px solid black", margin: "4px 0 8px 0" }} />
+
+            {/* Patient info row */}
             <div style={{
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "baseline",
-                borderBottom: "1px solid #ccc",
-                paddingBottom: "7px",
-                marginBottom: "12px",
+                alignItems: "flex-start",
                 fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: "8.5pt",
+                marginBottom: "8px",
             }}>
-                <div style={{ fontWeight: "bold", fontSize: "9.5pt", color: "#000" }}>
-                    {patient.name}
+                <div style={{ lineHeight: "1.8" }}>
+                    <div><strong>Name:</strong>&nbsp;&nbsp;{patient.name}</div>
+                    {(referenceDoctor || patient.reference) && (
+                        <div><strong>Ref. Doc Name:</strong>&nbsp;&nbsp;{referenceDoctor || patient.reference}</div>
+                    )}
                 </div>
-                {patient.phone_number && (
-                    <div style={{ fontSize: "7.5pt", color: "#333" }}>
-                        {patient.phone_number}
-                    </div>
-                )}
-                {patient.sex && (
-                    <div style={{ fontSize: "7.5pt", color: "#333" }}>
-                        {patient.sex}
-                    </div>
-                )}
-                {patient.age != null && (
-                    <div style={{ fontSize: "7.5pt", color: "#333" }}>
-                        {patient.age} yrs
-                    </div>
-                )}
+                <div style={{ textAlign: "center" }}>
+                    <strong>Ph:</strong>&nbsp;&nbsp;{patient.phone_number || ""}
+                </div>
+                <div style={{ textAlign: "right", lineHeight: "1.8" }}>
+                    <div><strong>Invoice No. :</strong>&nbsp;{invoiceId || "DRAFT"}</div>
+                    <div><strong>Date :</strong>&nbsp;{printDate}&nbsp;&nbsp;&nbsp;<strong>Time :</strong>&nbsp;{printTime}</div>
+                </div>
             </div>
 
-            {/* Items Table */}
+            <hr style={{ border: "none", borderTop: "1px solid black", margin: "4px 0 8px 0" }} />
+
+            {/* Items table */}
             <table style={{
                 width: "100%",
                 borderCollapse: "collapse",
                 fontFamily: "Arial, Helvetica, sans-serif",
-                marginBottom: "14px",
+                marginBottom: "12px",
             }}>
                 <thead>
-                    <tr style={{ borderBottom: "2px solid black" }}>
-                        <th style={{
-                            textAlign: "left",
-                            fontSize: "6.5pt",
-                            letterSpacing: "0.6px",
-                            textTransform: "uppercase",
-                            paddingBottom: "5px",
-                            paddingTop: "2px",
-                            width: "30px",
-                            fontWeight: "600",
-                        }}>#</th>
-                        <th style={{
-                            textAlign: "left",
-                            fontSize: "6.5pt",
-                            letterSpacing: "0.6px",
-                            textTransform: "uppercase",
-                            paddingBottom: "5px",
-                            paddingTop: "2px",
-                            fontWeight: "600",
-                        }}>Item</th>
-                        <th style={{
-                            textAlign: "right",
-                            fontSize: "6.5pt",
-                            letterSpacing: "0.6px",
-                            textTransform: "uppercase",
-                            paddingBottom: "5px",
-                            paddingTop: "2px",
-                            width: "40px",
-                            fontWeight: "600",
-                        }}>Qty</th>
-                        <th style={{
-                            textAlign: "right",
-                            fontSize: "6.5pt",
-                            letterSpacing: "0.6px",
-                            textTransform: "uppercase",
-                            paddingBottom: "5px",
-                            paddingTop: "2px",
-                            width: "70px",
-                            fontWeight: "600",
-                        }}>MRP (₹)</th>
-                        <th style={{
-                            textAlign: "right",
-                            fontSize: "6.5pt",
-                            letterSpacing: "0.6px",
-                            textTransform: "uppercase",
-                            paddingBottom: "5px",
-                            paddingTop: "2px",
-                            width: "70px",
-                            fontWeight: "600",
-                        }}>Total (₹)</th>
+                    <tr>
+                        <th style={{ ...headerCellStyle, width: "36px" }}>S. No.</th>
+                        <th style={{ ...headerCellStyle, textAlign: "left" }}>Item Name</th>
+                        <th style={{ ...headerCellStyle, width: "70px" }}>HSN Code</th>
+                        <th style={{ ...headerCellStyle, width: "50px" }}>MFR</th>
+                        <th style={{ ...headerCellStyle, width: "70px" }}>Batch No.</th>
+                        <th style={{ ...headerCellStyle, width: "46px" }}>Expiry</th>
+                        <th style={{ ...headerCellStyle, width: "55px" }}>MRP</th>
+                        <th style={{ ...headerCellStyle, width: "50px" }}>CGST%</th>
+                        <th style={{ ...headerCellStyle, width: "50px" }}>SGST%</th>
+                        <th style={{ ...headerCellStyle, width: "52px" }}>Quantity</th>
+                        <th style={{ ...headerCellStyle, width: "65px" }}>Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {billItems.map((item, idx) => (
-                        <tr key={idx} style={{ borderBottom: "1px solid #ddd" }}>
-                            <td style={{
-                                paddingTop: "6px",
-                                paddingBottom: "6px",
-                                fontSize: "8pt",
-                                color: "#999",
-                            }}>{idx + 1}</td>
-                            <td style={{
-                                paddingTop: "6px",
-                                paddingBottom: "6px",
-                                fontSize: "8pt",
-                                color: "#000",
-                            }}>{item.item_name}</td>
-                            <td style={{
-                                paddingTop: "6px",
-                                paddingBottom: "6px",
-                                fontSize: "8pt",
-                                textAlign: "right",
-                                color: "#000",
-                            }}>{item.qty}</td>
-                            <td style={{
-                                paddingTop: "6px",
-                                paddingBottom: "6px",
-                                fontSize: "8pt",
-                                textAlign: "right",
-                                color: "#000",
-                            }}>{item.mrp.toFixed(2)}</td>
-                            <td style={{
-                                paddingTop: "6px",
-                                paddingBottom: "6px",
-                                fontSize: "8pt",
-                                textAlign: "right",
-                                color: "#000",
-                            }}>{(item.qty * item.mrp).toFixed(2)}</td>
+                    {billItems.map((item, idx) => {
+                        const halfGst = item.gst_rate ? (item.gst_rate / 2).toFixed(2) + "%" : ""
+                        const amount = (item.qty * item.mrp).toFixed(2)
+                        return (
+                            <tr key={idx}>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{idx + 1}</td>
+                                <td style={{ ...cellStyle }}>{item.item_name}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.hsn_code || ""}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.manufacturer || ""}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.batch_number || ""}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{formatExpiry(item.expiry_date)}</td>
+                                <td style={{ ...cellStyle, textAlign: "right" }}>{item.mrp.toFixed(2)}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.qty}</td>
+                                <td style={{ ...cellStyle, textAlign: "right" }}>{amount}</td>
+                            </tr>
+                        )
+                    })}
+                    {/* Empty filler rows to pad the table (min 8 rows total) */}
+                    {Array.from({ length: Math.max(0, 8 - billItems.length) }).map((_, i) => (
+                        <tr key={`empty-${i}`}>
+                            {Array.from({ length: 11 }).map((_, j) => (
+                                <td key={j} style={{ ...cellStyle, height: "22px" }}>&nbsp;</td>
+                            ))}
                         </tr>
                     ))}
+                    {/* Total row */}
+                    <tr>
+                        <td colSpan={9} style={{
+                            ...cellStyle,
+                            borderTop: "1px solid black",
+                            borderBottom: "1px solid black",
+                            textAlign: "right",
+                            fontWeight: "bold",
+                            fontSize: "9pt",
+                        }}>Total</td>
+                        <td style={{ ...cellStyle, borderTop: "1px solid black", borderBottom: "1px solid black" }}></td>
+                        <td style={{
+                            ...cellStyle,
+                            borderTop: "1px solid black",
+                            borderBottom: "1px solid black",
+                            textAlign: "right",
+                            fontWeight: "bold",
+                            fontSize: "9pt",
+                        }}>{total.toFixed(2)}</td>
+                    </tr>
                 </tbody>
             </table>
 
-            {/* Totals */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
-                <div style={{ width: "46%", fontFamily: "Arial, Helvetica, sans-serif" }}>
-                    <div style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "5px 0",
-                        borderBottom: "1px solid #ddd",
-                        fontSize: "7pt",
-                        color: "#555",
-                    }}>
-                        <span>Subtotal</span>
-                        <span>₹ {total.toFixed(2)}</span>
-                    </div>
-                    <div style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "6px 0",
-                        borderTop: "2px solid black",
-                        marginTop: "2px",
-                        fontSize: "10pt",
-                        fontWeight: "800",
-                        color: "#000",
-                    }}>
-                        <span>Total</span>
-                        <span>₹ {total.toFixed(2)}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* FOLLOW-UP: uncomment when follow_up_date is wired up */}
-            {/*
+            {/* Footer */}
             <div style={{
-                border: "1px solid #ccc",
-                borderRadius: "3px",
-                padding: "6px 10px",
-                marginBottom: "14px",
                 fontFamily: "Arial, Helvetica, sans-serif",
                 fontSize: "7.5pt",
                 color: "#333",
+                lineHeight: "1.6",
             }}>
-                <span style={{ fontWeight: "600" }}>Follow-up Date:</span> {followUpDate}
-            </div>
-            */}
-
-            {/* Footer */}
-            <div style={{
-                borderTop: "1px solid #bbb",
-                paddingTop: "7px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-end",
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "6.5pt",
-                color: "#888",
-                marginTop: "auto",
-            }}>
-                <span>Thank you for visiting {clinicName}.</span>
-                <span>Authorised Signature ___________</span>
+                <div>Goods once sold will not be taken back or exchanged</div>
+                <div>Subject to Hanamkonda Jurisdiction</div>
             </div>
         </div>
     )

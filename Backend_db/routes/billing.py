@@ -193,9 +193,17 @@ def get_bill_details(invoice_id):
     bill = Bill.query.get_or_404(invoice_id)
     patient = Patient.query.get(bill.patient_id)
     items = BillItem.query.filter_by(bill_id=invoice_id).all()
-    
+
+    # Bulk-load ProductMaster rows for O(1) lookup in the loop
+    product_ids = [i.product_id for i in items if i.product_id]
+    products_map = {}
+    if product_ids:
+        masters = ProductMaster.query.filter(ProductMaster.id.in_(product_ids)).all()
+        products_map = {m.id: m for m in masters}
+
     item_list = []
     for i in items:
+        master = products_map.get(i.product_id)
         item_list.append({
             'item_name': i.item_name,
             'batch_number': i.batch_number,
@@ -203,9 +211,11 @@ def get_bill_details(invoice_id):
             'quantity': i.quantity,
             'mrp': float(i.mrp) if i.mrp else 0,
             'gst_rate': float(i.gst_rate) if i.gst_rate else 0,
-            'total_value': float(i.total_value) if i.total_value else 0
+            'total_value': float(i.total_value) if i.total_value else 0,
+            'hsn_code': master.hsn_code if master else None,
+            'manufacturer': master.manufacturer if master else None,
         })
-        
+
     return jsonify({
         'invoice_id': bill.invoice_id,
         'created_at': bill.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -215,6 +225,7 @@ def get_bill_details(invoice_id):
             'id': bill.patient_id,
             'age': patient.age if patient else None,
             'sex': patient.sex if patient else None,
+            'reference': patient.reference if patient else None,
         },
         'payment_type': bill.payment_type,
         'total_amount': float(bill.total_amount),

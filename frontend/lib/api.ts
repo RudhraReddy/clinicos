@@ -63,6 +63,7 @@ export interface InventoryItem {
     pack_size?: string;
     hsn_code?: string;
     gst_rate?: number;
+    formula?: string;
 }
 
 export interface CreateVisitData {
@@ -331,6 +332,14 @@ export const api = {
 
     async getBillDetails(invoiceId: string): Promise<any> {
         return fetchApi(`/api/billing/${invoiceId}`);
+    },
+
+    async getInventoryAllChanges(dateFrom?: string, dateTo?: string): Promise<any> {
+        const params = new URLSearchParams()
+        if (dateFrom) params.set('date_from', dateFrom)
+        if (dateTo) params.set('date_to', dateTo)
+        const qs = params.toString()
+        return fetchApi(`/api/inventory/all-changes${qs ? `?${qs}` : ''}`)
     },
 
     // Billing Search

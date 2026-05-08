@@ -63,6 +63,7 @@ def get_patients():
             'sex': p.sex,
             'address': p.address,
             'reference': p.reference,
+            'created_at': p.created_at.isoformat() if p.created_at else None,
         })
     return jsonify(results), 200
 

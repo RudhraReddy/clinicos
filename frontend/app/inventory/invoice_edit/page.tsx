@@ -32,6 +32,7 @@ interface ProductRow {
     hsn: string // New
     gst: string // New (was missing in interface but used in backend?)
     category: string
+    formula: string
     match_type?: 'exact' | 'partial'
 }
 
@@ -72,7 +73,7 @@ export default function InvoiceEditPage() {
 
             if (isManual) {
                 // Initialize with one empty row
-                setRows([{ product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine" }])
+                setRows([{ product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "" }])
                 setLoading(false)
                 return
             }
@@ -101,7 +102,8 @@ export default function InvoiceEditPage() {
                         pack: p.pack || "",
                         hsn: p.hsn || "",
                         gst: p.gst || "",
-                        category: p.category || "Medicine"
+                        category: p.category || "Medicine",
+                        formula: p.formula || ""
                     }))
 
                     setRows(products)
@@ -221,7 +223,7 @@ export default function InvoiceEditPage() {
     }
 
     const addRow = () => {
-        setRows([...rows, { product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine" }])
+        setRows([...rows, { product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "" }])
     }
 
     const deleteRow = (index: number) => {
@@ -318,57 +320,61 @@ export default function InvoiceEditPage() {
                 </div>
             </div>
 
-            <div className="border rounded-lg bg-card overflow-hidden">
+            <div className="border rounded-sm bg-card overflow-hidden">
                 {/* Desktop View */}
                 <div className="hidden md:block">
-                    <Table>
+                    <Table className="border-collapse [&_td]:border [&_td]:border-border [&_td]:p-0 [&_th]:border [&_th]:border-border [&_th]:p-0">
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[200px]">Product Name</TableHead>
-                                <TableHead>MFG</TableHead>
-                                {/* <TableHead>Dose</TableHead> */}
-                                <TableHead>Packs</TableHead>
-                                <TableHead>HSN</TableHead>
-                                <TableHead>Batch</TableHead>
-                                <TableHead>Exp</TableHead>
-                                <TableHead>MRP</TableHead>
-                                <TableHead>Rate</TableHead>
-                                <TableHead title="GST %">GST</TableHead>
-                                <TableHead>Qty</TableHead>
-                                <TableHead>Free</TableHead>
-                                {/* <TableHead>Amount</TableHead> */}
-                                <TableHead className="w-[50px]"></TableHead>
+                                <TableHead className="w-[200px] px-2 py-1.5">Product Name</TableHead>
+                                <TableHead className="px-2 py-1.5">MFG</TableHead>
+                                {/* <TableHead className="px-2 py-1.5">Dose</TableHead> */}
+                                <TableHead className="px-2 py-1.5">Packs</TableHead>
+                                <TableHead className="px-2 py-1.5">HSN</TableHead>
+                                <TableHead className="px-2 py-1.5">Batch</TableHead>
+                                <TableHead className="px-2 py-1.5">Exp</TableHead>
+                                <TableHead className="px-2 py-1.5">MRP</TableHead>
+                                <TableHead className="px-2 py-1.5">Rate</TableHead>
+                                <TableHead className="px-2 py-1.5" title="GST %">GST</TableHead>
+                                <TableHead className="px-2 py-1.5">Qty</TableHead>
+                                <TableHead className="px-2 py-1.5">Free</TableHead>
+                                <TableHead className="px-2 py-1.5">Formula</TableHead>
+                                {/* <TableHead className="px-2 py-1.5">Amount</TableHead> */}
+                                <TableHead className="w-[50px] px-2 py-1.5"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {rows.map((row, i) => (
                                 <TableRow key={i}>
-                                    <TableCell>
-                                        <ProductSelector
-                                            value={row.product_name}
-                                            inventory={inventory}
-                                            onSelect={(item) => selectProduct(i, item)}
-                                            onChangeValue={(val) => updateRow(i, 'product_name', val)}
-                                            matchType={row.match_type}
-                                        />
-                                        {row.match_type === 'exact' && <span className="text-xs text-green-600 flex items-center mt-1"><Check className="w-3 h-3 mr-1" /> Matched</span>}
-                                        {row.match_type === 'partial' && <span className="text-xs text-orange-500 flex items-center mt-1"><AlertCircle className="w-3 h-3 mr-1" /> Partial Match (Verify)</span>}
+                                    <TableCell className="align-top">
+                                        <div className="px-1 py-0.5">
+                                            <ProductSelector
+                                                value={row.product_name}
+                                                inventory={inventory}
+                                                onSelect={(item) => selectProduct(i, item)}
+                                                onChangeValue={(val) => updateRow(i, 'product_name', val)}
+                                                matchType={row.match_type}
+                                            />
+                                            {row.match_type === 'exact' && <span className="text-xs text-green-600 flex items-center mt-1"><Check className="w-3 h-3 mr-1" /> Matched</span>}
+                                            {row.match_type === 'partial' && <span className="text-xs text-orange-500 flex items-center mt-1"><AlertCircle className="w-3 h-3 mr-1" /> Partial Match (Verify)</span>}
+                                        </div>
                                     </TableCell>
-                                    <TableCell><Input className="h-8 w-20" value={row.mfg} onChange={e => updateRow(i, 'mfg', e.target.value)} /></TableCell>
-                                    {/* <TableCell><Input className="h-8 w-16" value={row.dosage} onChange={e => updateRow(i, 'dosage', e.target.value)} /></TableCell> */}
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.mfg} onChange={e => updateRow(i, 'mfg', e.target.value)} /></TableCell>
+                                    {/* <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.dosage} onChange={e => updateRow(i, 'dosage', e.target.value)} /></TableCell> */}
                                     <TableCell>
-                                        <Input className="h-8 w-16" placeholder="e.g. 1x10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} />
+                                        <input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. 1x10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} />
                                     </TableCell>
-                                    <TableCell><Input className="h-8 w-16" value={row.hsn} onChange={e => updateRow(i, 'hsn', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-20" value={row.batch} onChange={e => updateRow(i, 'batch', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-20" value={row.expiry} onChange={e => updateRow(i, 'expiry', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-16" value={row.mrp} onChange={e => updateRow(i, 'mrp', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-16" value={row.rate} onChange={e => updateRow(i, 'rate', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-12" value={row.gst} onChange={e => updateRow(i, 'gst', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-12" value={row.qty} onChange={e => updateRow(i, 'qty', e.target.value)} /></TableCell>
-                                    <TableCell><Input className="h-8 w-12" value={row.free} onChange={e => updateRow(i, 'free', e.target.value)} /></TableCell>
-                                    {/* <TableCell><Input className="h-8" value={row.amount} onChange={e => updateRow(i, 'amount', e.target.value)} /></TableCell> */}
-                                    <TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.hsn} onChange={e => updateRow(i, 'hsn', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.batch} onChange={e => updateRow(i, 'batch', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.expiry} onChange={e => updateRow(i, 'expiry', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.mrp} onChange={e => updateRow(i, 'mrp', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.rate} onChange={e => updateRow(i, 'rate', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.gst} onChange={e => updateRow(i, 'gst', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.qty} onChange={e => updateRow(i, 'qty', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.free} onChange={e => updateRow(i, 'free', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. Tab 500mg" value={row.formula} onChange={e => updateRow(i, 'formula', e.target.value)} /></TableCell>
+                                    {/* <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.amount} onChange={e => updateRow(i, 'amount', e.target.value)} /></TableCell> */}
+                                    <TableCell className="text-center">
                                         <Button variant="ghost" size="sm" onClick={() => deleteRow(i)}>
                                             <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
@@ -443,12 +449,15 @@ export default function InvoiceEditPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3 p-2 bg-muted/20 rounded">
+                            <div className="grid grid-cols-2 gap-3 p-2 bg-muted/20 rounded">
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-muted-foreground">Qty</label>
                                     <Input className="h-9 bg-background" value={row.qty} onChange={e => updateRow(i, 'qty', e.target.value)} />
                                 </div>
-                                {/* Amount removed */}
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Formula</label>
+                                    <Input className="h-9" placeholder="e.g. Tab 500mg" value={row.formula} onChange={e => updateRow(i, 'formula', e.target.value)} />
+                                </div>
                             </div>
                         </div>
                     ))}

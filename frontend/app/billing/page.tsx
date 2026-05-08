@@ -81,19 +81,27 @@ function BillingContent() {
     const [printDialogOpen, setPrintDialogOpen] = useState(false)
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
 
-    // Clinic settings (persisted in localStorage)
     const [clinicName, setClinicName] = useState("Teja Reddy Clinic")
     const [clinicAddress, setClinicAddress] = useState("#3145 Here and there, TS 500081")
+    const [clinicPhone, setClinicPhone] = useState("+91 98765 43210")
+    const [referenceDoctor, setReferenceDoctor] = useState("")
+
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [settingsNameDraft, setSettingsNameDraft] = useState("")
     const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
+    const [settingsPhoneDraft, setSettingsPhoneDraft] = useState("")
+    const [settingsReferenceDoctorDraft, setSettingsReferenceDoctorDraft] = useState("")
 
     // Load clinic settings from localStorage
     useEffect(() => {
         const storedName = localStorage.getItem("clinic_name")
         const storedAddress = localStorage.getItem("clinic_address")
+        const storedPhone = localStorage.getItem("clinic_phone")
+        const storedRefDoc = localStorage.getItem("clinic_ref_doc")
         if (storedName) setClinicName(storedName)
         if (storedAddress !== null) setClinicAddress(storedAddress)
+        if (storedPhone !== null) setClinicPhone(storedPhone)
+        if (storedRefDoc !== null) setReferenceDoctor(storedRefDoc)
     }, [])
 
     // Load patient if ID present in URL
@@ -227,6 +235,8 @@ function BillingContent() {
                     if (open) {
                         setSettingsNameDraft(clinicName)
                         setSettingsAddressDraft(clinicAddress)
+                        setSettingsPhoneDraft(clinicPhone)
+                        setSettingsReferenceDoctorDraft(referenceDoctor)
                     }
                 }}>
                     <DialogTrigger asChild>
@@ -262,13 +272,35 @@ function BillingContent() {
                                     rows={3}
                                 />
                             </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="settings-clinic-phone">Clinic Phone</Label>
+                                <Input
+                                    id="settings-clinic-phone"
+                                    value={settingsPhoneDraft}
+                                    onChange={(e) => setSettingsPhoneDraft(e.target.value)}
+                                    placeholder="+91 98765 43210"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="settings-clinic-refdoc">Reference Doctor</Label>
+                                <Input
+                                    id="settings-clinic-refdoc"
+                                    value={settingsReferenceDoctorDraft}
+                                    onChange={(e) => setSettingsReferenceDoctorDraft(e.target.value)}
+                                    placeholder="Dr. John Doe"
+                                />
+                            </div>
                             <Button
                                 className="w-full"
                                 onClick={() => {
                                     localStorage.setItem("clinic_name", settingsNameDraft)
                                     localStorage.setItem("clinic_address", settingsAddressDraft)
+                                    localStorage.setItem("clinic_phone", settingsPhoneDraft)
+                                    localStorage.setItem("clinic_ref_doc", settingsReferenceDoctorDraft)
                                     setClinicName(settingsNameDraft)
                                     setClinicAddress(settingsAddressDraft)
+                                    setClinicPhone(settingsPhoneDraft)
+                                    setReferenceDoctor(settingsReferenceDoctorDraft)
                                     setSettingsOpen(false)
                                     toast.success("Clinic settings saved")
                                 }}
@@ -600,7 +632,9 @@ function BillingContent() {
                 invoiceId={printInvoiceId}
                 clinicName={clinicName}
                 clinicAddress={clinicAddress}
-                clinicPhone="+91 98765 43210"
+                clinicPhone={clinicPhone}
+                clinicLicense="TG/WLU/2025-140763"
+                referenceDoctor={referenceDoctor}
             />
         </div>
     )

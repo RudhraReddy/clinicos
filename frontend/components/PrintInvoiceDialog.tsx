@@ -18,6 +18,11 @@ interface PrintBillItem {
     item_name: string
     qty: number
     mrp: number
+    hsn_code?: string | null
+    manufacturer?: string | null
+    batch_number?: string | null
+    expiry_date?: string | null
+    gst_rate?: number | null
 }
 
 interface PrintInvoicePatient {
@@ -25,6 +30,7 @@ interface PrintInvoicePatient {
     phone_number: string
     age?: number | null
     sex?: string | null
+    reference?: string | null
 }
 
 interface PrintInvoiceData {
@@ -42,15 +48,17 @@ interface PrintInvoiceDialogProps {
     clinicName: string
     clinicAddress: string
     clinicPhone: string
+    clinicLicense?: string
+    referenceDoctor?: string
 }
 
 function printElement(elementId: string) {
     const el = document.getElementById(elementId)
     if (!el) return
-    const win = window.open('', '_blank', 'width=600,height=850')
+    const win = window.open('', '_blank', 'width=900,height=650')
     if (!win) return
     win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
-    <style>body{margin:0;padding:0}@page{size:A5 portrait;margin:8mm}</style>
+    <style>body{margin:0;padding:0}@page{size:A4 landscape;margin:8mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
     win.document.close()
     win.focus()
@@ -65,6 +73,8 @@ export function PrintInvoiceDialog({
     clinicName,
     clinicAddress,
     clinicPhone,
+    clinicLicense = "",
+    referenceDoctor = "",
 }: PrintInvoiceDialogProps) {
     const [loading, setLoading] = useState(false)
     const [invoiceData, setInvoiceData] = useState<PrintInvoiceData | null>(null)
@@ -84,15 +94,18 @@ export function PrintInvoiceDialog({
                     phone_number: data.patient.phone,
                     age: data.patient.age ?? null,
                     sex: data.patient.sex ?? null,
+                    reference: data.patient.reference ?? null,
                 }
-                const billItems: PrintBillItem[] = data.items.map((i: {
-                    item_name: string
-                    quantity: number
-                    mrp: number
-                }) => ({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const billItems: PrintBillItem[] = data.items.map((i: any) => ({
                     item_name: i.item_name,
                     qty: i.quantity,
                     mrp: i.mrp,
+                    hsn_code: i.hsn_code ?? null,
+                    manufacturer: i.manufacturer ?? null,
+                    batch_number: i.batch_number ?? null,
+                    expiry_date: i.expiry_date ?? null,
+                    gst_rate: i.gst_rate ?? null,
                 }))
                 setInvoiceData({
                     patient,
@@ -116,7 +129,7 @@ export function PrintInvoiceDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Invoice Preview</DialogTitle>
                 </DialogHeader>
@@ -132,12 +145,14 @@ export function PrintInvoiceDialog({
                         clinicName={clinicName}
                         clinicAddress={clinicAddress}
                         clinicPhone={clinicPhone}
+                        clinicLicense={clinicLicense}
+                        referenceDoctor={referenceDoctor}
                         patient={invoiceData.patient}
                         billItems={invoiceData.billItems}
                         invoiceId={invoiceData.invoiceId}
                         total={invoiceData.total}
                         date={invoiceData.date}
-                        className="bg-white p-8 text-black"
+                        className="bg-white p-6 text-black"
                     />
                 )}
 

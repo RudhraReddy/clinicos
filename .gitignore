@@ -28,3 +28,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 .superpowers/
+.playwright-mcp/
+.gemini/
+dont upload/

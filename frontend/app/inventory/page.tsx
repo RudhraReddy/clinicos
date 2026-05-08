@@ -13,7 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History } from "lucide-react"
+import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { UploadInventoryReportDialog } from "@/components/UploadInventoryReportDialog"
@@ -24,9 +24,231 @@ import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from 'next/link'
 
+function AllChangesPanel() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+    const [dateFrom, setDateFrom] = useState('')
+    const [dateTo, setDateTo] = useState('')
+    const [filterType, setFilterType] = useState('ALL') // 'ALL', 'SALE', 'ADJUSTMENT', 'PURCHASE'
+
+    const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
+
+    const load = async (from = dateFrom, to = dateTo) => {
+        setLoading(true)
+        try {
+            const res = await api.getInventoryAllChanges(from || undefined, to || undefined)
+            setData(res)
+        } catch {
+            setData(null)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const resetDates = () => {
+        setDateFrom('')
+        setDateTo('')
+        setFilterType('ALL')
+        load('', '')
+    }
+
+    const toggleExpandAll = () => {
+        if (!data?.days) return
+        if (expandedDays.size === data.days.length) {
+            setExpandedDays(new Set())
+        } else {
+            setExpandedDays(new Set(data.days.map((d: any) => d.date)))
+        }
+    }
+
+    const toggleDay = (date: string) => {
+        const newSet = new Set(expandedDays)
+        if (newSet.has(date)) {
+            newSet.delete(date)
+        } else {
+            newSet.add(date)
+        }
+        setExpandedDays(newSet)
+    }
+
+    useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+                <div className="flex gap-3 items-end flex-wrap">
+                    <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">From</label>
+                        <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">To</label>
+                        <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
+                    </div>
+                    <Button onClick={() => load()} variant="outline">Apply</Button>
+                    <Button onClick={resetDates} variant="ghost" size="icon" title="Reset Dates">
+                        <RotateCcw className="h-4 w-4" />
+                    </Button>
+                </div>
+                <div className="flex items-end gap-3">
+                    <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Type</label>
+                        <Select value={filterType} onValueChange={setFilterType}>
+                            <SelectTrigger className="w-[140px] h-9">
+                                <SelectValue placeholder="All Changes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">All Changes</SelectItem>
+                                <SelectItem value="SALE">Sales</SelectItem>
+                                <SelectItem value="ADJUSTMENT">Manual</SelectItem>
+                                <SelectItem value="PURCHASE">Invoice</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {data?.days && data.days.length > 0 && (
+                        <Button variant="outline" size="sm" className="h-9" onClick={toggleExpandAll}>
+                            {expandedDays.size === data.days.length ? "Collapse All" : "Expand All"}
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {loading && (
+                <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            )}
+
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {!loading && data?.days?.map((dayRaw: any) => {
+                let sales = dayRaw.sales || [];
+                let manual = dayRaw.manual || [];
+                
+                if (filterType === 'SALE') {
+                    manual = [];
+                } else if (filterType === 'ADJUSTMENT') {
+                    sales = [];
+                    // Keep anything that isn't a PURCHASE/Invoice
+                    manual = manual.filter((e: any) => e.type !== 'PURCHASE');
+                } else if (filterType === 'PURCHASE') {
+                    sales = [];
+                    // Keep only PURCHASE/Invoice
+                    manual = manual.filter((e: any) => e.type === 'PURCHASE');
+                }
+                
+                if (sales.length === 0 && manual.length === 0) return null;
+                
+                const day = { ...dayRaw, sales, manual };
+                const isExpanded = expandedDays.has(day.date)
+                return (
+                <Card key={day.date}>
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleDay(day.date)}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                {new Date(day.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            </CardTitle>
+                            <span className="text-sm text-muted-foreground">
+                                {[
+                                    day.sales.length > 0 ? `Sales (${day.sales.length})` : null,
+                                    day.manual.filter((e: any) => e.type === 'PURCHASE').length > 0 ? `Invoices Added (${day.manual.filter((e: any) => e.type === 'PURCHASE').length})` : null,
+                                    day.manual.filter((e: any) => e.type !== 'PURCHASE').length > 0 ? `Manual Changes (${day.manual.filter((e: any) => e.type !== 'PURCHASE').length})` : null
+                                ].filter(Boolean).join(' • ') || 'No changes'}
+                            </span>
+                        </div>
+                    </CardHeader>
+                    {isExpanded && (
+                    <CardContent className="space-y-4">
+                        {day.manual.length > 0 && (
+                            <div>
+                                <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                                    Manual Changes ({day.manual.length})
+                                </h4>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Product</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Qty Change</TableHead>
+                                            <TableHead>Notes</TableHead>
+                                            <TableHead>Time</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {day.manual.map((e: any) => (
+                                            <TableRow key={e.id}>
+                                                <TableCell className="font-medium">{e.product_name}</TableCell>
+                                                <TableCell><Badge variant="outline">{e.type}</Badge></TableCell>
+                                                <TableCell className="text-right">
+                                                    {e.change_amount > 0 ? `+${e.change_amount}` : e.change_amount}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">{e.notes || '—'}</TableCell>
+                                                <TableCell className="text-sm">
+                                                    {e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+
+                        {day.sales.length > 0 && (
+                            <div>
+                                <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                                    Sales ({day.sales.length})
+                                </h4>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Product</TableHead>
+                                            <TableHead>Bill ID</TableHead>
+                                            <TableHead className="text-right">Qty Sold</TableHead>
+                                            <TableHead>Time</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {day.sales.map((e: any) => (
+                                            <TableRow key={e.id}>
+                                                <TableCell className="font-medium">{e.product_name}</TableCell>
+                                                <TableCell className="font-mono text-sm">{e.bill_id || '—'}</TableCell>
+                                                <TableCell className="text-right text-red-600">{e.change_amount}</TableCell>
+                                                <TableCell className="text-sm">
+                                                    {e.timestamp ? new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+
+                        {day.manual.length === 0 && day.sales.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No changes recorded.</p>
+                        )}
+                    </CardContent>
+                    )}
+                </Card>
+            )})}
+
+            {!loading && (!data?.days || data.days.length === 0) && (
+                <div className="text-center text-muted-foreground py-12">No changes found.</div>
+            )}
+        </div>
+    )
+}
+
 export default function InventoryPage() {
+    const [role, setRole] = useState<string>('')
+    const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -99,6 +321,7 @@ export default function InventoryPage() {
 
     useEffect(() => {
         loadData()
+        setRole(localStorage.getItem('clinic_role') || '')
     }, [])
 
     // Extract Unique Values for Filters
@@ -241,6 +464,21 @@ export default function InventoryPage() {
                     } onSuccess={loadData} />
                 </div>
             </div>
+
+            {/* Tabs */}
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="space-y-4">
+                {role === 'doctor' && (
+                    <TabsList>
+                        <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                        <TabsTrigger value="all-changes">All Changes</TabsTrigger>
+                    </TabsList>
+                )}
+
+                <TabsContent value="all-changes">
+                    <AllChangesPanel />
+                </TabsContent>
+
+                <TabsContent value="inventory" className="space-y-6 mt-0">
             <div className="flex gap-2 items-center flex-wrap justify-between">
                 <div className="flex gap-2 items-center flex-wrap">
                     <Button variant="outline" onClick={() => window.location.href = '/inventory/history'}>
@@ -670,6 +908,8 @@ export default function InventoryPage() {
                     )}
                 </SheetContent>
             </Sheet>
+                </TabsContent>
+            </Tabs>
         </div >
     )
 }

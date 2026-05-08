@@ -466,7 +466,8 @@ def get_inventory():
             'status': status_tags,
             'pack_size': item.pack_size,
             'hsn_code': item.hsn_code,
-            'gst_rate': float(item.gst_rate) if item.gst_rate else 0.0
+            'gst_rate': float(item.gst_rate) if item.gst_rate else 0.0,
+            'formula': item.formula,
         })
     return jsonify(results), 200
 
@@ -556,18 +557,45 @@ def add_inventory_item():
 def update_inventory_item(id):
     item = ProductMaster.query.get_or_404(id)
     data = request.get_json()
-    
+
+    changed_fields = []
+
     if 'item_name' in data:
+        if item.item_name != data['item_name']:
+            changed_fields.append('item_name')
         item.item_name = data['item_name']
     if 'category' in data:
+        if item.category != data['category']:
+            changed_fields.append('category')
         item.category = data['category']
     if 'min_stock_level' in data:
-        item.min_stock_level = int(data['min_stock_level'])
+        new_val = int(data['min_stock_level'])
+        if item.min_stock_level != new_val:
+            changed_fields.append('min_stock_level')
+        item.min_stock_level = new_val
     if 'pack_size' in data:
+        if item.pack_size != data['pack_size']:
+            changed_fields.append('pack_size')
         item.pack_size = data['pack_size']
     if 'hsn_code' in data:
+        if item.hsn_code != data['hsn_code']:
+            changed_fields.append('hsn_code')
         item.hsn_code = data['hsn_code']
-        
+    if 'formula' in data:
+        new_formula = data['formula']
+        if item.formula != new_formula:
+            changed_fields.append('formula')
+        item.formula = new_formula
+
+    if changed_fields:
+        hist = InventoryHistory(
+            product_id=id,
+            change_amount=0,
+            type='ADJUSTMENT',
+            notes=f"Item fields updated: {', '.join(changed_fields)}"
+        )
+        db.session.add(hist)
+
     db.session.commit()
     return jsonify({'message': 'Item updated successfully'}), 200
 
@@ -1015,6 +1043,7 @@ def save_invoice():
             p_pack = p.get('packs') or p.get('pack') or ''
             p_batch = p.get('batch') or p.get('batch_number') or ''
             p_hsn = p.get('hsn') or p.get('hsn_code') or ''
+            p_formula = (p.get('formula') or '').strip()
             
             try: 
                 p_gst = float(str(p.get('gst', 0) or 0))
@@ -1042,15 +1071,18 @@ def save_invoice():
                     category='',
                     manufacturer=p_mfg,
                     pack_size=str(p_pack),
-                    hsn_code=str(p_hsn)
+                    hsn_code=str(p_hsn),
+                    formula=p_formula if p_formula else None,
                 )
                 db.session.add(item)
                 db.session.flush()
             else:
-                 if p_mfg and not item.manufacturer:
-                     item.manufacturer = p_mfg
-                 if p_hsn and not item.hsn_code:
-                     item.hsn_code = p_hsn
+                if p_mfg and not item.manufacturer:
+                    item.manufacturer = p_mfg
+                if p_hsn and not item.hsn_code:
+                    item.hsn_code = p_hsn
+                if p_formula:
+                    item.formula = p_formula
             
             qty = 0
             try: qty = int(float(str(p.get('qty', 0))))
@@ -1099,7 +1131,65 @@ def save_invoice():
             
         db.session.commit()
         return jsonify({'message': 'Invoice Saved', 'invoice_number': invoice_no}), 200
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@inventory.route('/inventory/all-changes', methods=['GET'])
+def get_all_inventory_changes():
+    """Returns all inventory history grouped by date, split into MANUAL and SALES"""
+    from collections import defaultdict
+
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+
+    query = InventoryHistory.query.order_by(InventoryHistory.timestamp.desc())
+
+    if date_from:
+        try:
+            query = query.filter(func.date(InventoryHistory.timestamp) >= date_from)
+        except Exception:
+            pass
+    if date_to:
+        try:
+            query = query.filter(func.date(InventoryHistory.timestamp) <= date_to)
+        except Exception:
+            pass
+
+    records = query.all()
+
+    product_ids = list({r.product_id for r in records})
+    products = {}
+    if product_ids:
+        products = {p.id: p.item_name for p in ProductMaster.query.filter(ProductMaster.id.in_(product_ids)).all()}
+
+    days: dict = defaultdict(lambda: {'manual': [], 'sales': []})
+
+    for r in records:
+        date_key = r.timestamp.strftime('%Y-%m-%d') if r.timestamp else 'unknown'
+        entry = {
+            'id': r.id,
+            'product_id': r.product_id,
+            'product_name': products.get(r.product_id, 'Unknown'),
+            'type': r.type,
+            'change_amount': r.change_amount,
+            'timestamp': r.timestamp.isoformat() if r.timestamp else None,
+            'notes': r.notes,
+            'bill_id': r.bill_id,
+        }
+        if r.type == 'SALE':
+            days[date_key]['sales'].append(entry)
+        else:
+            days[date_key]['manual'].append(entry)
+
+    result = []
+    for date_key in sorted(days.keys(), reverse=True):
+        result.append({
+            'date': date_key,
+            'manual': days[date_key]['manual'],
+            'sales': days[date_key]['sales'],
+        })
+
+    return jsonify({'days': result}), 200

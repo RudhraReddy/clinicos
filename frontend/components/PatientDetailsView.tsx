@@ -167,6 +167,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                             <span>Phone: <span className="text-foreground">{patient.phone_number}</span></span>
                             {patient.age && <span>Age: <span className="text-foreground">{patient.age}</span></span>}
                             {patient.sex && <span>Sex: <span className="text-foreground">{patient.sex}</span></span>}
+                            {patient.created_at && <span>Joined: <span className="text-foreground">{new Date(patient.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span></span>}
                         </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
@@ -391,6 +392,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                     clinicName="MediCare Clinic"
                     clinicAddress=""
                     clinicPhone=""
+                    clinicLicense=""
                 />
             </DialogContent>
         </Dialog>
