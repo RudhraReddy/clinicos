@@ -162,7 +162,7 @@ Production stack, projected ~$15/month (Render Hobby workspace):
 | `clinicos-frontend` | Render | Starter Node web | 512MB | $7/mo |
 | `clinicos-db` | Render | **Free** PostgreSQL (256MB, 1GB storage) | — | $0 → **must upgrade to $7/mo** |
 | `clinic-uploads` disk | Render | 10GB persistent (attached to clinicos-api) | — | $1/mo |
-| Google Cloud Vision API | GCP | pay-per-use (1000 free/mo) | — | $0/mo |
+| Google Cloud Vision API | GCP | pay-per-use (1000 free/mo) | — | $0/mo (budget alert set at $10) |
 
 > **URGENT:** `clinicos-db` is on the **Free plan** and will be **auto-deleted on 2026-05-29** (~22 days). Upgrade to Starter ($7/mo) at the Render dashboard before that date to preserve all data.
 
