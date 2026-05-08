@@ -12,6 +12,24 @@ load_dotenv()
 # db is imported from extensions
 
 
+def _apply_migrations(db):
+    """
+    Idempotent column-addition migrations.
+    db.create_all() only creates missing tables; it never adds columns to
+    existing tables. Add each new column here with IF NOT EXISTS so the
+    statement is safe to run on every startup.
+    """
+    from sqlalchemy import text
+    stmts = [
+        # 2026-05-08: formula column added to product_master
+        "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS formula TEXT",
+    ]
+    with db.engine.connect() as conn:
+        for stmt in stmts:
+            conn.execute(text(stmt))
+        conn.commit()
+
+
 def create_app():
     app = Flask(__name__)
 
@@ -34,6 +52,7 @@ def create_app():
         for bp in blueprints:
              app.register_blueprint(bp, url_prefix='/api')
         db.create_all()
+        _apply_migrations(db)
 
     return app
 
