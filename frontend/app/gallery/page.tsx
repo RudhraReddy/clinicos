@@ -56,6 +56,19 @@ export default function GalleryPage() {
         }
     }, [invoiceQuery, invoiceImages])
 
+    const handleDeleteImage = async (e: React.MouseEvent, imageId: number) => {
+        e.stopPropagation()
+        if (!confirm("Are you sure you want to delete this image? It will be moved to the trash.")) return
+        try {
+            await api.deletePatientImage(imageId)
+            setImages(prev => prev.filter(img => img.id !== imageId))
+            setFilteredImages(prev => prev.filter(img => img.id !== imageId))
+        } catch (err) {
+            console.error("Failed to delete image", err)
+            alert("Failed to delete image")
+        }
+    }
+
     const loadImages = async () => {
         try {
             const data = await api.getAllPatientImages()
@@ -189,11 +202,14 @@ export default function GalleryPage() {
                                         filteredImages.map((img) => (
                                             <TableRow key={img.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setViewImage(img)}>
                                                 <TableCell>
-                                                    <div className="h-12 w-12 rounded overflow-hidden bg-muted border">
+                                                    <div className="h-12 w-12 rounded overflow-hidden bg-muted border flex items-center justify-center">
                                                         <img
                                                             src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
                                                             alt="Thumbnail"
                                                             className="h-full w-full object-cover"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none'
+                                                            }}
                                                         />
                                                     </div>
                                                 </TableCell>
@@ -209,7 +225,18 @@ export default function GalleryPage() {
                                                     {img.notes || "-"}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                                    {img.visit_id || "-"}
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <span>{img.visit_id || "-"}</span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                                            onClick={(e) => handleDeleteImage(e, img.id)}
+                                                            title="Move to trash"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -324,11 +351,14 @@ export default function GalleryPage() {
                                         trashImages.map((img) => (
                                             <TableRow key={img.id}>
                                                 <TableCell>
-                                                    <div className="h-10 w-10 rounded overflow-hidden bg-muted border">
+                                                    <div className="h-10 w-10 rounded overflow-hidden bg-muted border flex items-center justify-center">
                                                         <img
                                                             src={`/api/patients/images/${img.id}/file`}
                                                             alt="Thumbnail"
                                                             className="h-full w-full object-cover opacity-60"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none'
+                                                            }}
                                                         />
                                                     </div>
                                                 </TableCell>

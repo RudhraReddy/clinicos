@@ -148,21 +148,23 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 - Patient images: `$UPLOAD_BASE_DIR/patients/<patient_id>/`
 - Invoice images: `$UPLOAD_BASE_DIR/invoices/`
 - QR upload temp: `$UPLOAD_BASE_DIR/temp/<session_id>/`
-- On Render, `UPLOAD_BASE_DIR` is `/tmp/clinic_uploads` (ephemeral).
+- On Render, `UPLOAD_BASE_DIR` is `/var/data/clinic_uploads` — the `clinic-uploads` **persistent** 10GB disk (not ephemeral).
 
 ## Deployment
 
 ### Architecture
 
-Three-service production stack, budget ~$24/month:
+Production stack, projected ~$15/month (Render Hobby workspace):
 
 | Service | Platform | Plan | RAM | Cost |
 |---|---|---|---|---|
-| `clinicos-api` | Render Starter | Python web | 512MB | $7/mo |
-| `clinicos-frontend` | Render Starter | Node web | 512MB | $7/mo |
-| `clinicos-db` | Render Starter | PostgreSQL | — | $7/mo |
-| `clinic-uploads` disk | Render | 10GB persistent | — | $1/mo |
-| `clinicos-ocr` | Fly.io | pay-per-use | 2GB | ~$2/mo |
+| `clinicos-api` | Render | Starter Python web | 512MB | $7/mo |
+| `clinicos-frontend` | Render | Starter Node web | 512MB | $7/mo |
+| `clinicos-db` | Render | **Free** PostgreSQL (256MB, 1GB storage) | — | $0 → **must upgrade to $7/mo** |
+| `clinic-uploads` disk | Render | 10GB persistent (attached to clinicos-api) | — | $1/mo |
+| `clinicos-ocr` | Fly.io | pay-per-use (scales to zero) | 2GB | ~$2/mo |
+
+> **URGENT:** `clinicos-db` is on the **Free plan** and will be **auto-deleted on 2026-05-29** (~22 days). Upgrade to Starter ($7/mo) at the Render dashboard before that date to preserve all data.
 
 ### Render
 
@@ -173,12 +175,14 @@ Configured via `render.yaml` (root of repo). Deployed automatically on push to `
 - API: `https://clinicos-api-69mw.onrender.com`
 
 Notes:
-- Persistent disk mounted at `/var/data/clinic_uploads` (env `UPLOAD_BASE_DIR`)
-- Gunicorn timeout 120s (OCR calls can take 30-60s)
+- Both web services (`clinicos-api`, `clinicos-frontend`) are on **Starter** plan — always-on, no spin-down
+- Persistent disk `clinic-uploads` (10GB) mounted at `/var/data/clinic_uploads` on `clinicos-api` (env `UPLOAD_BASE_DIR`). Render takes daily snapshots with 7-day retention.
+- **`clinicos-db` is on Free plan** — expiry 2026-05-29. Actual DB name has a Render suffix (`clinic_db_s5ra`) but this is transparent since `DATABASE_URL` is injected. PostgreSQL 18, 1GB storage, 256MB RAM.
+- Gunicorn timeout 120s (OCR calls can take 30-60s); `--max-requests-jitter 50` is active in the live start command (also in render.yaml)
 - `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml) — set to `https://clinicos-ocr.fly.dev`
 - `DATABASE_URL` injected from Render PostgreSQL; `app.py` normalises `postgres://` → `postgresql://` on startup
 - `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
-- Both services are on **Free** plan (spin-down after 15 min idle). Upgrade to Starter ($7/mo each) for always-on.
+- No health check paths configured on either service — Render cannot detect hung workers
 
 ### OCR (Fly.io)
 
@@ -193,7 +197,7 @@ PaddleOCR runs as a separate microservice in `ocr_cloud/`. Models are baked into
   cd ocr_cloud
   flyctl deploy --remote-only
   ```
-- Config: `ocr_cloud/fly.toml` — `auto_stop_machines = "stop"`, `auto_start_machines = true`
+- Config: `ocr_cloud/fly.toml` — `auto_stop_machines = true`, `auto_start_machines = true`, `min_machines_running = 0`
 - First request after idle may be slow (~30s) while machine wakes up; subsequent requests are fast.
 
 ### Environment Variables
@@ -206,8 +210,7 @@ PaddleOCR runs as a separate microservice in `ocr_cloud/`. Models are baked into
 | `UPLOAD_BASE_DIR` | `/var/data/clinic_uploads` |
 | `FLASK_DEBUG` | `false` |
 | `CORS_ORIGINS` | `https://clinicos-frontend.onrender.com` |
-| `OCR_SERVICE_URL` | `https://clinicos-ocr.fly.dev` (secret — set in dashboard) |
-| `PYTHON_VERSION` | `3.11.2` |
+| `OCR_SERVICE_URL` | `https://clinicos-ocr.fly.dev` (secret — set in dashboard, not in render.yaml) |
 
 **`clinicos-frontend`:**
 

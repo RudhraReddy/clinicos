@@ -321,6 +321,9 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                                                                             alt="Thumbnail"
                                                                             className="w-full h-full object-cover"
                                                                             loading="lazy"
+                                                                            onError={(e) => {
+                                                                                (e.target as HTMLImageElement).style.display = 'none'
+                                                                            }}
                                                                         />
                                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
                                                                             <Maximize2 className="h-4 w-4 text-white" />

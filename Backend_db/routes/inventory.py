@@ -10,22 +10,26 @@ import requests as http_requests
 
 from utils import parse_expiry_date
 
-OCR_SERVICE_URL = os.environ.get('OCR_SERVICE_URL', '').rstrip('/')
-
 def _run_ocr(filepath: str) -> dict:
-    if not OCR_SERVICE_URL:
-        return {'error': 'OCR service not configured (set OCR_SERVICE_URL env var)'}
+    ocr_service_url = os.environ.get('OCR_SERVICE_URL', '').rstrip('/')
+    if not ocr_service_url:
+        return {'error': 'OCR service not configured — set OCR_SERVICE_URL in Render dashboard'}
     try:
         with open(filepath, 'rb') as f:
             resp = http_requests.post(
-                f'{OCR_SERVICE_URL}/ocr',
+                f'{ocr_service_url}/ocr',
                 files={'image': f},
                 timeout=90
             )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            return {'error': f'OCR service error: {resp.status_code} {resp.text[:200]}'}
         return resp.json()
+    except http_requests.Timeout:
+        return {'error': 'OCR service timed out (cold start may be slow — try again in 30s)'}
+    except http_requests.ConnectionError:
+        return {'error': 'Could not reach OCR service — check Fly.io machine status'}
     except Exception as e:
-        return {'error': str(e)}
+        return {'error': f'OCR error: {type(e).__name__}: {str(e)}'}
 
 _EMPTY_OCR: dict = {
     'product_details': [],

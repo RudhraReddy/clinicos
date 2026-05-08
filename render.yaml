@@ -17,6 +17,7 @@ services:
       --max-requests 500
       --max-requests-jitter 50
       "app:create_app()"
+
     disk:
       name: clinic-uploads
       mountPath: /var/data/clinic_uploads

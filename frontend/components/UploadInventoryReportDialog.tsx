@@ -39,12 +39,21 @@ export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDi
             return
         }
 
+        // Check for any other backend/OCR error (e.g. service timeout, misconfiguration)
+        if (ocrData?.error) {
+            setSubmitResult({
+                success: false,
+                message: ocrData.error
+            })
+            return
+        }
+
         // Check for Empty Data (Failed Extraction)
-        const products = ocrData.product_details || []
+        const products = ocrData?.product_details || []
         if (products.length === 0) {
             setSubmitResult({
                 success: false,
-                message: "Could not handle this image properly. Please reupload a clearer image."
+                message: "Could not extract any products from this image. Please reupload a clearer image."
             })
             return
         }
@@ -70,9 +79,14 @@ export function UploadInventoryReportDialog({ trigger }: UploadInventoryReportDi
 
         } catch (err) {
             console.error("Upload failed", err)
+            const msg = err instanceof Error ? err.message : "Unknown error"
+            // Surface network/connection errors clearly rather than burying them
+            const isNetwork = msg.toLowerCase().includes("network") || msg.toLowerCase().includes("failed to fetch")
             setSubmitResult({
                 success: false,
-                message: `Failed to upload report: ${err instanceof Error ? err.message : "Unknown error"}`
+                message: isNetwork
+                    ? "Network error: could not reach the server. Please check your connection and try again."
+                    : `Upload failed: ${msg}`
             })
         } finally {
             setSubmitting(false)
