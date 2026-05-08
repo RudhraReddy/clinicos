@@ -15,7 +15,8 @@ import {
     Loader2,
     Clock,
     User,
-    FileText
+    FileText,
+    Trash2
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { API_BASE_URL } from "@/lib/api"
@@ -34,6 +35,8 @@ export interface ImagePreviewProps {
     // Optional: Function to handle saving changes (notes, tags)
     // If not provided, editing is disabled
     onSave?: (image: any, notes: string, tag: string) => Promise<void>
+    // Optional: Function to handle deleting the image
+    onDelete?: (image: any) => Promise<void>
     // Optional: Custom source URL generator (if default API logic doesn't fit)
     srcGenerator?: (image: any) => string
     // Optional: Title to display (defaults to patient name or vendor name)
@@ -51,6 +54,7 @@ export function ImagePreviewDialog({
     allImages,
     onNavigate,
     onSave,
+    onDelete,
     srcGenerator,
     title,
     subtitle,
@@ -65,6 +69,7 @@ export function ImagePreviewDialog({
     const [notes, setNotes] = useState("")
     const [tag, setTag] = useState("")
     const [saving, setSaving] = useState(false)
+    const [deleting, setDeleting] = useState(false)
 
     // Reset state when image changes
     useEffect(() => {
@@ -106,6 +111,21 @@ export function ImagePreviewDialog({
             // Error handling should ideally be done by the parent or toast here if we add toaster
         } finally {
             setSaving(false)
+        }
+    }
+
+    const handleDeleteClick = async () => {
+        if (!onDelete) return
+        if (!window.confirm("Are you sure you want to delete this image?")) return
+        setDeleting(true)
+        try {
+            await onDelete(image)
+            onClose() // Close the dialog after successful delete
+        } catch (e) {
+            console.error(e)
+            alert("Failed to delete image")
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -309,7 +329,7 @@ export function ImagePreviewDialog({
                             </div>
                         )}
 
-                        {onSave && (
+                        {(onSave || onDelete) && (
                             <div>
                                 {isEditing ? (
                                     <div className="flex gap-3">
@@ -320,9 +340,18 @@ export function ImagePreviewDialog({
                                         </Button>
                                     </div>
                                 ) : (
-                                    <Button className="w-full" onClick={() => setIsEditing(true)}>
-                                        <Edit2 className="mr-2 h-4 w-4" /> Edit Details
-                                    </Button>
+                                    <div className="flex gap-3">
+                                        {onDelete && (
+                                            <Button variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200" onClick={handleDeleteClick} disabled={saving || deleting} title="Delete Image">
+                                                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
+                                        )}
+                                        {onSave && (
+                                            <Button className="flex-1" onClick={() => setIsEditing(true)}>
+                                                <Edit2 className="mr-2 h-4 w-4" /> Edit Details
+                                            </Button>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}

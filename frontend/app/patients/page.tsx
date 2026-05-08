@@ -13,7 +13,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText } from "lucide-react"
 import { api, type Patient } from "@/lib/api"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
@@ -30,6 +30,7 @@ export default function PatientsPage() {
     const [dialogOpen, setDialogOpen] = useState(false)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<'full' | 'visits-only'>('full')
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
     const [page, setPage] = useState(1)
 
@@ -99,13 +100,12 @@ export default function PatientsPage() {
                                 setEditDialogOpen(false)
                             }}
                         />
-                        {role === 'doctor' && (
-                            <PatientDetailsView
-                                open={viewDialogOpen}
-                                onOpenChange={setViewDialogOpen}
-                                patient={selectedPatient}
-                            />
-                        )}
+                        <PatientDetailsView
+                            open={viewDialogOpen}
+                            onOpenChange={setViewDialogOpen}
+                            patient={selectedPatient}
+                            viewMode={viewMode}
+                        />
                     </>
                 )}
             </div>
@@ -176,13 +176,23 @@ export default function PatientsPage() {
                                                 <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        {role === 'doctor' && (
+                                                        {role === 'doctor' ? (
                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                                                 setSelectedPatient(patient)
+                                                                setViewMode('full')
                                                                 setViewDialogOpen(true)
-                                                            }}>
+                                                            }} title="View Patient Details">
                                                                 <Eye className="h-4 w-4" />
                                                                 <span className="sr-only">View</span>
+                                                            </Button>
+                                                        ) : (
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                                setSelectedPatient(patient)
+                                                                setViewMode('visits-only')
+                                                                setViewDialogOpen(true)
+                                                            }} title="View Visit Logs">
+                                                                <FileText className="h-4 w-4" />
+                                                                <span className="sr-only">View Visits</span>
                                                             </Button>
                                                         )}
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {

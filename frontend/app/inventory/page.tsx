@@ -272,6 +272,7 @@ export default function InventoryPage() {
     const [filterGST, setFilterGST] = useState<Set<string>>(new Set())
     const [filterHSN, setFilterHSN] = useState<Set<string>>(new Set())
     const [filterMinStock, setFilterMinStock] = useState<[number, number] | null>(null)
+    const [filterFormula, setFilterFormula] = useState<Set<string>>(new Set())
 
     // Low-stock alert banner
     const [stockAlertDismissed, setStockAlertDismissed] = useState(false)
@@ -335,6 +336,7 @@ export default function InventoryPage() {
     const optionsPack = Array.from(new Set(inventory.map(i => i.pack_size || ""))).filter(Boolean).sort()
     const optionsGST = Array.from(new Set(inventory.map(i => i.gst_rate ? i.gst_rate.toString() : ""))).filter(Boolean).sort()
     const optionsHSN = Array.from(new Set(inventory.map(i => i.hsn_code || ""))).filter(Boolean).sort()
+    const optionsFormula = Array.from(new Set(inventory.map(i => i.formula || ""))).filter(Boolean).sort()
 
     const optionsId = Array.from(new Set(inventory.map(i => i.id.toString()))).sort((a, b) => parseInt(a) - parseInt(b))
 
@@ -380,7 +382,8 @@ export default function InventoryPage() {
     const filteredInventory = inventory.filter(item => {
         const matchesSearch = item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase())
+            item.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (item.formula || '').toLowerCase().includes(searchQuery.toLowerCase())
 
         const matchesName = filterName.size === 0 || filterName.has(item.item_name)
         const matchesMfg = filterMfg.size === 0 || (item.manufacturer && filterMfg.has(item.manufacturer))
@@ -401,16 +404,17 @@ export default function InventoryPage() {
         const matchesPack = filterPack.size === 0 || filterPack.has(item.pack_size || "")
         const matchesGST = filterGST.size === 0 || filterGST.has(item.gst_rate ? item.gst_rate.toString() : "")
         const matchesHSN = filterHSN.size === 0 || filterHSN.has(item.hsn_code || "")
+        const matchesFormula = filterFormula.size === 0 || filterFormula.has(item.formula || "")
         const matchesMinStock = filterMinStock === null || (item.min_stock_level >= filterMinStock[0] && item.min_stock_level <= filterMinStock[1])
 
         return matchesSearch && matchesName && matchesMfg && matchesVendor && matchesCategory && matchesStatus &&
             matchesId && matchesQty && matchesPrice && matchesValue && matchesExpiry &&
-            matchesPack && matchesGST && matchesHSN && matchesMinStock
+            matchesPack && matchesGST && matchesHSN && matchesFormula && matchesMinStock
     })
 
     // Column Visibility State
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
-        'item_name', 'pack_size', 'manufacturer', 'vendor', 'quantity', 'expiry_date', 'status'
+        'item_name', 'pack_size', 'manufacturer', 'vendor', 'quantity', 'expiry_date', 'status', 'formula'
     ]))
 
     const toggleColumn = (col: string) => {
@@ -437,6 +441,7 @@ export default function InventoryPage() {
         { id: 'category', label: 'Category' },
         { id: 'hsn_code', label: 'HSN' },
         { id: 'gst_rate', label: 'GST %' },
+        { id: 'formula', label: 'Formula' },
         { id: 'min_stock_level', label: 'Min Stock' },
         { id: 'total_value', label: 'Total Value' },
     ]
@@ -684,6 +689,14 @@ export default function InventoryPage() {
                                                 onChange={setFilterHSN}
                                             />
                                         </TableHead>}
+                                        {visibleColumns.has('formula') && <TableHead>
+                                            <DataTableColumnFilter
+                                                title="Formula"
+                                                options={optionsFormula}
+                                                selectedValues={filterFormula}
+                                                onChange={setFilterFormula}
+                                            />
+                                        </TableHead>}
                                         {visibleColumns.has('min_stock_level') && <TableHead>
                                             <DataTableRangeFilter
                                                 title="Min Stock"
@@ -714,7 +727,7 @@ export default function InventoryPage() {
                                             {(filterName.size > 0 || filterMfg.size > 0 || filterVendor.size > 0 ||
                                                 filterCategory.size > 0 || filterStatus.size > 0 ||
                                                 filterId.size > 0 || filterQty !== null || filterPrice !== null || filterExpiry.size > 0 ||
-                                                filterPack.size > 0 || filterGST.size > 0 || filterHSN.size > 0 || filterMinStock !== null || filterValue !== null
+                                                filterPack.size > 0 || filterGST.size > 0 || filterHSN.size > 0 || filterFormula.size > 0 || filterMinStock !== null || filterValue !== null
                                             ) && (
                                                     <Button
                                                         variant="ghost"
@@ -734,6 +747,7 @@ export default function InventoryPage() {
                                                             setFilterPack(new Set())
                                                             setFilterGST(new Set())
                                                             setFilterHSN(new Set())
+                                                            setFilterFormula(new Set())
                                                             setFilterMinStock(null)
                                                         }}
                                                         title="Reset all filters"
@@ -799,10 +813,10 @@ export default function InventoryPage() {
                                                 {visibleColumns.has('total_value') && <TableCell>
                                                     {item.total_value ? `$${item.total_value.toLocaleString()}` : '-'}
                                                 </TableCell>}
-                                                {visibleColumns.has('category') && <TableCell>{item.category || '-'}</TableCell>}
-                                                {visibleColumns.has('hsn_code') && <TableCell>{item.hsn_code || '-'}</TableCell>}
-                                                {visibleColumns.has('min_stock_level') && <TableCell>{item.min_stock_level}</TableCell>}
-
+                                                {visibleColumns.has('category') && <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>}
+                                                {visibleColumns.has('hsn_code') && <TableCell className="text-muted-foreground text-xs">{item.hsn_code || '-'}</TableCell>}
+                                                {visibleColumns.has('formula') && <TableCell className="text-muted-foreground text-xs">{item.formula || '-'}</TableCell>}
+                                                {visibleColumns.has('min_stock_level') && <TableCell className="text-muted-foreground text-xs">{item.min_stock_level}</TableCell>}
                                                 {visibleColumns.has('expiry_date') && <TableCell>{item.expiry_date}</TableCell>}
                                                 {visibleColumns.has('status') && <TableCell>
                                                     <div className="flex gap-1 flex-wrap">

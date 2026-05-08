@@ -63,7 +63,7 @@ function BillingContent() {
     const [submitting, setSubmitting] = useState(false)
 
     // Payment type
-    const [paymentType, setPaymentType] = useState<"CASH" | "CARD" | "INSURANCE">("CASH")
+    const [paymentType, setPaymentType] = useState<"CASH" | "CARD" | "UPI">("CASH")
 
     // History
     const [history, setHistory] = useState<BillingHistoryEntry[]>([])
@@ -454,14 +454,14 @@ function BillingContent() {
                                     <Label htmlFor="payment-type" className="text-sm font-medium whitespace-nowrap">
                                         Payment Method
                                     </Label>
-                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "INSURANCE")}>
+                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
                                         <SelectTrigger id="payment-type" className="w-[160px]">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="CASH">Cash</SelectItem>
                                             <SelectItem value="CARD">Card</SelectItem>
-                                            <SelectItem value="INSURANCE">Insurance</SelectItem>
+                                            <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -519,7 +519,7 @@ function BillingContent() {
                                             <SelectItem value="ALL">All</SelectItem>
                                             <SelectItem value="CASH">Cash</SelectItem>
                                             <SelectItem value="CARD">Card</SelectItem>
-                                            <SelectItem value="INSURANCE">Insurance</SelectItem>
+                                            <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>

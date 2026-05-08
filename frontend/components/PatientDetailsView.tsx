@@ -28,9 +28,10 @@ interface PatientDetailsViewProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     trigger?: React.ReactNode
+    viewMode?: 'full' | 'visits-only'
 }
 
-export function PatientDetailsView({ patient, open, onOpenChange, trigger }: PatientDetailsViewProps) {
+export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewMode = 'full' }: PatientDetailsViewProps) {
     const [loading, setLoading] = useState(false)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [timelineData, setTimelineData] = useState<any[]>([])
@@ -82,8 +83,8 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
         try {
             const [visitsData, imagesData, billsData] = await Promise.all([
                 api.getVisits(patient.patient_id),
-                api.getPatientImages(patient.patient_id),
-                api.getPatientBillingHistory(patient.patient_id)
+                viewMode === 'full' ? api.getPatientImages(patient.patient_id) : Promise.resolve([]),
+                viewMode === 'full' ? api.getPatientBillingHistory(patient.patient_id) : Promise.resolve([])
             ])
 
             // Group everything by Date (YYYY-MM-DD)
@@ -381,6 +382,14 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger }: Pat
                         const idx = context.findIndex((i: any) => i.id === image.id)
                         if (dir === 'next' && idx < context.length - 1) setLightboxState({ image: context[idx + 1], context })
                         if (dir === 'prev' && idx > 0) setLightboxState({ image: context[idx - 1], context })
+                    }}
+                    onSave={async (img, notes, tag) => {
+                        await api.updatePatientImage(img.id, { notes, tag })
+                        loadAllData()
+                    }}
+                    onDelete={async (img) => {
+                        await api.deletePatientImage(img.id)
+                        loadAllData()
                     }}
                     fullScreen={true}
                 />

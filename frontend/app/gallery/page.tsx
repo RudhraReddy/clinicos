@@ -429,6 +429,11 @@ export default function GalleryPage() {
                     // Re-filter handled by useEffect but depends on query, simpler to just reload or update local
                     setViewImage({ ...img, notes, tag })
                 }}
+                onDelete={async (img) => {
+                    await api.deletePatientImage(img.id)
+                    setImages(prev => prev.filter(i => i.id !== img.id))
+                    setFilteredImages(prev => prev.filter(i => i.id !== img.id))
+                }}
                 title={viewImage?.patient_name}
             />
 
