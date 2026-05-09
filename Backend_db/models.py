@@ -224,4 +224,5 @@ class DoctorStaffAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     doctor_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     staff_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
     __table_args__ = (db.UniqueConstraint('doctor_id', 'staff_id'),)
