@@ -309,8 +309,8 @@ export default function StatusPage() {
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-2">
                 {inv.low_stock.length===0 && <p className="text-xs text-muted-foreground">All items well stocked ✓</p>}
-                {inv.low_stock.map(item=>(
-                  <div key={item.name} className="flex justify-between text-xs py-1 border-b last:border-0">
+                {inv.low_stock.map((item, index)=>(
+                  <div key={`${item.name}-${index}`} className="flex justify-between text-xs py-1 border-b last:border-0">
                     <span className="truncate font-medium">{item.name}</span>
                     <span className="text-red-500 font-bold shrink-0 ml-2">{item.qty} left</span>
                   </div>
@@ -325,8 +325,8 @@ export default function StatusPage() {
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-2">
                 {inv.expiring_soon.length===0 && <p className="text-xs text-muted-foreground">No items expiring soon ✓</p>}
-                {inv.expiring_soon.map(item=>(
-                  <div key={item.name} className="flex justify-between text-xs py-1 border-b last:border-0">
+                {inv.expiring_soon.map((item, index)=>(
+                  <div key={`${item.name}-${item.expiry}-${index}`} className="flex justify-between text-xs py-1 border-b last:border-0">
                     <span className="truncate font-medium">{item.name}</span>
                     <span className="text-amber-500 font-bold shrink-0 ml-2">{item.expiry}</span>
                   </div>

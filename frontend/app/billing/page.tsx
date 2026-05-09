@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
 import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 import { PatientSearch } from "@/components/PatientSearch"
+import { useAuth } from "@/lib/auth_context"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import {
@@ -42,6 +43,7 @@ export interface BillItem {
     gst: number;
     total: number;
     pack_size?: string;
+    unit: 'packs' | 'ea';
 }
 
 const getPackMultiplier = (packSize?: string) => {
@@ -60,10 +62,18 @@ const getPackMultiplier = (packSize?: string) => {
 
 function BillingContent() {
     const searchParams = useSearchParams()
+    const { role } = useAuth()
     const [showQR, setShowQR] = useState(false)
 
     // Tab
     const [activeTab, setActiveTab] = useState("new")
+
+    // Automatically switch to history tab for doctors
+    useEffect(() => {
+        if (role === 'doctor') {
+            setActiveTab('history')
+        }
+    }, [role])
 
     // Patient
     const [patientId, setPatientId] = useState(searchParams.get("patient_id") || "")
@@ -162,6 +172,7 @@ function BillingContent() {
             gst: item.gst_rate || 0,
             total: unitMRP,
             pack_size: item.pack_size,
+            unit: 'ea',
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
@@ -170,8 +181,21 @@ function BillingContent() {
 
     const updateQty = (index: number, newQty: number) => {
         const newItems = [...billItems]
-        newItems[index].qty = newQty
-        newItems[index].total = newItems[index].mrp * newQty
+        const item = newItems[index]
+        item.qty = newQty
+        const multiplier = getPackMultiplier(item.pack_size)
+        const count = item.unit === 'packs' ? newQty * multiplier : newQty
+        item.total = item.mrp * count
+        setBillItems(newItems)
+    }
+
+    const updateUnit = (index: number, newUnit: 'packs' | 'ea') => {
+        const newItems = [...billItems]
+        const item = newItems[index]
+        item.unit = newUnit
+        const multiplier = getPackMultiplier(item.pack_size)
+        const count = newUnit === 'packs' ? item.qty * multiplier : item.qty
+        item.total = item.mrp * count
         setBillItems(newItems)
     }
 
@@ -188,10 +212,18 @@ function BillingContent() {
                 patient_id: patientId,
                 visit_id: visitId || undefined,
                 payment_type: paymentType,
-                items_used: billItems.map(i => ({
-                    item_id: i.item_id,
-                    quantity: i.qty / getPackMultiplier(i.pack_size),
-                })),
+                items_used: billItems.map(i => {
+                    const multiplier = getPackMultiplier(i.pack_size)
+                    const count = i.unit === 'packs' ? i.qty * multiplier : i.qty
+                    return {
+                        item_id: i.item_id,
+                        quantity: count / multiplier,
+                        qty: i.qty,
+                        unit: i.unit,
+                        mrp: i.unit === 'packs' ? i.mrp * multiplier : i.mrp,
+                        total_value: i.total,
+                    }
+                }),
             }
 
             const data = await api.createBill(payload)
@@ -218,7 +250,7 @@ function BillingContent() {
     }
 
     const calculateTotal = () => {
-        return billItems.reduce((acc, item) => acc + (item.qty * (item.mrp || 0)), 0)
+        return billItems.reduce((acc, item) => acc + (item.total || 0), 0)
     }
 
     return (
@@ -231,10 +263,12 @@ function BillingContent() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                    <TabsTrigger value="new">New Bill</TabsTrigger>
-                    <TabsTrigger value="history">History</TabsTrigger>
-                </TabsList>
+                {role !== 'doctor' && (
+                    <TabsList>
+                        <TabsTrigger value="new">New Bill</TabsTrigger>
+                        <TabsTrigger value="history">History</TabsTrigger>
+                    </TabsList>
+                )}
 
                 <TabsContent value="new" className="space-y-6">
                     {/* Patient & Actions Section */}
@@ -352,6 +386,7 @@ function BillingContent() {
                                             <TableHead>Product Name</TableHead>
                                             <TableHead>Batch</TableHead>
                                             <TableHead className="w-[100px]">Qty</TableHead>
+                                            <TableHead className="w-[100px]">Unit</TableHead>
                                             <TableHead className="w-[100px]">Price (Est)</TableHead>
                                             <TableHead className="w-[100px]">Total</TableHead>
                                             <TableHead className="w-[50px]"></TableHead>
@@ -372,8 +407,26 @@ function BillingContent() {
                                                         onChange={(e) => updateQty(idx, parseInt(e.target.value) || 1)}
                                                     />
                                                 </TableCell>
-                                                <TableCell>{item.mrp || '-'}</TableCell>
-                                                <TableCell>{(item.qty * (item.mrp || 0)).toFixed(2)}</TableCell>
+                                                <TableCell>
+                                                    {getPackMultiplier(item.pack_size) > 1 ? (
+                                                        <Select
+                                                            value={item.unit}
+                                                            onValueChange={(val) => updateUnit(idx, val as 'packs' | 'ea')}
+                                                        >
+                                                            <SelectTrigger className="h-8 w-[85px] bg-background">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="ea">ea</SelectItem>
+                                                                <SelectItem value="packs">packs</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted rounded">ea</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>{(item.unit === 'packs' ? item.mrp * getPackMultiplier(item.pack_size) : item.mrp).toFixed(2)}</TableCell>
+                                                <TableCell>{item.total.toFixed(2)}</TableCell>
                                                 <TableCell>
                                                     <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}>
                                                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -492,17 +545,41 @@ function BillingContent() {
                                                 <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
                                                 <TableCell>{bill.payment_type}</TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            setPrintInvoiceId(bill.invoice_id)
-                                                            setPrintDialogOpen(true)
-                                                        }}
-                                                    >
-                                                        <Printer className="h-4 w-4 mr-1" />
-                                                        Print
-                                                    </Button>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setPrintInvoiceId(bill.invoice_id)
+                                                                setPrintDialogOpen(true)
+                                                            }}
+                                                        >
+                                                            <Printer className="h-4 w-4 mr-1" />
+                                                            Print
+                                                        </Button>
+                                                        {role === 'doctor' && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/30 dark:border-rose-900/50"
+                                                                onClick={async () => {
+                                                                    if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
+                                                                        try {
+                                                                            await api.deleteBill(bill.invoice_id)
+                                                                            toast.success("Bill successfully deleted and stock restored.")
+                                                                            loadHistory(historyPage)
+                                                                        } catch (err) {
+                                                                            console.error(err)
+                                                                            toast.error("Failed to delete bill")
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 mr-1" />
+                                                                Delete
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

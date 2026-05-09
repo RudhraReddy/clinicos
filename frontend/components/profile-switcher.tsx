@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Monitor, Stethoscope, Shield } from "lucide-react"
+import { Check, ChevronsUpDown, Monitor, Stethoscope } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,11 +27,6 @@ const roles: { value: UserRole; label: string; icon: React.ElementType }[] = [
         value: "doctor",
         label: "Doctor",
         icon: Stethoscope,
-    },
-    {
-        value: "admin",
-        label: "Admin",
-        icon: Shield,
     },
 ]
 
@@ -63,7 +58,7 @@ export function ProfileSwitcher() {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
+            <PopoverContent className="w-[200px] p-0" align="start" side="top" sideOffset={8}>
                 <Command>
                     {/* <CommandInput placeholder="Search profile..." /> */}
                     <CommandList>

@@ -76,7 +76,7 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 ### Frontend
 
 - **App Router:** All pages in `frontend/app/`. Role-based nav filtering done in `layout/Sidebar.tsx`.
-- **Role system:** Roles (`frontdesk`, `doctor`, `admin`) stored in `localStorage["clinic_role"]` — no server-side auth. Managed via `lib/auth_context.tsx` and `profile-switcher.tsx`.
+- **Role system:** Roles (`frontdesk`, `doctor`) stored in `localStorage["clinic_role"]` — no server-side auth. Managed via `lib/auth_context.tsx` and `profile-switcher.tsx`.
 - **UI stack:** Tailwind CSS 4 + shadcn/ui (Radix UI) + lucide-react icons. Toast notifications via `sonner`.
 - **All API calls** go through `frontend/lib/api.ts`. This is the only place to add/modify API interaction.
 - **IST date helper:** `frontend/lib/utils.ts` exports `getTodayIST()` — returns today's date as `YYYY-MM-DD` in IST. Use this wherever you need today's date on the frontend.
@@ -85,22 +85,22 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 
 | Route | File | Roles |
 |---|---|---|
-| `/` | `app/page.tsx` | frontdesk, admin |
-| `/dashboard` | `app/dashboard/page.tsx` | frontdesk, admin (identical to `/`) |
+| `/` | `app/page.tsx` | frontdesk |
+| `/dashboard` | `app/dashboard/page.tsx` | frontdesk (identical to `/`) |
 | `/doctor` | `app/doctor/page.tsx` | doctor (auto-redirected from `/`) |
 | `/patients` | `app/patients/page.tsx` | all |
-| `/visits` | `app/visits/page.tsx` | frontdesk, admin |
-| `/billing` | `app/billing/page.tsx` | frontdesk, admin |
+| `/visits` | `app/visits/page.tsx` | frontdesk |
+| `/billing` | `app/billing/page.tsx` | frontdesk |
 | `/inventory` | `app/inventory/page.tsx` | all |
-| `/inventory/history` | `app/inventory/history/page.tsx` | frontdesk, admin |
-| `/inventory/history/[id]` | `app/inventory/history/[id]/page.tsx` | frontdesk, admin |
-| `/inventory/invoice_edit` | `app/inventory/invoice_edit/page.tsx` | frontdesk, admin |
+| `/inventory/history` | `app/inventory/history/page.tsx` | frontdesk |
+| `/inventory/history/[id]` | `app/inventory/history/[id]/page.tsx` | frontdesk |
+| `/inventory/invoice_edit` | `app/inventory/invoice_edit/page.tsx` | frontdesk |
 | `/gallery` | `app/gallery/page.tsx` | doctor |
 | `/status` | `app/status/page.tsx` | doctor |
 | `/connect/[sessionId]` | `app/connect/[sessionId]/page.tsx` | public (mobile upload) |
 
 The sidebar (`Sidebar.tsx`) uses two separate nav lists keyed on role:
-- **frontdesk / admin**: Dashboard (`/`), Patients, Inventory, Billing — no Gallery
+- **frontdesk**: Dashboard (`/`), Patients, Inventory, Billing — no Gallery
 - **doctor**: Dashboard (`/doctor`), Patients, Inventory, Gallery, Status
 
 The `/` root page redirects `doctor` role to `/doctor` on load.
@@ -110,13 +110,13 @@ The `/` root page redirects `doctor` role to `/doctor` on load.
 `components/PatientDetailsView.tsx` is a full-screen Dialog showing a chronological timeline of visits, images, and bills.
 - **Images** open in `ImagePreviewDialog` with prev/next navigation and keyboard arrow key support.
 - **Bills** are clickable cards that open `PrintInvoiceDialog` to preview and print the invoice.
-- The **Eye (view history) button** on the patients list page is only rendered for `role === 'doctor'`; frontdesk/admin see only the Edit button.
+- The **Eye (view history) button** on the patients list page is only rendered for `role === 'doctor'`; frontdesk sees only the Edit button.
 
 ### Status / Analytics Page
 
 `app/status/page.tsx` is a doctor-only analytics dashboard. All metrics are computed client-side from `api.getVisits()` and `api.getBillingHistory()` — no dedicated backend endpoints. Sections: revenue KPI cards, weekly revenue bar chart, visits by day-of-week, busiest hours, payment type breakdown, new vs returning patients, recent patients list.
 
-Placeholder empty directories exist for future auth: `app/admin/`, `app/login/`, `app/create-account/`, `app/admin-login/`.
+Placeholder empty directories exist for future auth: `app/login/`, `app/create-account/`.
 
 ### Database Models
 
@@ -289,7 +289,7 @@ These three strings are passed as props at two call sites and are currently hard
 - `frontend/app/billing/page.tsx` lines ~85–86, ~603 — `clinicName` and `clinicAddress` have local state; phone is hardcoded
 - `frontend/components/PatientDetailsView.tsx` lines ~388–390 — all three hardcoded
 
-**Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context. The settings edit UI should be admin-only.
+**Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
 

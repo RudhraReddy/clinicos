@@ -21,6 +21,7 @@ const doctorNavItems = [
     { title: "Dashboard", href: "/doctor", icon: LayoutDashboard },
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Billing", href: "/billing", icon: CreditCard },
     { title: "Gallery", href: "/gallery", icon: ImageIcon },
     { title: "Status", href: "/status", icon: BarChart2 },
 ]

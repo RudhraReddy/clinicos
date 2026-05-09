@@ -148,27 +148,33 @@ def get_trash_images():
 @images.route('/patients/images', methods=['GET'])
 def get_all_patient_images():
     """Fetch all non-deleted patient images sorted by timestamp desc, joining with Patient info."""
-    images_list = (
-        db.session.query(PatientImage, Patient)
-        .join(Patient, PatientImage.patient_id == Patient.patient_id)
-        .filter(PatientImage.deleted_at == None)
-        .order_by(PatientImage.timestamp.desc())
-        .all()
-    )
+    try:
+        images_list = (
+            db.session.query(PatientImage, Patient)
+            .join(Patient, PatientImage.patient_id == Patient.patient_id)
+            .filter(PatientImage.deleted_at == None)
+            .order_by(PatientImage.timestamp.desc())
+            .all()
+        )
 
-    results = []
-    for img, patient in images_list:
-        results.append({
-            'id': img.id,
-            'patient_id': img.patient_id,
-            'patient_name': patient.name,
-            'visit_id': img.visit_id,
-            'timestamp': img.timestamp.isoformat(),
-            'notes': img.notes,
-            'tag': img.tag,
-            'filename': os.path.basename(img.image_path)
-        })
-    return jsonify(results), 200
+        results = []
+        for img, patient in images_list:
+            results.append({
+                'id': img.id,
+                'patient_id': img.patient_id,
+                'patient_name': patient.name if patient else "Unknown",
+                'visit_id': img.visit_id,
+                'timestamp': img.timestamp.isoformat() if img.timestamp else None,
+                'notes': img.notes,
+                'tag': img.tag,
+                'filename': os.path.basename(img.image_path) if img.image_path else ""
+            })
+        return jsonify(results), 200
+    except Exception as e:
+        import traceback
+        print("ERROR in get_all_patient_images:")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @images.route('/patients/images/<int:image_id>', methods=['PUT'])

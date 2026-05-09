@@ -23,6 +23,22 @@ interface PrintBillItem {
     batch_number?: string | null
     expiry_date?: string | null
     gst_rate?: number | null
+    unit?: string | null
+    pack_size?: string | null
+}
+
+const getPackMultiplier = (packSize?: string) => {
+    const pack = packSize?.toLowerCase() || ''
+    if (pack.includes('s') || pack.includes('x')) {
+        const match = pack.match(/(\d+)/)
+        if (match) {
+            const num = parseInt(match[0])
+            if (!isNaN(num) && num > 1) {
+                return num
+            }
+        }
+    }
+    return 1
 }
 
 interface PrintInvoicePatient {
@@ -97,16 +113,23 @@ export function PrintInvoiceDialog({
                     reference: data.patient.reference ?? null,
                 }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const billItems: PrintBillItem[] = data.items.map((i: any) => ({
-                    item_name: i.item_name,
-                    qty: i.quantity,
-                    mrp: i.mrp,
-                    hsn_code: i.hsn_code ?? null,
-                    manufacturer: i.manufacturer ?? null,
-                    batch_number: i.batch_number ?? null,
-                    expiry_date: i.expiry_date ?? null,
-                    gst_rate: i.gst_rate ?? null,
-                }))
+                const billItems: PrintBillItem[] = data.items.map((i: any) => {
+                    const parts = (i.batch_number || "").split('|')
+                    const cleanBatch = parts[0]
+                    const unit = parts[1] || 'ea'
+                    return {
+                        item_name: i.item_name,
+                        qty: i.quantity,
+                        mrp: i.mrp,
+                        hsn_code: i.hsn_code ?? null,
+                        manufacturer: i.manufacturer ?? null,
+                        batch_number: cleanBatch,
+                        expiry_date: i.expiry_date ?? null,
+                        gst_rate: i.gst_rate ?? null,
+                        unit: unit,
+                        pack_size: i.pack_size ?? null,
+                    }
+                })
                 setInvoiceData({
                     patient,
                     billItems,

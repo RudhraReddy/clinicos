@@ -355,6 +355,12 @@ export const api = {
         return fetchApi(`/api/billing/${invoiceId}`);
     },
 
+    async deleteBill(invoiceId: string): Promise<void> {
+        return fetchApi(`/api/billing/${invoiceId}`, {
+            method: 'DELETE',
+        });
+    },
+
     async getInventoryAllChanges(dateFrom?: string, dateTo?: string): Promise<any> {
         const params = new URLSearchParams()
         if (dateFrom) params.set('date_from', dateFrom)

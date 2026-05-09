@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react"
 
-export type UserRole = "frontdesk" | "doctor" | "admin"
+export type UserRole = "frontdesk" | "doctor"
 
 interface AuthContextType {
     role: UserRole
@@ -19,9 +19,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Persist to localStorage
     useEffect(() => {
-        const savedRole = localStorage.getItem("clinic_role") as UserRole
-        if (savedRole && ["frontdesk", "doctor", "admin"].includes(savedRole)) {
-            setRoleState(savedRole)
+        const savedRole = localStorage.getItem("clinic_role")
+        if (savedRole === "admin") {
+            setRoleState("frontdesk")
+            localStorage.setItem("clinic_role", "frontdesk")
+        } else if (savedRole && ["frontdesk", "doctor"].includes(savedRole)) {
+            setRoleState(savedRole as UserRole)
         }
         setIsLoading(false)
     }, [])
@@ -33,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Mock User Data based on role
     const user = {
-        name: role === "doctor" ? "Dr. Ayesha" : role === "admin" ? "Admin User" : "Front Desk Staff",
+        name: role === "doctor" ? "Dr. Ayesha" : "Front Desk Staff",
     }
 
     return (

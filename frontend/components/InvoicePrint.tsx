@@ -9,6 +9,8 @@ interface BillItem {
     batch_number?: string | null
     expiry_date?: string | null  // YYYY-MM-DD
     gst_rate?: number | null
+    unit?: string | null
+    pack_size?: string | null
 }
 
 interface InvoicePrintProps {
@@ -179,7 +181,10 @@ export function InvoicePrint({
                                 <td style={{ ...cellStyle, textAlign: "right" }}>{item.mrp.toFixed(2)}</td>
                                 <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
                                 <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.qty}</td>
+                                <td style={{ ...cellStyle, textAlign: "center" }}>
+                                    {Math.round(item.qty)}
+                                    {item.unit === 'ea' && item.pack_size && (item.pack_size.toLowerCase().includes('s') || item.pack_size.toLowerCase().includes('x')) ? ' ea' : ''}
+                                </td>
                                 <td style={{ ...cellStyle, textAlign: "right" }}>{amount}</td>
                             </tr>
                         )

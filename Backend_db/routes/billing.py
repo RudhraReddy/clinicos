@@ -54,57 +54,64 @@ def create_bill():
         master_id = item.get('item_id')
         qty_needed = float(item.get('quantity', 0))
         
-        if qty_needed <= 0: continue
-        
         product_master = ProductMaster.query.get(master_id)
         if not product_master: continue 
         
+        # Get exact frontend fields
+        billed_qty = float(item.get('qty', qty_needed))
+        billed_unit = item.get('unit', 'ea')
+        billed_mrp = float(item.get('mrp', 0))
+        billed_total = float(item.get('total_value', billed_mrp * billed_qty))
+        
+        total_calc_amount += billed_total
+        
+        # Deduct from inventory batches (FIFO)
+        remaining_to_deduct = qty_needed
         batches = InventoryBatch.query.filter(
             InventoryBatch.product_id == master_id,
             InventoryBatch.quantity > 0
         ).order_by(InventoryBatch.expiry_date.asc()).all()
         
-        remaining_to_deduct = qty_needed
+        associated_batch_id = None
+        associated_batch_number = "Auto-FIFO"
+        associated_expiry_date = None
         
-        target_batches = []
         if batches:
-             target_batches = batches
-
-        for batch in target_batches:
-            if remaining_to_deduct <= 0: break
+            associated_batch_id = batches[0].id
+            associated_batch_number = batches[0].batch_number
+            associated_expiry_date = batches[0].expiry_date
             
-            take = min(float(batch.quantity), float(remaining_to_deduct))
-            
-            batch.quantity = float(batch.quantity) - take
-            remaining_to_deduct = float(remaining_to_deduct) - take
-            
-            unit_price = float(batch.mrp) if batch.mrp else 0
-            line_total = unit_price * take
-            total_calc_amount += line_total
-            
-            bill_item = BillItem(
-                bill_id=invoice_id,
-                product_id=master_id,
-                batch_id=batch.id,
-                item_name=product_master.item_name,
-                batch_number=batch.batch_number,
-                expiry_date=batch.expiry_date,
-                quantity=take,
-                mrp=batch.mrp,
-                gst_rate=product_master.gst_rate,
-                total_value=line_total
-            )
-            db.session.add(bill_item)
-            
-            history = InventoryHistory(
-                product_id=master_id,
-                batch_id=batch.id,
-                bill_id=invoice_id,
-                change_amount=-take,
-                type='SALE',
-                notes=f"Billed Invoice {invoice_id}"
-            )
-            db.session.add(history)
+            for batch in batches:
+                if remaining_to_deduct <= 0: break
+                take = min(float(batch.quantity), float(remaining_to_deduct))
+                batch.quantity = float(batch.quantity) - take
+                remaining_to_deduct = float(remaining_to_deduct) - take
+                
+                # Add to inventory history
+                history = InventoryHistory(
+                    product_id=master_id,
+                    batch_id=batch.id,
+                    bill_id=invoice_id,
+                    change_amount=-take,
+                    type='SALE',
+                    notes=f"Billed Invoice {invoice_id}"
+                )
+                db.session.add(history)
+        
+        # ALWAYS create exactly one BillItem with the exact quantity billed!
+        bill_item = BillItem(
+            bill_id=invoice_id,
+            product_id=master_id,
+            batch_id=associated_batch_id,
+            item_name=product_master.item_name,
+            batch_number=associated_batch_number + f"|{billed_unit}",
+            expiry_date=associated_expiry_date,
+            quantity=billed_qty,
+            mrp=billed_mrp,
+            gst_rate=product_master.gst_rate,
+            total_value=billed_total
+        )
+        db.session.add(bill_item)
 
     if 'total_amount' in data:
          new_bill.total_amount = total_calc_amount
@@ -214,6 +221,7 @@ def get_bill_details(invoice_id):
             'total_value': float(i.total_value) if i.total_value else 0,
             'hsn_code': master.hsn_code if master else None,
             'manufacturer': master.manufacturer if master else None,
+            'pack_size': master.pack_size if master else None,
         })
 
     return jsonify({
@@ -231,3 +239,71 @@ def get_bill_details(invoice_id):
         'total_amount': float(bill.total_amount),
         'items': item_list
     }), 200
+
+@billing.route('/billing/<invoice_id>', methods=['DELETE'])
+def delete_bill(invoice_id):
+    bill = Bill.query.get(invoice_id)
+    if not bill:
+        return jsonify({'error': 'Bill not found'}), 404
+
+    # 1. Unlink associated Visit if present
+    if bill.visit_id:
+        visit = Visit.query.get(bill.visit_id)
+        if visit:
+            visit.invoice_id = None
+            visit.status = 'in_progress'
+
+    # Also check other visits that might reference this invoice_id
+    visits = Visit.query.filter_by(invoice_id=invoice_id).all()
+    for v in visits:
+        v.invoice_id = None
+        v.status = 'in_progress'
+
+    # 2. Revert inventory stock deductions
+    bill_items = BillItem.query.filter_by(bill_id=invoice_id).all()
+    for item in bill_items:
+        # Get multiplier for pack size
+        multiplier = 1
+        product_master = ProductMaster.query.get(item.product_id)
+        if product_master and product_master.pack_size:
+            pack = product_master.pack_size.lower()
+            if 's' in pack or 'x' in pack:
+                import re
+                match = re.search(r'(\d+)', pack)
+                if match:
+                    try:
+                        multiplier = int(match.group(1))
+                    except:
+                        multiplier = 1
+
+        is_ea = False
+        if item.batch_number and '|ea' in item.batch_number:
+            is_ea = True
+
+        qty_to_restore = float(item.quantity)
+        if is_ea and multiplier > 1:
+            qty_to_restore = qty_to_restore / multiplier
+
+        # Find the specific batch to restore stock to
+        if item.batch_id:
+            batch = InventoryBatch.query.get(item.batch_id)
+            if batch:
+                batch.quantity = float(batch.quantity) + qty_to_restore
+        else:
+            # Fallback: find any batch for this product
+            batch = InventoryBatch.query.filter_by(product_id=item.product_id).first()
+            if batch:
+                batch.quantity = float(batch.quantity) + qty_to_restore
+
+    # 3. Delete inventory history records
+    InventoryHistory.query.filter_by(bill_id=invoice_id).delete()
+
+    # 4. Delete bill items
+    BillItem.query.filter_by(bill_id=invoice_id).delete()
+
+    # 5. Delete the Bill itself
+    db.session.delete(bill)
+    db.session.commit()
+
+    return jsonify({'message': f'Bill {invoice_id} successfully deleted and stock restored.'}), 200
+

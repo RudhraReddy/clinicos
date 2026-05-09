@@ -414,9 +414,8 @@ export default function InventoryPage() {
     })
 
     // Column Visibility State
-    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
-        'id', 'item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'expiry_date', 'status', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value'
-    ]))
+    const defaultColumns = ['item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'formula', 'expiry_date', 'status']
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(defaultColumns))
 
     useEffect(() => {
         if (appFontSize > 16) {
@@ -427,12 +426,7 @@ export default function InventoryPage() {
                 return next
             })
         } else {
-            setVisibleColumns(prev => {
-                const next = new Set(prev)
-                const toAdd = ['id', 'item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'expiry_date', 'status', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value']
-                toAdd.forEach(c => next.add(c))
-                return next
-            })
+            setVisibleColumns(new Set(defaultColumns))
         }
     }, [appFontSize])
 
