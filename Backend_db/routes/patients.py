@@ -1,12 +1,14 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from models import Patient
 from extensions import db, get_ist_now
 from sqlalchemy import func
+from .auth import require_auth, log_activity
 
 patients = Blueprint('patients', __name__)
 
 @patients.route('/patients', methods=['POST'])
+@require_auth
 def create_patient():
     data = request.get_json()
     
@@ -23,15 +25,27 @@ def create_patient():
         sex=data.get('sex'),
         address=data.get('address'),
         reference=data.get('reference'),
-        dob=None # Deprecated
+        dob=None,
+        created_by_user_id=g.current_user.get('user_id'),
     )
-    
+
     db.session.add(new_patient)
     db.session.commit()
-    
+
+    log_activity(
+        action='CREATE',
+        resource_type='patient',
+        resource_id=patient_id,
+        resource_label=data['name'],
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Patient created', 'patient_id': patient_id}), 201
 
 @patients.route('/patients', methods=['GET'])
+@require_auth
 def get_patients():
     query_str = request.args.get('q', '').lower().strip()
     phone = request.args.get('phone_number')
@@ -68,6 +82,7 @@ def get_patients():
     return jsonify(results), 200
 
 @patients.route('/patients/<patient_id>', methods=['GET'])
+@require_auth
 def get_patient_detail(patient_id):
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
     return jsonify({
@@ -82,6 +97,7 @@ def get_patient_detail(patient_id):
     }), 200
 
 @patients.route('/patients/<patient_id>', methods=['PUT'])
+@require_auth
 def update_patient(patient_id):
     data = request.get_json()
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
@@ -100,5 +116,15 @@ def update_patient(patient_id):
         patient.reference = data['reference']
         
     db.session.commit()
-    
+
+    log_activity(
+        action='UPDATE',
+        resource_type='patient',
+        resource_id=patient_id,
+        resource_label=patient.name,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Patient updated'}), 200

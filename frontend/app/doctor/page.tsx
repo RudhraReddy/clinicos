@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone } from 'lucide-react'
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
+import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
@@ -288,7 +289,6 @@ export default function DoctorDashboard() {
                                 <h1 className="text-3xl font-bold tracking-tight">{selectedVisit.patient_name}</h1>
                                 <p className="text-muted-foreground text-lg">{selectedVisit.reason || "No reason specified"}</p>
                             </div>
-                            <div></div>
                         </div>
 
                         {/* Patient Details Banner */}

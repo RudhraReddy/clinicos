@@ -21,6 +21,9 @@ export default function AppShell({
         setOpen(false)
     }, [pathname])
 
+    const noShell = pathname.startsWith('/login') || pathname.startsWith('/create-account')
+    if (noShell) return <>{children}</>
+
     return (
         <div className="flex min-h-screen flex-col md:flex-row">
             {/* Desktop Sidebar */}
