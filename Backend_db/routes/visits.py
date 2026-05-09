@@ -1,5 +1,5 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
 from models import Visit, Patient, ProductMaster
 from sqlalchemy import func
@@ -26,7 +26,8 @@ def create_visit():
         status=data.get('status', 'in_progress'),
         visiting_fee=data.get('visiting_fee', 0),
         amount_paid=data.get('amount_paid', 0),
-        payment_status=data.get('payment_status', 'unpaid')
+        payment_status=data.get('payment_status', 'unpaid'),
+        created_by_user_id=g.current_user.get('user_id')
     )
     db.session.add(new_visit)
     db.session.commit()
@@ -35,7 +36,24 @@ def create_visit():
 @visits.route('/visits', methods=['GET'])
 @require_auth
 def get_all_visits():
-    visits_list = Visit.query.order_by(Visit.created_at.desc()).limit(50).all()
+    created_by = request.args.get('created_by')
+
+    query = Visit.query.order_by(Visit.created_at.desc())
+
+    if created_by and created_by != 'all':
+        # Doctor filtering by a specific staff member
+        # Verify the requesting doctor has that staff assigned
+        if g.current_user.get('role') == 'doctor':
+            from models import DoctorStaffAssignment
+            assignment = DoctorStaffAssignment.query.filter_by(
+                doctor_id=g.current_user['user_id'],
+                staff_id=created_by
+            ).first()
+            if not assignment:
+                return jsonify({'error': 'Staff not assigned to you'}), 403
+        query = query.filter(Visit.created_by_user_id == created_by)
+
+    visits_list = query.limit(50).all()
     results = []
     for v in visits_list:
         patient = Patient.query.get(v.patient_id)

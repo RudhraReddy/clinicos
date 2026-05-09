@@ -1,6 +1,6 @@
 
 from datetime import timedelta
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
 from models import PatientImage, Patient
 import os
@@ -39,7 +39,8 @@ def upload_patient_image(patient_id):
             visit_id=visit_id if visit_id else None,
             image_path=filepath,
             notes=notes,
-            tag=request.form.get('tag', 'Medical Record')
+            tag=request.form.get('tag', 'Medical Record'),
+            created_by_user_id=g.current_user.get('user_id')
         )
         db.session.add(image)
         db.session.commit()
@@ -155,13 +156,26 @@ def get_trash_images():
 def get_all_patient_images():
     """Fetch all non-deleted patient images sorted by timestamp desc, joining with Patient info."""
     try:
-        images_list = (
+        images_list_query = (
             db.session.query(PatientImage, Patient)
             .join(Patient, PatientImage.patient_id == Patient.patient_id)
             .filter(PatientImage.deleted_at == None)
             .order_by(PatientImage.timestamp.desc())
-            .all()
         )
+
+        created_by = request.args.get('created_by')
+        if created_by and created_by != 'all':
+            if g.current_user.get('role') == 'doctor':
+                from models import DoctorStaffAssignment
+                assignment = DoctorStaffAssignment.query.filter_by(
+                    doctor_id=g.current_user['user_id'],
+                    staff_id=created_by
+                ).first()
+                if not assignment:
+                    return jsonify({'error': 'Staff not assigned to you'}), 403
+            images_list_query = images_list_query.filter(PatientImage.created_by_user_id == created_by)
+
+        images_list = images_list_query.all()
 
         results = []
         for img, patient in images_list:

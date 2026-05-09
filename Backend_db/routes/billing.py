@@ -1,7 +1,7 @@
 
 import math
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
 from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory
 from sqlalchemy import func
@@ -39,7 +39,8 @@ def create_bill():
         patient_id=patient.patient_id,
         visit_id=visit_id,
         payment_type=data.get('payment_type', 'CASH'),
-        total_amount=0
+        total_amount=0,
+        created_by_user_id=g.current_user.get('user_id')
     )
     db.session.add(new_bill)
     db.session.flush()
@@ -160,6 +161,18 @@ def get_billing_history():
 
     if patient_id:
         query = query.filter(Bill.patient_id == patient_id)
+
+    created_by = request.args.get('created_by')
+    if created_by and created_by != 'all':
+        if g.current_user.get('role') == 'doctor':
+            from models import DoctorStaffAssignment
+            assignment = DoctorStaffAssignment.query.filter_by(
+                doctor_id=g.current_user['user_id'],
+                staff_id=created_by
+            ).first()
+            if not assignment:
+                return jsonify({'error': 'Staff not assigned to you'}), 403
+        query = query.filter(Bill.created_by_user_id == created_by)
 
     total = query.count()
     rows  = query.offset((page - 1) * limit).limit(limit).all()

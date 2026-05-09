@@ -471,4 +471,65 @@ export const api = {
     },
 };
 
+// Auth API helpers
+export async function login(email: string, password: string) {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Login failed')
+  }
+  return res.json() as Promise<{ user_id: string; username: string; role: string }>
+}
+
+export async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+}
+
+export async function getMe() {
+  const res = await fetch('/api/auth/me', { credentials: 'include' })
+  if (!res.ok) return null
+  return res.json() as Promise<{ user_id: string; username: string; role: string; location_label?: string }>
+}
+
+export async function verifyTotp(totp_code: string) {
+  const res = await fetch('/api/auth/verify-totp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ totp_code }),
+  })
+  return { ok: res.ok }
+}
+
+export async function register(data: {
+  totp_code: string
+  email: string
+  username: string
+  password: string
+  role: 'staff' | 'doctor'
+  location_label?: string
+}) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Registration failed')
+  }
+}
+
+export async function getAssignedStaff() {
+  const res = await fetch('/api/auth/users/me/assigned-staff', { credentials: 'include' })
+  if (!res.ok) return []
+  return res.json() as Promise<Array<{ user_id: string; username: string; role: string; location_label?: string }>>
+}
+
 export { ApiError };
