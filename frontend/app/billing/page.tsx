@@ -557,7 +557,7 @@ function BillingContent() {
                                                             <Printer className="h-4 w-4 mr-1" />
                                                             Print
                                                         </Button>
-                                                        {role === 'doctor' && (
+                                                        {role === 'admin' && (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"

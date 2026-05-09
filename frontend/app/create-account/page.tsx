@@ -25,13 +25,13 @@ function CreateAccountContent() {
   const roleParam = searchParams.get("role")
 
   const [step, setStep] = useState<Step>("totp")
-  const [totpCode, setTotpCode] = useState("")
+  const [totpInput, setTotpInput] = useState("")      // raw 6-digit code — step 1 only
+  const [grantToken, setGrantToken] = useState("")    // 10-min signed token from backend
   const [totpLoading, setTotpLoading] = useState(false)
   const [shaking, setShaking] = useState(false)
 
   const [role, setRole] = useState<Role>(roleParam === "doctor" ? "doctor" : "staff")
   const [username, setUsername] = useState("")
-  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [locationLabel, setLocationLabel] = useState("")
@@ -42,7 +42,7 @@ function CreateAccountContent() {
   const passwordChecks = PASSWORD_CHECKS.map((c) => ({ ...c, passing: c.test(password) }))
   const allChecksPassing = passwordChecks.every((c) => c.passing)
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0
-  const canSubmit = allChecksPassing && passwordsMatch && username.trim().length > 0 && email.trim().length > 0
+  const canSubmit = allChecksPassing && passwordsMatch && username.trim().length > 0
 
   function triggerShake() {
     setShaking(true)
@@ -57,9 +57,11 @@ function CreateAccountContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ totp_code: totpCode }),
+        body: JSON.stringify({ totp_code: totpInput }),
       })
-      if (res.ok) {
+      const data = await res.json()
+      if (res.ok && data.grant_token) {
+        setGrantToken(data.grant_token)  // store 10-min grant — never re-check the live code
         setStep("details")
       } else {
         triggerShake()
@@ -79,8 +81,7 @@ function CreateAccountContent() {
     setRegisterLoading(true)
     try {
       const body: Record<string, string> = {
-        totp_code: totpCode,
-        email,
+        grant_token: grantToken,  // signed 10-min token — no live TOTP re-check
         username,
         password,
         role,
@@ -154,8 +155,8 @@ function CreateAccountContent() {
                   inputMode="numeric"
                   maxLength={6}
                   placeholder="123456"
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                  value={totpInput}
+                  onChange={(e) => setTotpInput(e.target.value.replace(/\D/g, ""))}
                   required
                   className={shaking ? "ca-shake" : ""}
                   autoComplete="one-time-code"
@@ -165,7 +166,7 @@ function CreateAccountContent() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={totpLoading || totpCode.length !== 6}
+                disabled={totpLoading || totpInput.length !== 6}
               >
                 {totpLoading ? "Verifying…" : "Continue"}
               </Button>
@@ -253,20 +254,6 @@ function CreateAccountContent() {
                   placeholder="Dr. Sharma or Front Desk"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Email */}
-              <div className="space-y-1.5">
-                <Label htmlFor="ca-email">Email</Label>
-                <Input
-                  id="ca-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>

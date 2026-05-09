@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db, get_ist_now
 from sqlalchemy.exc import IntegrityError
 
-from models import DoctorStaffAssignment, User
+from models import AuditLog, DoctorStaffAssignment, User
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -21,6 +21,25 @@ _SESSION_HOURS = 8
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def log_activity(action, resource_type=None, resource_id=None, resource_label=None,
+                 details=None, user_id=None, username=None, ip_address=None):
+    """Insert a row into audit_logs. Safe to call from any route."""
+    try:
+        entry = AuditLog(
+            action=action,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            resource_label=resource_label,
+            details=details,
+            user_id=user_id,
+            username=username,
+            ip_address=ip_address,
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 def _validate_password_strength(password: str):
     """
@@ -40,12 +59,33 @@ def _validate_password_strength(password: str):
     return None
 
 
-def _verify_totp(code: str) -> bool:
+_GRANT_MINUTES = 10  # how long a verified TOTP grant stays valid
+
+
+def _verify_totp(code: str, valid_window: int = 1) -> bool:
     """Validates a TOTP code against TOTP_SECRET env var."""
-    secret = os.environ.get('TOTP_SECRET', '')
+    secret = os.environ.get('TOTP_SECRET', '').strip()
     if not secret:
         return False
-    return pyotp.TOTP(secret).verify(code)
+    return pyotp.TOTP(secret).verify(str(code).strip(), valid_window=valid_window)
+
+
+def _make_grant_token(app) -> str:
+    """Issue a short-lived JWT that proves the caller passed TOTP verification."""
+    payload = {
+        'purpose': 'totp_grant',
+        'exp': _dt.datetime.utcnow() + _dt.timedelta(minutes=_GRANT_MINUTES),
+    }
+    return jwt.encode(payload, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+
+def _check_grant_token(token: str, app) -> bool:
+    """Return True if the grant token is valid and unexpired."""
+    try:
+        payload = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        return payload.get('purpose') == 'totp_grant'
+    except jwt.PyJWTError:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +95,16 @@ def _verify_totp(code: str) -> bool:
 def require_doctor(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if g.current_user.get('role') != 'doctor':
+        if g.current_user.get('role') not in ('doctor', 'admin'):
+            return jsonify({'error': 'Forbidden'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_admin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if g.current_user.get('role') != 'admin':
             return jsonify({'error': 'Forbidden'}), 403
         return f(*args, **kwargs)
     return decorated
@@ -90,24 +139,34 @@ def require_auth(f):
 def register():
     data = request.get_json(silent=True) or {}
 
-    totp_code = data.get('totp_code', '')
-    email = (data.get('email') or '').strip().lower()
-    username = (data.get('username') or '').strip()
-    password = data.get('password', '')
-    role = (data.get('role') or '').strip()
+    grant_token = (data.get('grant_token') or '').strip()
+    totp_code   = (data.get('totp_code')   or '').strip()  # fallback for direct callers
+    username       = (data.get('username') or '').strip()
+    password       = data.get('password', '')
+    role           = (data.get('role')     or '').strip()
     location_label = (data.get('location_label') or '').strip() or None
 
-    # Validate TOTP
-    if not _verify_totp(totp_code):
-        return jsonify({'error': 'Invalid or expired TOTP code'}), 400
+    # Accept either a pre-issued grant token (preferred) or a fresh TOTP code
+    if grant_token:
+        if not _check_grant_token(grant_token, current_app):
+            return jsonify({'error': 'Verification token expired. Please go back and verify again.'}), 400
+    elif totp_code:
+        if not _verify_totp(totp_code):
+            return jsonify({'error': 'Invalid or expired TOTP code'}), 400
+    else:
+        return jsonify({'error': 'TOTP verification is required'}), 400
 
     # Validate required fields
-    if not email or not username or not password or not role:
-        return jsonify({'error': 'email, username, password, and role are required'}), 400
+    if not username or not password or not role:
+        return jsonify({'error': 'username, password, and role are required'}), 400
 
     # Validate role
-    if role not in ('staff', 'doctor'):
-        return jsonify({'error': "role must be 'staff' or 'doctor'"}), 400
+    if role not in ('staff', 'doctor', 'admin'):
+        return jsonify({'error': "role must be 'staff', 'doctor', or 'admin'"}), 400
+
+    # Disable direct admin registration
+    if role == 'admin':
+        return jsonify({'error': 'Admin registration is disabled. Use hardcoded accounts.'}), 400
 
     # Validate password strength
     pw_error = _validate_password_strength(password)
@@ -115,10 +174,10 @@ def register():
         return jsonify({'error': pw_error}), 400
 
     # Check uniqueness
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Username already taken'}), 400
+
+    email = f"{username.lower()}@example.com"
 
     user = User(
         id=str(uuid.uuid4()),
@@ -139,18 +198,38 @@ def register():
 @auth_bp.route('/auth/login', methods=['POST'])
 def login():
     data = request.get_json(silent=True) or {}
-    email = (data.get('email') or '').strip().lower()
+    username = (data.get('username') or '').strip()
     password = data.get('password', '')
 
-    if not email or not password:
-        return jsonify({'error': 'email and password are required'}), 400
+    if not username or not password:
+        return jsonify({'error': 'username and password are required'}), 400
 
-    user = User.query.filter_by(email=email).first()
-    if not user or not check_password_hash(user.password_hash, password):
-        return jsonify({'error': 'Invalid email or password'}), 401
+    # Hardcoded admin accounts with TOTP password
+    if username.lower() in ("saivelapati", "tejavelapati"):
+        if _verify_totp(password):
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                # Create on-the-fly to support foreign keys / audit logs / standard flow
+                user = User(
+                    id=str(uuid.uuid4()),
+                    email=f"{username.lower()}@example.com",
+                    username=username,
+                    password_hash=generate_password_hash("placeholder"),
+                    role="admin",
+                    is_active=True,
+                    created_at=get_ist_now(),
+                )
+                db.session.add(user)
+                db.session.commit()
+        else:
+            return jsonify({'error': 'Invalid TOTP code for admin login'}), 401
+    else:
+        user = User.query.filter_by(username=username).first()
+        if not user or not check_password_hash(user.password_hash, password):
+            return jsonify({'error': 'Invalid username or password'}), 401
 
     if not user.is_active:
-        return jsonify({'error': 'Invalid email or password'}), 401
+        return jsonify({'error': 'Invalid username or password'}), 401
 
     now_utc = _dt.datetime.utcnow()
     exp = now_utc + _dt.timedelta(hours=_SESSION_HOURS)
@@ -168,6 +247,17 @@ def login():
         algorithm='HS256',
     )
 
+    log_activity(
+        action='LOGIN',
+        resource_type='auth',
+        resource_id=user.id,
+        resource_label=user.username,
+        details=f'role={user.role}',
+        user_id=user.id,
+        username=user.username,
+        ip_address=request.remote_addr,
+    )
+
     resp = jsonify({'user_id': user.id, 'username': user.username, 'role': user.role})
     resp.set_cookie(
         'auth_token',
@@ -181,7 +271,18 @@ def login():
 
 
 @auth_bp.route('/auth/logout', methods=['POST'])
+@require_auth
 def logout():
+    u = g.current_user
+    log_activity(
+        action='LOGOUT',
+        resource_type='auth',
+        resource_id=u.get('user_id'),
+        resource_label=u.get('username'),
+        user_id=u.get('user_id'),
+        username=u.get('username'),
+        ip_address=request.remote_addr,
+    )
     resp = jsonify({'message': 'Logged out'})
     resp.set_cookie('auth_token', '', max_age=0, httponly=True, samesite='Strict', secure=not current_app.debug)
     return resp, 200
@@ -203,29 +304,43 @@ def me():
 
 @auth_bp.route('/auth/verify-totp', methods=['POST'])
 def verify_totp():
+    """Verify a TOTP code and return a short-lived grant token on success.
+
+    The grant token can be passed as `grant_token` to /auth/register and
+    /auth/reset-password instead of re-submitting the raw 30-second code,
+    giving the user up to 10 minutes to complete the form.
+    """
     data = request.get_json(silent=True) or {}
     totp_code = data.get('totp_code', '')
 
     if _verify_totp(totp_code):
-        return jsonify({'valid': True}), 200
+        grant = _make_grant_token(current_app)
+        return jsonify({'valid': True, 'grant_token': grant}), 200
     return jsonify({'error': 'Invalid or expired code'}), 401
 
 
 @auth_bp.route('/auth/reset-password', methods=['POST'])
 def reset_password():
     data = request.get_json(silent=True) or {}
-    email = (data.get('email') or '').strip().lower()
-    totp_code = data.get('totp_code', '')
+    username     = (data.get('username')     or '').strip()
+    grant_token  = (data.get('grant_token')  or '').strip()
+    totp_code    = (data.get('totp_code')    or '').strip()  # fallback
     new_password = data.get('new_password', '')
 
-    # Validate TOTP first
-    if not _verify_totp(totp_code):
-        return jsonify({'error': 'Invalid or expired TOTP code'}), 400
+    # Accept grant token (issued by verify-totp) or a fresh TOTP code
+    if grant_token:
+        if not _check_grant_token(grant_token, current_app):
+            return jsonify({'error': 'Verification token expired. Please go back and verify again.'}), 400
+    elif totp_code:
+        if not _verify_totp(totp_code):
+            return jsonify({'error': 'Invalid or expired TOTP code'}), 400
+    else:
+        return jsonify({'error': 'TOTP verification is required'}), 400
 
-    if not email:
-        return jsonify({'error': 'email is required'}), 400
+    if not username:
+        return jsonify({'error': 'username is required'}), 400
 
-    user = User.query.filter_by(email=email).first()
+    user = User.query.filter_by(username=username).first()
     if not user:
         return jsonify({'error': 'Invalid request'}), 400
 

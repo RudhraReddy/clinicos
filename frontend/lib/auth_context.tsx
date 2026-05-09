@@ -2,19 +2,19 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 
-export type UserRole = 'frontdesk' | 'doctor'
+export type UserRole = 'frontdesk' | 'doctor' | 'admin'
 
 export interface AuthUser {
   user_id: string
   username: string
-  role: 'staff' | 'doctor'
+  role: 'staff' | 'doctor' | 'admin'
   location_label?: string | null
 }
 
 interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
-  role: 'frontdesk' | 'doctor'  // computed from user.role; 'frontdesk' when logged out or staff
+  role: 'frontdesk' | 'doctor' | 'admin'  // computed from user.role; 'frontdesk' when logged out or staff
   /** @deprecated Will be removed once profile-switcher is updated to use server auth */
   setRole: (role: UserRole) => void
   logout: () => Promise<void>
@@ -84,8 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/login'
   }
 
-  // Computed role for backwards compatibility with existing nav/page guards
-  const role: 'frontdesk' | 'doctor' = user?.role === 'doctor' ? 'doctor' : 'frontdesk'
+  // Computed role for nav/page guards
+  const role: 'frontdesk' | 'doctor' | 'admin' =
+    user?.role === 'admin' ? 'admin' :
+    user?.role === 'doctor' ? 'doctor' :
+    'frontdesk'
 
   // Deprecated no-op — kept so profile-switcher.tsx compiles until it is updated
   const setRole = (_role: UserRole) => {
@@ -117,10 +120,9 @@ export function useAuth() {
   return context
 }
 
-// Backwards-compat shim: existing code reads `role` from useAuth()
-// Map user.role to the old 'frontdesk'/'doctor' values used by nav/page guards
-export function useRole(): 'frontdesk' | 'doctor' {
+export function useRole(): 'frontdesk' | 'doctor' | 'admin' {
   const { user } = useAuth()
+  if (user?.role === 'admin') return 'admin'
   if (user?.role === 'doctor') return 'doctor'
-  return 'frontdesk'  // staff maps to frontdesk
+  return 'frontdesk'
 }

@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
 from models import PatientImage, Patient
 import os
-from .auth import require_auth
+from .auth import require_auth, log_activity
 
 images = Blueprint('images', __name__)
 
@@ -44,6 +44,16 @@ def upload_patient_image(patient_id):
         )
         db.session.add(image)
         db.session.commit()
+
+        log_activity(
+            action='CREATE',
+            resource_type='patient_image',
+            resource_id=str(image.id),
+            resource_label=f"Patient {patient_id} — {request.form.get('tag', 'Medical Record')}",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
 
         return jsonify({'message': 'Image uploaded successfully', 'id': image.id}), 201
 
@@ -209,6 +219,17 @@ def update_patient_image(image_id):
         img.tag = data['tag']
 
     db.session.commit()
+
+    log_activity(
+        action='UPDATE',
+        resource_type='patient_image',
+        resource_id=str(image_id),
+        resource_label=f"Image {image_id}",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Image updated successfully'}), 200
 
 
@@ -221,6 +242,17 @@ def soft_delete_patient_image(image_id):
         return jsonify({'message': 'Image already in trash'}), 200
     img.deleted_at = get_ist_now()
     db.session.commit()
+
+    log_activity(
+        action='DELETE',
+        resource_type='patient_image',
+        resource_id=str(image_id),
+        resource_label=f"Image {image_id} (Patient {img.patient_id})",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'moved to trash'}), 200
 
 

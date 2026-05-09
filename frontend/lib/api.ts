@@ -472,12 +472,12 @@ export const api = {
 };
 
 // Auth API helpers
-export async function login(email: string, password: string) {
+export async function login(username: string, password: string) {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
@@ -508,10 +508,9 @@ export async function verifyTotp(totp_code: string) {
 
 export async function register(data: {
   totp_code: string
-  email: string
   username: string
   password: string
-  role: 'staff' | 'doctor'
+  role: 'staff' | 'doctor' | 'admin'
   location_label?: string
 }) {
   const res = await fetch('/api/auth/register', {
@@ -530,6 +529,96 @@ export async function getAssignedStaff() {
   const res = await fetch('/api/auth/users/me/assigned-staff', { credentials: 'include' })
   if (!res.ok) return []
   return res.json() as Promise<Array<{ user_id: string; username: string; role: string; location_label?: string }>>
+}
+
+// --- Admin APIs ---
+
+export interface AdminUser {
+  user_id: string
+  username: string
+  email: string
+  role: 'staff' | 'doctor' | 'admin'
+  is_active: boolean
+  location_label?: string | null
+  created_at: string
+  assigned_staff_ids?: string[]
+}
+
+export interface ActivityEntry {
+  id: number
+  user_id: string | null
+  username: string | null
+  action: string
+  resource_type: string | null
+  resource_id: string | null
+  resource_label: string | null
+  details: string | null
+  timestamp: string
+  ip_address: string | null
+}
+
+export interface ActivityLogFilters {
+  user_id?: string
+  action?: string
+  resource_type?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  limit?: number
+}
+
+export async function getAdminStats() {
+  const res = await fetch('/api/admin/stats', { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load stats')
+  return res.json() as Promise<{
+    users_by_role: Record<string, number>
+    active_users: number
+    inactive_users: number
+    logins_today: number
+    total_audit_entries: number
+    recent_activity: ActivityEntry[]
+  }>
+}
+
+export async function getAdminUsers(role?: string) {
+  const qs = role ? `?role=${role}` : ''
+  const res = await fetch(`/api/admin/users${qs}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load users')
+  return res.json() as Promise<AdminUser[]>
+}
+
+export async function updateAdminUser(userId: string, data: { role?: string; is_active?: boolean; location_label?: string | null }) {
+  const res = await fetch(`/api/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Update failed')
+  }
+}
+
+export async function getActivityLog(filters: ActivityLogFilters = {}) {
+  const params = new URLSearchParams()
+  if (filters.user_id) params.set('user_id', filters.user_id)
+  if (filters.action) params.set('action', filters.action)
+  if (filters.resource_type) params.set('resource_type', filters.resource_type)
+  if (filters.date_from) params.set('date_from', filters.date_from)
+  if (filters.date_to) params.set('date_to', filters.date_to)
+  if (filters.page) params.set('page', String(filters.page))
+  if (filters.limit) params.set('limit', String(filters.limit))
+  const qs = params.toString()
+  const res = await fetch(`/api/admin/activity-log${qs ? `?${qs}` : ''}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load activity log')
+  return res.json() as Promise<{
+    total: number
+    page: number
+    limit: number
+    pages: number
+    entries: ActivityEntry[]
+  }>
 }
 
 export { ApiError };

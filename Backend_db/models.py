@@ -14,6 +14,7 @@ class Patient(db.Model):
     address = db.Column(db.Text)
     reference = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=get_ist_now)
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
     # Def to generate unique patient_id
     @staticmethod
@@ -37,6 +38,7 @@ class PurchaseInvoice(db.Model):
     upload_date = db.Column(db.DateTime, default=get_ist_now)
     image_path = db.Column(db.String(255)) # Path to saved image
     source = db.Column(db.String(50)) # 'OCR', 'MANUAL', 'CSV_UPDATE', 'CSV_OVERWRITE'
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
 class ProductMaster(db.Model):
     """
@@ -61,6 +63,7 @@ class ProductMaster(db.Model):
     generic_tags = db.Column(db.Text) # Comma Separated
     # NOTE: New column — run ALTER TABLE product_master ADD COLUMN formula TEXT; in production
     formula = db.Column(db.Text, nullable=True)
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
     # Relationships
     batches = db.relationship('InventoryBatch', backref='product', lazy=True)
@@ -96,10 +99,11 @@ class InventoryBatch(db.Model):
 
     # Current Stock
     quantity = db.Column(db.Numeric(10, 2), default=0.0)
-    
+
     # Original Invoice Details (For History)
     initial_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Qty at time of purchase (Paid + Free)
     free_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Free Qty included in initial
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
 
 class InventoryHistory(db.Model):
@@ -115,12 +119,13 @@ class InventoryHistory(db.Model):
     bill_id = db.Column(db.String(50), db.ForeignKey('bills.invoice_id'), nullable=True) # Sales
     purchase_invoice_number = db.Column(db.String(50), db.ForeignKey('purchase_invoices.invoice_number'), nullable=True) # Stock In
     
-    # change_amount = db.Column(db.Numeric(10, 2), nullable=False)
     change_amount = db.Column(db.Numeric(10, 2), nullable=False)
     # Type: PURCHASE, SALE, EXPIRED, RETURN, ADJUSTMENT
-    type = db.Column(db.String(50), nullable=False) 
+    type = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     notes = db.Column(db.Text)
+    user_id = db.Column(db.String(36), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
 
 # --- Visits & Billing ---
 
@@ -213,7 +218,7 @@ class User(db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False, index=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  # 'staff' | 'doctor'
+    role = db.Column(db.String(20), nullable=False)  # 'staff' | 'doctor' | 'admin'
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     location_label = db.Column(db.String(100), nullable=True)
@@ -226,3 +231,20 @@ class DoctorStaffAssignment(db.Model):
     staff_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     __table_args__ = (db.UniqueConstraint('doctor_id', 'staff_id'),)
+
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(36), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
+    # LOGIN, LOGOUT, CREATE, UPDATE, DELETE
+    action = db.Column(db.String(20), nullable=False)
+    # patient, visit, bill, inventory_batch, purchase_invoice, patient_image, inventory_product, user, auth
+    resource_type = db.Column(db.String(50), nullable=True)
+    resource_id = db.Column(db.String(100), nullable=True)
+    resource_label = db.Column(db.String(200), nullable=True)
+    details = db.Column(db.Text, nullable=True)
+    timestamp = db.Column(db.DateTime, default=get_ist_now, index=True)
+    ip_address = db.Column(db.String(45), nullable=True)

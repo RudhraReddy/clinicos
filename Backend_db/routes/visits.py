@@ -5,7 +5,7 @@ from models import Visit, Patient, ProductMaster
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
-from .auth import require_auth
+from .auth import require_auth, log_activity
 
 visits = Blueprint('visits', __name__)
 
@@ -31,6 +31,17 @@ def create_visit():
     )
     db.session.add(new_visit)
     db.session.commit()
+
+    log_activity(
+        action='CREATE',
+        resource_type='visit',
+        resource_id=visit_id,
+        resource_label=f"{patient.name} — {data.get('visit_date', '')}",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Visit logged', 'visit_id': visit_id}), 201
 
 @visits.route('/visits', methods=['GET'])
@@ -138,8 +149,19 @@ def update_visit(visit_id):
         visit.visit_time = datetime.strptime(data['visit_time'], '%H:%M').time() if data['visit_time'] else None
         
     visit.updated_at = get_ist_now()
-        
+
     db.session.commit()
+
+    log_activity(
+        action='UPDATE',
+        resource_type='visit',
+        resource_id=visit_id,
+        resource_label=visit_id,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Visit updated successfully'}), 200
 
 @visits.route('/visits/<visit_id>', methods=['DELETE'])
@@ -148,4 +170,15 @@ def delete_visit(visit_id):
     visit = Visit.query.get_or_404(visit_id)
     db.session.delete(visit)
     db.session.commit()
+
+    log_activity(
+        action='DELETE',
+        resource_type='visit',
+        resource_id=visit_id,
+        resource_label=visit_id,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Visit deleted successfully'}), 200

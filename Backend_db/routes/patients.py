@@ -1,9 +1,9 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from models import Patient
 from extensions import db, get_ist_now
 from sqlalchemy import func
-from .auth import require_auth
+from .auth import require_auth, log_activity
 
 patients = Blueprint('patients', __name__)
 
@@ -25,12 +25,23 @@ def create_patient():
         sex=data.get('sex'),
         address=data.get('address'),
         reference=data.get('reference'),
-        dob=None # Deprecated
+        dob=None,
+        created_by_user_id=g.current_user.get('user_id'),
     )
-    
+
     db.session.add(new_patient)
     db.session.commit()
-    
+
+    log_activity(
+        action='CREATE',
+        resource_type='patient',
+        resource_id=patient_id,
+        resource_label=data['name'],
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Patient created', 'patient_id': patient_id}), 201
 
 @patients.route('/patients', methods=['GET'])
@@ -105,5 +116,15 @@ def update_patient(patient_id):
         patient.reference = data['reference']
         
     db.session.commit()
-    
+
+    log_activity(
+        action='UPDATE',
+        resource_type='patient',
+        resource_id=patient_id,
+        resource_label=patient.name,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Patient updated'}), 200

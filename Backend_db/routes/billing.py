@@ -6,7 +6,7 @@ from extensions import db, get_ist_now
 from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory
 from sqlalchemy import func
 from utils import generate_invoice_id
-from .auth import require_auth
+from .auth import require_auth, log_activity
 
 billing = Blueprint('billing', __name__)
 
@@ -97,7 +97,9 @@ def create_bill():
                     bill_id=invoice_id,
                     change_amount=-take,
                     type='SALE',
-                    notes=f"Billed Invoice {invoice_id}"
+                    notes=f"Billed Invoice {invoice_id}",
+                    user_id=g.current_user.get('user_id'),
+                    username=g.current_user.get('username'),
                 )
                 db.session.add(history)
         
@@ -122,6 +124,17 @@ def create_bill():
          new_bill.total_amount = total_calc_amount
 
     db.session.commit()
+
+    log_activity(
+        action='CREATE',
+        resource_type='bill',
+        resource_id=invoice_id,
+        resource_label=f"{patient.name} — ₹{total_calc_amount:.2f}",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Bill created', 'invoice_id': invoice_id, 'total': total_calc_amount}), 201
 
 @billing.route('/billing/history', methods=['GET'])
@@ -261,6 +274,9 @@ def get_bill_details(invoice_id):
 @billing.route('/billing/<invoice_id>', methods=['DELETE'])
 @require_auth
 def delete_bill(invoice_id):
+    if g.current_user.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized. Only admins can delete bills.'}), 403
+
     bill = Bill.query.get(invoice_id)
     if not bill:
         return jsonify({'error': 'Bill not found'}), 404
@@ -323,6 +339,16 @@ def delete_bill(invoice_id):
     # 5. Delete the Bill itself
     db.session.delete(bill)
     db.session.commit()
+
+    log_activity(
+        action='DELETE',
+        resource_type='bill',
+        resource_id=invoice_id,
+        resource_label=invoice_id,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
 
     return jsonify({'message': f'Bill {invoice_id} successfully deleted and stock restored.'}), 200
 

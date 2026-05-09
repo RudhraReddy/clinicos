@@ -289,9 +289,6 @@ export default function DoctorDashboard() {
                                 <h1 className="text-3xl font-bold tracking-tight">{selectedVisit.patient_name}</h1>
                                 <p className="text-muted-foreground text-lg">{selectedVisit.reason || "No reason specified"}</p>
                             </div>
-                            <div>
-                                <StaffAssignmentDialog />
-                            </div>
                         </div>
 
                         {/* Patient Details Banner */}

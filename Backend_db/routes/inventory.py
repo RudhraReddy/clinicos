@@ -1,5 +1,5 @@
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
 from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice
 from sqlalchemy import func
@@ -9,7 +9,7 @@ import os
 import requests as http_requests
 
 from utils import parse_expiry_date
-from .auth import require_auth
+from .auth import require_auth, log_activity
 
 def _parse_vision_response(vision_result: dict) -> dict:
     """
@@ -716,10 +716,22 @@ def add_inventory_item():
         manufacturer=data.get('supplier', ''),
         category=data.get('category', ''),
         pack_size=data.get('pack_size', ''),
-        hsn_code=data.get('hsn_code', '')
+        hsn_code=data.get('hsn_code', ''),
+        created_by_user_id=g.current_user.get('user_id'),
     )
     db.session.add(new_item)
     db.session.commit()
+
+    log_activity(
+        action='CREATE',
+        resource_type='inventory_product',
+        resource_id=new_item.id,
+        resource_label=data['item_name'],
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Master Item added', 'id': new_item.id}), 201
 
 @inventory.route('/inventory/<string:id>', methods=['PUT'])
@@ -771,11 +783,25 @@ def update_inventory_item(id):
             product_id=id,
             change_amount=0,
             type='ADJUSTMENT',
-            notes=f"Item fields updated: {', '.join(changed_fields)}"
+            notes=f"Item fields updated: {', '.join(changed_fields)}",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
         )
         db.session.add(hist)
 
     db.session.commit()
+
+    log_activity(
+        action='UPDATE',
+        resource_type='inventory_product',
+        resource_id=id,
+        resource_label=item.item_name,
+        details=f"Fields: {', '.join(changed_fields)}" if changed_fields else None,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Item updated successfully'}), 200
 
 @inventory.route('/inventory/batch/<int:id>', methods=['PUT'])
@@ -808,7 +834,9 @@ def update_inventory_batch(id):
                     batch_id=batch.id,
                     change_amount=diff,
                     type='ADJUSTMENT',
-                    notes='Manual Batch Update'
+                    notes='Manual Batch Update',
+                    user_id=g.current_user.get('user_id'),
+                    username=g.current_user.get('username'),
                 )
                 db.session.add(hist)
         except: pass
@@ -830,9 +858,19 @@ def update_inventory_batch(id):
 
     if changes:
         db.session.commit()
+        log_activity(
+            action='UPDATE',
+            resource_type='inventory_batch',
+            resource_id=str(id),
+            resource_label=f"Batch {id} ({batch.product_id})",
+            details='; '.join(changes),
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
         return jsonify({'message': 'Batch updated', 'changes': changes}), 200
     else:
-        db.session.commit() 
+        db.session.commit()
         return jsonify({'message': 'No significant changes or just price updated'}), 200
 
 @inventory.route('/inventory/search', methods=['GET'])
@@ -1218,7 +1256,8 @@ def save_invoice():
             vendor_name=data.get('vendor_name', ''),
             image_path=image_path,
             source=source_type,
-            upload_date=get_ist_now()
+            upload_date=get_ist_now(),
+            created_by_user_id=g.current_user.get('user_id'),
         )
         db.session.add(new_inv)
     
@@ -1304,22 +1343,36 @@ def save_invoice():
                 mrp=mrp,
                 purchase_rate=rate,
                 gst_rate=p_gst,
-                expiry_date=expiry
+                expiry_date=expiry,
+                created_by_user_id=g.current_user.get('user_id'),
             )
             db.session.add(new_batch)
             db.session.flush()
-            
+
             history = InventoryHistory(
                 product_id=item.id,
                 batch_id=new_batch.id,
                 purchase_invoice_number=invoice_no,
                 change_amount=total_stock_qty,
                 type='PURCHASE',
-                notes=f"Invoice: {invoice_no}, Batch: {p_batch}"
+                notes=f"Invoice: {invoice_no}, Batch: {p_batch}",
+                user_id=g.current_user.get('user_id'),
+                username=g.current_user.get('username'),
             )
             db.session.add(history)
-            
+
         db.session.commit()
+
+        log_activity(
+            action='CREATE',
+            resource_type='purchase_invoice',
+            resource_id=invoice_no,
+            resource_label=f"{data.get('vendor_name', 'Unknown Vendor')} — {invoice_no}",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+
         return jsonify({'message': 'Invoice Saved', 'invoice_number': invoice_no}), 200
 
     except Exception as e:

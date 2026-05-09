@@ -20,13 +20,16 @@ export default function LoginPage() {
   const [visible, setVisible] = useState(false)
 
   // Login form
-  const [loginEmail, setLoginEmail] = useState("")
+  const [loginUsername, setLoginUsername] = useState("")
   const [loginPassword, setLoginPassword] = useState("")
   const [loginLoading, setLoginLoading] = useState(false)
 
   // Forgot password form
-  const [resetEmail, setResetEmail] = useState("")
-  const [totpCode, setTotpCode] = useState("")
+  const [resetUsername, setResetUsername] = useState("")
+  const [resetTotpInput, setResetTotpInput] = useState("")
+  const [resetGrantToken, setResetGrantToken] = useState("")   // 10-min grant from backend
+  const [resetTotpVerified, setResetTotpVerified] = useState(false)
+  const [resetTotpLoading, setResetTotpLoading] = useState(false)
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [newPasswordVisible, setNewPasswordVisible] = useState(false)
@@ -39,8 +42,13 @@ export default function LoginPage() {
   }
 
   function goToForgot() {
-    // Pre-fill the reset email from whatever was typed in login
-    setResetEmail(loginEmail)
+    // Pre-fill the reset username from whatever was typed in login
+    setResetUsername(loginUsername)
+    setResetTotpInput("")
+    setResetGrantToken("")
+    setResetTotpVerified(false)
+    setNewPassword("")
+    setConfirmPassword("")
     setStep("forgot")
   }
 
@@ -52,7 +60,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -60,15 +68,41 @@ export default function LoginPage() {
         return
       }
       const role: string = data.role ?? ""
-      if (role === "doctor") {
-        router.push("/doctor")
+      if (role === "admin") {
+        window.location.href = "/admin"
+      } else if (role === "doctor") {
+        window.location.href = "/doctor"
       } else {
-        router.push("/")
+        window.location.href = "/"
       }
     } catch {
       toast.error("Network error — please try again")
     } finally {
       setLoginLoading(false)
+    }
+  }
+
+  async function handleVerifyResetTotp(e: React.FormEvent) {
+    e.preventDefault()
+    setResetTotpLoading(true)
+    try {
+      const res = await fetch("/api/auth/verify-totp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ totp_code: resetTotpInput }),
+      })
+      const data = await res.json()
+      if (res.ok && data.grant_token) {
+        setResetGrantToken(data.grant_token)
+        setResetTotpVerified(true)
+      } else {
+        toast.error("Invalid or expired code. Codes refresh every 30 seconds.")
+      }
+    } catch {
+      toast.error("Network error — please try again")
+    } finally {
+      setResetTotpLoading(false)
     }
   }
 
@@ -85,18 +119,26 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          email: resetEmail,
-          totp_code: totpCode,
+          username: resetUsername,
+          grant_token: resetGrantToken,   // signed 10-min token
           new_password: newPassword,
         }),
       })
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error ?? data.message ?? "Reset failed")
+        // If grant expired, send user back to re-verify
+        if (res.status === 400 && data.error?.includes('expired')) {
+          setResetTotpVerified(false)
+          setResetGrantToken("")
+          setResetTotpInput("")
+        }
         return
       }
       toast.success("Password updated successfully")
-      setTotpCode("")
+      setResetTotpInput("")
+      setResetGrantToken("")
+      setResetTotpVerified(false)
       setNewPassword("")
       setConfirmPassword("")
       setStep("login")
@@ -184,14 +226,14 @@ export default function LoginPage() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="login-email">Email</Label>
+                <Label htmlFor="login-username">Username</Label>
                 <Input
-                  id="login-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
+                  id="login-username"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="your_username"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
                   required
                 />
               </div>
@@ -272,82 +314,103 @@ export default function LoginPage() {
 
             <form onSubmit={handleReset} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="reset-email">Email</Label>
+                <Label htmlFor="reset-username">Username</Label>
                 <Input
-                  id="reset-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
+                  id="reset-username"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="your_username"
+                  value={resetUsername}
+                  onChange={(e) => setResetUsername(e.target.value)}
                   required
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="totp-code">6-digit code</Label>
-                <Input
-                  id="totp-code"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="123456"
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="new-password">New password</Label>
-                <div className="relative">
-                  <Input
-                    id="new-password"
-                    type={newPasswordVisible ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    className="pr-10"
-                  />
-                  <button
+              {/* Sub-step A: TOTP verify */}
+              {!resetTotpVerified ? (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-totp">6-digit authenticator code</Label>
+                    <Input
+                      id="reset-totp"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={resetTotpInput}
+                      onChange={(e) => setResetTotpInput(e.target.value.replace(/\D/g, ""))}
+                      required
+                      autoComplete="one-time-code"
+                    />
+                  </div>
+                  <Button
                     type="button"
-                    onClick={() => setNewPasswordVisible((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none"
-                    aria-label={newPasswordVisible ? "Hide password" : "Show password"}
+                    className="w-full"
+                    disabled={resetTotpLoading || resetTotpInput.length !== 6}
+                    onClick={handleVerifyResetTotp}
                   >
-                    {newPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                    {resetTotpLoading ? "Verifying…" : "Verify Code"}
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                /* Sub-step B: new password (TOTP already verified) */
+                <>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 -mt-1">
+                    ✓ Identity verified — set your new password below
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm-password">Confirm password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirm-password"
-                    type={confirmPasswordVisible ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setConfirmPasswordVisible((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none"
-                    aria-label={confirmPasswordVisible ? "Hide password" : "Show password"}
-                  >
-                    {confirmPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-password">New password</Label>
+                    <div className="relative">
+                      <Input
+                        id="new-password"
+                        type={newPasswordVisible ? "text" : "password"}
+                        autoComplete="new-password"
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewPasswordVisible((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                        aria-label={newPasswordVisible ? "Hide password" : "Show password"}
+                      >
+                        {newPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-              <Button type="submit" className="w-full" disabled={resetLoading}>
-                {resetLoading ? "Resetting…" : "Reset Password"}
-              </Button>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="confirm-password">Confirm password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm-password"
+                        type={confirmPasswordVisible ? "text" : "password"}
+                        autoComplete="new-password"
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setConfirmPasswordVisible((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none"
+                        aria-label={confirmPasswordVisible ? "Hide password" : "Show password"}
+                      >
+                        {confirmPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={resetLoading}>
+                    {resetLoading ? "Resetting…" : "Reset Password"}
+                  </Button>
+                </>
+              )}
             </form>
           </CardContent>
         </Card>

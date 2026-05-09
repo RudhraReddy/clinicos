@@ -29,6 +29,13 @@ def _apply_migrations(db):
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
         "ALTER TABLE patient_images ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(50)",
+        # 2026-05-09: Audit system — user tagging on remaining tables
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE inventory_batches ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS user_id VARCHAR(36)",
+        "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS username VARCHAR(100)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

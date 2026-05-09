@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -26,13 +26,23 @@ const doctorNavItems = [
     { title: "Status", href: "/status", icon: BarChart2 },
 ]
 
+const adminNavItems = [
+    { title: "Dashboard", href: "/", icon: LayoutDashboard },
+    { title: "Patients", href: "/patients", icon: Users },
+    { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Billing", href: "/billing", icon: CreditCard },
+    { title: "Gallery", href: "/gallery", icon: ImageIcon },
+    { title: "Status", href: "/status", icon: BarChart2 },
+    { title: "Admin", href: "/admin", icon: Shield },
+]
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname()
     const { role, logout, user } = useAuth()
 
-    const filteredNavItems = role === 'doctor' ? doctorNavItems : staffNavItems
+    const filteredNavItems = role === 'admin' ? adminNavItems : role === 'doctor' ? doctorNavItems : staffNavItems
 
     return (
         <div className={cn("pb-0 min-h-screen border-r bg-white dark:bg-[#181818] flex flex-col justify-between", className)}>
