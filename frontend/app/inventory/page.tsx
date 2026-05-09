@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table"
 import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry } from "@/lib/api"
+import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
 import { UploadInventoryReportDialog } from "@/components/UploadInventoryReportDialog"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
@@ -248,7 +249,7 @@ function AllChangesPanel() {
 
 export default function InventoryPage() {
     const { appFontSize } = useSettings()
-    const [role, setRole] = useState<string>('')
+    const { role } = useAuth()
     const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [loading, setLoading] = useState(true)
@@ -323,7 +324,6 @@ export default function InventoryPage() {
 
     useEffect(() => {
         loadData()
-        setRole(localStorage.getItem('clinic_role') || '')
     }, [])
 
     // Extract Unique Values for Filters
