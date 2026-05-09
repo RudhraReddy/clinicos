@@ -9,7 +9,9 @@ from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from extensions import db, get_ist_now
-from models import User
+from sqlalchemy.exc import IntegrityError
+
+from models import DoctorStaffAssignment, User
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -49,6 +51,15 @@ def _verify_totp(code: str) -> bool:
 # ---------------------------------------------------------------------------
 # Auth decorator
 # ---------------------------------------------------------------------------
+
+def require_doctor(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if g.current_user.get('role') != 'doctor':
+            return jsonify({'error': 'Forbidden'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
 
 def require_auth(f):
     @wraps(f)
@@ -227,3 +238,89 @@ def reset_password():
     db.session.commit()
 
     return jsonify({'message': 'Password updated'}), 200
+
+
+@auth_bp.route('/auth/users', methods=['GET'])
+@require_auth
+def list_users():
+    role_filter = request.args.get('role')
+    query = User.query.filter_by(is_active=True)
+    if role_filter:
+        query = query.filter_by(role=role_filter)
+    users = query.all()
+    return jsonify([
+        {
+            'user_id': u.id,
+            'username': u.username,
+            'role': u.role,
+            'location_label': u.location_label,
+        }
+        for u in users
+    ]), 200
+
+
+@auth_bp.route('/auth/users/me/assigned-staff', methods=['GET'])
+@require_auth
+@require_doctor
+def list_assigned_staff():
+    doctor_id = g.current_user['user_id']
+    assignments = DoctorStaffAssignment.query.filter_by(doctor_id=doctor_id).all()
+    result = []
+    for assignment in assignments:
+        user = db.session.get(User, assignment.staff_id)
+        if user and user.is_active:
+            result.append({
+                'user_id': user.id,
+                'username': user.username,
+                'role': user.role,
+                'location_label': user.location_label,
+            })
+    return jsonify(result), 200
+
+
+@auth_bp.route('/auth/users/assign-staff', methods=['POST'])
+@require_auth
+@require_doctor
+def assign_staff():
+    data = request.get_json(silent=True) or {}
+    staff_id = (data.get('staff_id') or '').strip()
+
+    if not staff_id:
+        return jsonify({'error': 'staff_id is required'}), 400
+
+    staff_user = db.session.get(User, staff_id)
+    if not staff_user or staff_user.role != 'staff' or not staff_user.is_active:
+        return jsonify({'error': 'Staff user not found or not eligible'}), 404
+
+    doctor_id = g.current_user['user_id']
+    assignment = DoctorStaffAssignment(
+        doctor_id=doctor_id,
+        staff_id=staff_id,
+        created_at=get_ist_now(),
+    )
+    db.session.add(assignment)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Staff already assigned to this doctor'}), 400
+
+    return jsonify({'message': 'Staff assigned'}), 201
+
+
+@auth_bp.route('/auth/users/assign-staff/<staff_id>', methods=['DELETE'])
+@require_auth
+@require_doctor
+def unassign_staff(staff_id):
+    doctor_id = g.current_user['user_id']
+    assignment = DoctorStaffAssignment.query.filter_by(
+        doctor_id=doctor_id,
+        staff_id=staff_id,
+    ).first()
+
+    if not assignment:
+        return jsonify({'error': 'Assignment not found'}), 404
+
+    db.session.delete(assignment)
+    db.session.commit()
+    return jsonify({'message': 'Assignment removed'}), 200
