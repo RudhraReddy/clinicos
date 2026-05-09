@@ -481,6 +481,159 @@ def get_inventory():
         })
     return jsonify(results), 200
 
+@inventory.route('/inventory_analytics', methods=['GET'])
+def get_inventory_analytics():
+    from models import PurchaseInvoice, BillItem, ProductMaster, InventoryBatch, Visit, Bill
+    from datetime import date, timedelta
+    import calendar as cal_mod
+
+    today = get_ist_now().date()
+
+    # ── Basic totals ────────────────────────────────────────────────────
+    total_purchase_cost  = float(db.session.query(func.sum(PurchaseInvoice.total_amount)).scalar() or 0)
+    total_invoices_count = PurchaseInvoice.query.count()
+    medicine_revenue     = float(db.session.query(func.sum(BillItem.total_value)).scalar() or 0)
+    total_sales_count    = BillItem.query.count()
+    total_current_value  = float(db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity))
+                                 .filter(InventoryBatch.quantity > 0).scalar() or 0)
+
+    # ── Visit fees ──────────────────────────────────────────────────────
+    visit_fees_collected = float(db.session.query(func.sum(Visit.amount_paid)).scalar() or 0)
+    visit_fees_pending   = float(db.session.query(
+        func.sum(Visit.visiting_fee - Visit.amount_paid)
+    ).filter(Visit.payment_status != 'full', Visit.visiting_fee > 0).scalar() or 0)
+    total_visits         = Visit.query.filter(Visit.status != 'deleted').count()
+
+    # This-month helpers
+    month_start = today.replace(day=1)
+
+    month_medicine = float(db.session.query(func.sum(BillItem.total_value))
+        .join(Bill, Bill.invoice_id == BillItem.bill_id)
+        .filter(func.date(Bill.created_at) >= month_start).scalar() or 0)
+
+    month_visit_fees = float(db.session.query(func.sum(Visit.amount_paid))
+        .filter(func.date(Visit.created_at) >= month_start).scalar() or 0)
+
+    # Today helpers
+    today_medicine = float(db.session.query(func.sum(BillItem.total_value))
+        .join(Bill, Bill.invoice_id == BillItem.bill_id)
+        .filter(func.date(Bill.created_at) == today).scalar() or 0)
+
+    today_visit_fees = float(db.session.query(func.sum(Visit.amount_paid))
+        .filter(func.date(Visit.created_at) == today).scalar() or 0)
+
+    # ── Weekly income split — last 8 weeks ──────────────────────────────
+    week_start_base = today - timedelta(days=today.weekday())  # Monday of current week
+    weekly_income = []
+    for i in range(7, -1, -1):
+        wk_start = week_start_base - timedelta(weeks=i)
+        wk_end   = wk_start + timedelta(days=6)
+        label    = wk_start.strftime('%-d %b')
+
+        med = float(db.session.query(func.sum(BillItem.total_value))
+            .join(Bill, Bill.invoice_id == BillItem.bill_id)
+            .filter(func.date(Bill.created_at).between(wk_start, wk_end)).scalar() or 0)
+
+        fees = float(db.session.query(func.sum(Visit.amount_paid))
+            .filter(func.date(Visit.created_at).between(wk_start, wk_end)).scalar() or 0)
+
+        weekly_income.append({'week': label, 'medicine': med, 'visit_fees': fees})
+
+    # ── Today breakdown by payment type ─────────────────────────────────
+    today_payment_q = db.session.query(
+        Bill.payment_type,
+        func.sum(Bill.total_amount)
+    ).filter(func.date(Bill.created_at) == today)\
+     .group_by(Bill.payment_type).all()
+    today_by_payment = [
+        {'type': (t or 'Other').upper(), 'value': float(v)}
+        for t, v in today_payment_q if v
+    ]
+
+    # ── Category stock breakdown ────────────────────────────────────────
+    cat_stock_q = db.session.query(
+        ProductMaster.category,
+        func.sum(InventoryBatch.mrp * InventoryBatch.quantity)
+    ).join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
+     .filter(InventoryBatch.quantity > 0)\
+     .group_by(ProductMaster.category).all()
+
+    category_stock = [{'category': c or 'Uncategorised', 'value': float(v)}
+                      for c, v in cat_stock_q if v]
+
+    # ── Category sales breakdown ────────────────────────────────────────
+    cat_sales_q = db.session.query(
+        ProductMaster.category,
+        func.sum(BillItem.total_value)
+    ).join(BillItem, BillItem.product_id == ProductMaster.id)\
+     .group_by(ProductMaster.category).all()
+
+    category_sales = [{'category': c or 'Uncategorised', 'value': float(v)}
+                      for c, v in cat_sales_q if v]
+
+    # ── Top 5 selling items ─────────────────────────────────────────────
+    top_items_q = db.session.query(
+        BillItem.item_name,
+        func.sum(BillItem.total_value).label('revenue'),
+        func.sum(BillItem.quantity).label('qty_sold')
+    ).group_by(BillItem.item_name)\
+     .order_by(func.sum(BillItem.total_value).desc())\
+     .limit(5).all()
+
+    top_items = [{'name': r.item_name, 'revenue': float(r.revenue), 'qty_sold': int(r.qty_sold)}
+                 for r in top_items_q]
+
+    # ── Stock alerts ────────────────────────────────────────────────────
+    three_months = today + timedelta(days=90)
+
+    low_stock_q = db.session.query(ProductMaster)\
+        .join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
+        .group_by(ProductMaster.id)\
+        .having(func.sum(InventoryBatch.quantity) <= ProductMaster.min_stock_level)\
+        .all()
+    low_stock = [{'name': p.item_name, 'qty': int(db.session.query(func.sum(InventoryBatch.quantity))
+                  .filter(InventoryBatch.product_id == p.id).scalar() or 0)} for p in low_stock_q[:5]]
+
+    expiring_q = db.session.query(ProductMaster.item_name, InventoryBatch.expiry_date)\
+        .join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
+        .filter(InventoryBatch.quantity > 0,
+                InventoryBatch.expiry_date != None,
+                InventoryBatch.expiry_date <= three_months)\
+        .order_by(InventoryBatch.expiry_date.asc()).limit(5).all()
+    expiring = [{'name': n, 'expiry': e.strftime('%m/%y')} for n, e in expiring_q]
+    today_visit_fees_pending = float(db.session.query(
+        func.sum(Visit.visiting_fee - Visit.amount_paid)
+    ).filter(func.date(Visit.created_at) == today, Visit.payment_status != 'full', Visit.visiting_fee > 0).scalar() or 0)
+
+    return jsonify({
+        # Totals
+        'total_purchase_cost':   total_purchase_cost,
+        'total_invoices_count':  total_invoices_count,
+        'medicine_revenue':      medicine_revenue,
+        'total_sales_count':     total_sales_count,
+        'total_current_value':   total_current_value,
+        'visit_fees_collected':  visit_fees_collected,
+        'visit_fees_pending':    visit_fees_pending,
+        'total_visits':          total_visits,
+        # Period
+        'month_medicine':        month_medicine,
+        'month_visit_fees':      month_visit_fees,
+        'today_medicine':        today_medicine,
+        'today_visit_fees':      today_visit_fees,
+        'today_visit_fees_pending': today_visit_fees_pending,
+        # Charts
+        'weekly_income':         weekly_income,
+        'category_stock':        category_stock,
+        'category_sales':        category_sales,
+        'top_items':             top_items,
+        # Alerts
+        'low_stock':             low_stock,
+        'expiring_soon':         expiring,
+        'low_stock_count':       len(low_stock_q),
+        'expiring_count':        len(expiring_q),
+        'today_by_payment':      today_by_payment,
+    }), 200
+
 @inventory.route('/inventory/<string:product_id>/history', methods=['GET'])
 def get_inventory_history(product_id):
     """Returns paginated movement history for a specific inventory item"""

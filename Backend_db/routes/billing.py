@@ -52,7 +52,7 @@ def create_bill():
     
     for item in items_used:
         master_id = item.get('item_id')
-        qty_needed = int(item.get('quantity', 0))
+        qty_needed = float(item.get('quantity', 0))
         
         if qty_needed <= 0: continue
         
@@ -73,10 +73,10 @@ def create_bill():
         for batch in target_batches:
             if remaining_to_deduct <= 0: break
             
-            take = min(batch.quantity, remaining_to_deduct)
+            take = min(float(batch.quantity), float(remaining_to_deduct))
             
-            batch.quantity -= take
-            remaining_to_deduct -= take
+            batch.quantity = float(batch.quantity) - take
+            remaining_to_deduct = float(remaining_to_deduct) - take
             
             unit_price = float(batch.mrp) if batch.mrp else 0
             line_total = unit_price * take

@@ -220,6 +220,25 @@ export const api = {
         });
     },
 
+    async getInventoryAnalytics(): Promise<{
+        total_purchase_cost: number; total_invoices_count: number;
+        medicine_revenue: number; total_sales_count: number;
+        total_current_value: number; visit_fees_collected: number;
+        visit_fees_pending: number; total_visits: number;
+        month_medicine: number; month_visit_fees: number;
+        today_medicine: number; today_visit_fees: number; today_visit_fees_pending: number;
+        weekly_income: { week: string; medicine: number; visit_fees: number }[];
+        category_stock: { category: string; value: number }[];
+        category_sales: { category: string; value: number }[];
+        top_items: { name: string; revenue: number; qty_sold: number }[];
+        low_stock: { name: string; qty: number }[];
+        expiring_soon: { name: string; expiry: string }[];
+        low_stock_count: number; expiring_count: number;
+        today_by_payment: { type: string; value: number }[];
+    }> {
+        return fetchApi('/api/inventory_analytics');
+    },
+
     async exportInventory() {
         // Trigger download directly
         window.location.href = `${API_BASE_URL}/api/inventory/export`

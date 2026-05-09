@@ -95,11 +95,11 @@ class InventoryBatch(db.Model):
     gst_amount = db.Column(db.Numeric(10, 2), default=0.0) # Total tax amount for this batch qty (optional use)
 
     # Current Stock
-    quantity = db.Column(db.Integer, default=0)
+    quantity = db.Column(db.Numeric(10, 2), default=0.0)
     
     # Original Invoice Details (For History)
-    initial_quantity = db.Column(db.Integer, default=0) # Qty at time of purchase (Paid + Free)
-    free_quantity = db.Column(db.Integer, default=0) # Free Qty included in initial
+    initial_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Qty at time of purchase (Paid + Free)
+    free_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Free Qty included in initial
 
 
 class InventoryHistory(db.Model):
@@ -115,8 +115,8 @@ class InventoryHistory(db.Model):
     bill_id = db.Column(db.String(50), db.ForeignKey('bills.invoice_id'), nullable=True) # Sales
     purchase_invoice_number = db.Column(db.String(50), db.ForeignKey('purchase_invoices.invoice_number'), nullable=True) # Stock In
     
-    # change_amount = db.Column(db.Integer, nullable=False)
-    change_amount = db.Column(db.Integer, nullable=False)
+    # change_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    change_amount = db.Column(db.Numeric(10, 2), nullable=False)
     # Type: PURCHASE, SALE, EXPIRED, RETURN, ADJUSTMENT
     type = db.Column(db.String(50), nullable=False) 
     timestamp = db.Column(db.DateTime, default=get_ist_now)
@@ -170,7 +170,7 @@ class BillItem(db.Model):
     item_name = db.Column(db.String(100))
     batch_number = db.Column(db.String(50))
     expiry_date = db.Column(db.Date)
-    quantity = db.Column(db.Integer)
+    quantity = db.Column(db.Numeric(10, 2))
     mrp = db.Column(db.Numeric(10, 2)) # Unit MRP at sale
     gst_rate = db.Column(db.Numeric(5, 2))
     total_value = db.Column(db.Numeric(10, 2)) # qty * mrp
