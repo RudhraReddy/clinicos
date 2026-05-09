@@ -134,8 +134,9 @@ class Visit(db.Model):
     visit_date = db.Column(db.Date)
     visit_time = db.Column(db.Time)
     status = db.Column(db.String(20), default='in_progress') # in_progress, Done, cancelled
-    doctor_id = db.Column(db.String(50)) # User ID of doctor
-    
+    doctor_id = db.Column(db.String(50)) # User ID of doctor (deprecated)
+    created_by_user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
+
     # Financials
     visiting_fee = db.Column(db.Integer, default=0)
     amount_paid = db.Column(db.Integer, default=0)
@@ -154,7 +155,7 @@ class Bill(db.Model):
     payment_type = db.Column(db.String(50)) # CASH, CARD, INSURANCE
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
-    created_by_user_id = db.Column(db.String(50)) # Admin/Staff ID
+    created_by_user_id = db.Column(db.String(50), db.ForeignKey('users.id'), nullable=True) # Admin/Staff ID
 
 
 
@@ -188,6 +189,7 @@ class PatientImage(db.Model):
     tag = db.Column(db.String(50)) # e.g., 'Prescription', 'Lab', 'X-Ray'
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     deleted_at = db.Column(db.DateTime, nullable=True, default=None)
+    created_by_user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
 
 class UploadSession(db.Model):
     """
@@ -201,3 +203,25 @@ class UploadSession(db.Model):
     status = db.Column(db.String(20), default='WAITING') # WAITING, UPLOADED, COMPLETED
     created_at = db.Column(db.DateTime, default=get_ist_now)
     files = db.Column(db.Text) # JSON string of uploaded files info: [{path, tag, notes}]
+
+# --- Auth ---
+
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.String(36), primary_key=True)  # UUID4
+    email = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False)  # 'staff' | 'doctor'
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+    location_label = db.Column(db.String(100), nullable=True)
+
+class DoctorStaffAssignment(db.Model):
+    __tablename__ = 'doctor_staff_assignments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    doctor_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    staff_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('doctor_id', 'staff_id'),)
