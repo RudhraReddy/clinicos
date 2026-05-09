@@ -2,6 +2,8 @@
 
 A full-stack clinic management system built with a **Next.js** frontend and a **Flask/PostgreSQL** backend. The system handles patient registration, appointment scheduling, inventory management, billing, and image/prescription storage.
 
+**Current Release Version:** `v2.1.0`
+
 ---
 
 ## Project Structure
@@ -63,7 +65,7 @@ clinic_related/
 
 ## User Roles
 
-The app has three roles stored in `localStorage` under the key `clinic_role`. No server-side auth — role switching is done via the Profile Switcher in the sidebar.
+The application uses server-side authentication with role-based access control (RBAC) for `frontdesk`, `doctor`, and `admin` users. Auth sessions are managed via `/api/auth/me` and verified token logic.
 
 | Role | Access |
 |---|---|
