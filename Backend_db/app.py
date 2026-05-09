@@ -39,7 +39,9 @@ def create_app():
     app = Flask(__name__)
 
     allowed_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
-    CORS(app, origins=allowed_origins)
+    CORS(app, origins=allowed_origins, supports_credentials=True)
+
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-change-in-prod')
 
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
