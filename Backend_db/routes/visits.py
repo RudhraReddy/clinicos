@@ -5,10 +5,12 @@ from models import Visit, Patient, ProductMaster
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
+from .auth import require_auth
 
 visits = Blueprint('visits', __name__)
 
 @visits.route('/visits', methods=['POST'])
+@require_auth
 def create_visit():
     data = request.get_json()
     patient = Patient.query.filter_by(patient_id=data['patient_id']).first_or_404()
@@ -31,6 +33,7 @@ def create_visit():
     return jsonify({'message': 'Visit logged', 'visit_id': visit_id}), 201
 
 @visits.route('/visits', methods=['GET'])
+@require_auth
 def get_all_visits():
     visits_list = Visit.query.order_by(Visit.created_at.desc()).limit(50).all()
     results = []
@@ -55,6 +58,7 @@ def get_all_visits():
     return jsonify(results), 200
 
 @visits.route('/visits/patient/<patient_id>', methods=['GET'])
+@require_auth
 def get_patient_visits(patient_id):
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
     visits_list = Visit.query.filter_by(patient_id=patient.patient_id).order_by(Visit.visit_date.desc(), Visit.created_at.desc()).all()
@@ -73,6 +77,7 @@ def get_patient_visits(patient_id):
     return jsonify(results), 200
 
 @visits.route('/visits/<visit_id>', methods=['GET'])
+@require_auth
 def get_visit(visit_id):
     visit = Visit.query.get_or_404(visit_id)
     patient = Patient.query.get(visit.patient_id)
@@ -94,6 +99,7 @@ def get_visit(visit_id):
     }), 200
 
 @visits.route('/visits/<visit_id>', methods=['PUT'])
+@require_auth
 def update_visit(visit_id):
     visit = Visit.query.get_or_404(visit_id)
     data = request.get_json()
@@ -119,6 +125,7 @@ def update_visit(visit_id):
     return jsonify({'message': 'Visit updated successfully'}), 200
 
 @visits.route('/visits/<visit_id>', methods=['DELETE'])
+@require_auth
 def delete_visit(visit_id):
     visit = Visit.query.get_or_404(visit_id)
     db.session.delete(visit)

@@ -3,10 +3,12 @@ from flask import Blueprint, request, jsonify
 from models import Patient
 from extensions import db, get_ist_now
 from sqlalchemy import func
+from .auth import require_auth
 
 patients = Blueprint('patients', __name__)
 
 @patients.route('/patients', methods=['POST'])
+@require_auth
 def create_patient():
     data = request.get_json()
     
@@ -32,6 +34,7 @@ def create_patient():
     return jsonify({'message': 'Patient created', 'patient_id': patient_id}), 201
 
 @patients.route('/patients', methods=['GET'])
+@require_auth
 def get_patients():
     query_str = request.args.get('q', '').lower().strip()
     phone = request.args.get('phone_number')
@@ -68,6 +71,7 @@ def get_patients():
     return jsonify(results), 200
 
 @patients.route('/patients/<patient_id>', methods=['GET'])
+@require_auth
 def get_patient_detail(patient_id):
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
     return jsonify({
@@ -82,6 +86,7 @@ def get_patient_detail(patient_id):
     }), 200
 
 @patients.route('/patients/<patient_id>', methods=['PUT'])
+@require_auth
 def update_patient(patient_id):
     data = request.get_json()
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()

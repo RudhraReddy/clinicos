@@ -6,10 +6,12 @@ from extensions import db, get_ist_now
 from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory
 from sqlalchemy import func
 from utils import generate_invoice_id
+from .auth import require_auth
 
 billing = Blueprint('billing', __name__)
 
 @billing.route('/billing', methods=['POST'])
+@require_auth
 def create_bill():
     data = request.get_json()
     
@@ -122,6 +124,7 @@ def create_bill():
     return jsonify({'message': 'Bill created', 'invoice_id': invoice_id, 'total': total_calc_amount}), 201
 
 @billing.route('/billing/history', methods=['GET'])
+@require_auth
 def get_billing_history():
     date_from    = request.args.get('date_from')
     date_to      = request.args.get('date_to')
@@ -182,6 +185,7 @@ def get_billing_history():
     }), 200
 
 @billing.route('/billing/patient/<patient_id>', methods=['GET'])
+@require_auth
 def get_patient_billing_history(patient_id):
     bills = Bill.query.filter_by(patient_id=patient_id).order_by(Bill.created_at.desc()).all()
     results = []
@@ -196,6 +200,7 @@ def get_patient_billing_history(patient_id):
     return jsonify(results), 200
 
 @billing.route('/billing/<invoice_id>', methods=['GET'])
+@require_auth
 def get_bill_details(invoice_id):
     bill = Bill.query.get_or_404(invoice_id)
     patient = Patient.query.get(bill.patient_id)
@@ -241,6 +246,7 @@ def get_bill_details(invoice_id):
     }), 200
 
 @billing.route('/billing/<invoice_id>', methods=['DELETE'])
+@require_auth
 def delete_bill(invoice_id):
     bill = Bill.query.get(invoice_id)
     if not bill:

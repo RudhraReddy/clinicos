@@ -4,10 +4,12 @@ from flask import Blueprint, request, jsonify, send_file
 from extensions import db, get_ist_now
 from models import PatientImage, Patient
 import os
+from .auth import require_auth
 
 images = Blueprint('images', __name__)
 
 @images.route('/patients/<patient_id>/images', methods=['POST'])
+@require_auth
 def upload_patient_image(patient_id):
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -50,6 +52,7 @@ def upload_patient_image(patient_id):
 
 
 @images.route('/patients/<patient_id>/images', methods=['GET'])
+@require_auth
 def get_patient_images(patient_id):
     images_list = (
         PatientImage.query
@@ -72,6 +75,7 @@ def get_patient_images(patient_id):
 
 
 @images.route('/patients/images/<int:image_id>/file', methods=['GET'])
+@require_auth
 def get_patient_image_file(image_id):
     img = PatientImage.query.get_or_404(image_id)
     if img.image_path and os.path.exists(img.image_path):
@@ -83,6 +87,7 @@ def get_patient_image_file(image_id):
 # to avoid Flask interpreting "trash" as an integer image_id.
 
 @images.route('/patients/images/trash', methods=['GET'])
+@require_auth
 def get_trash_images():
     """
     Return all soft-deleted patient images.
@@ -146,6 +151,7 @@ def get_trash_images():
 
 
 @images.route('/patients/images', methods=['GET'])
+@require_auth
 def get_all_patient_images():
     """Fetch all non-deleted patient images sorted by timestamp desc, joining with Patient info."""
     try:
@@ -178,6 +184,7 @@ def get_all_patient_images():
 
 
 @images.route('/patients/images/<int:image_id>', methods=['PUT'])
+@require_auth
 def update_patient_image(image_id):
     img = PatientImage.query.get_or_404(image_id)
     data = request.json
@@ -192,6 +199,7 @@ def update_patient_image(image_id):
 
 
 @images.route('/patients/images/<int:image_id>', methods=['DELETE'])
+@require_auth
 def soft_delete_patient_image(image_id):
     """Move an image to trash (soft-delete)."""
     img = PatientImage.query.get_or_404(image_id)
@@ -203,6 +211,7 @@ def soft_delete_patient_image(image_id):
 
 
 @images.route('/patients/images/<int:image_id>/restore', methods=['POST'])
+@require_auth
 def restore_patient_image(image_id):
     """Restore an image from trash."""
     img = PatientImage.query.get_or_404(image_id)
@@ -212,6 +221,7 @@ def restore_patient_image(image_id):
 
 
 @images.route('/patients/images/<int:image_id>/permanent', methods=['DELETE'])
+@require_auth
 def permanent_delete_patient_image(image_id):
     """Permanently delete an image: removes the file and the DB row."""
     img = PatientImage.query.get_or_404(image_id)
