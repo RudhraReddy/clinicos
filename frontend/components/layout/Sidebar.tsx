@@ -99,9 +99,9 @@ export function Sidebar({ className }: SidebarProps) {
                         {user?.username ?? 'Logout'}
                     </Button>
                 </div>
-                <div className="text-center pt-1 border-t border-muted/30">
+                <div className="border-t border-muted/30">
                     <p className="text-[10px] text-muted-foreground/60 tracking-wider">
-                        CURRENT VERSION: v2.1.0
+                        SYSTEM VERSION: v2.1.0
                     </p>
                 </div>
             </div>
