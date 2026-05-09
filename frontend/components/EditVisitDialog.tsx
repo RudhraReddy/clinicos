@@ -228,6 +228,14 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                 />
                             </div>
                         </div>
+                        {visit.created_at && (
+                            <div className="text-[10px] text-muted-foreground/80 space-y-0.5 border-t pt-2 mt-1 flex flex-col gap-0.5 px-1">
+                                <div>Created: {new Date(visit.created_at).toLocaleString()}</div>
+                                {visit.updated_at && (
+                                    <div>Last Updated: {new Date(visit.updated_at).toLocaleString()}</div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
                         <div className="flex gap-2">

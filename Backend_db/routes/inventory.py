@@ -415,6 +415,16 @@ def get_inventory():
         max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
         min_mrp = db.session.query(func.min(InventoryBatch.mrp)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
         
+        active_batch = db.session.query(InventoryBatch.mrp).filter(
+            InventoryBatch.product_id == item.id,
+            InventoryBatch.quantity > 0
+        ).order_by(InventoryBatch.expiry_date.asc()).first()
+        current_mrp = float(active_batch[0]) if active_batch and active_batch[0] else float(max_mrp)
+
+        total_value = db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity)).filter(
+            InventoryBatch.product_id == item.id
+        ).scalar() or 0.0
+        
         earliest_expiry = db.session.query(func.min(InventoryBatch.expiry_date)).filter(
             InventoryBatch.product_id == item.id, 
             InventoryBatch.quantity > 0
@@ -458,10 +468,10 @@ def get_inventory():
             'category': item.category,
             'manufacturer': item.manufacturer,
             'vendors': vendor_list,
-            'price': float(max_mrp),
+            'price': current_mrp,
             'min_price': float(min_mrp),
             'max_price': float(max_mrp),
-            'total_value': float(max_mrp) * total_qty,
+            'total_value': float(total_value),
             'expiry_date': earliest_expiry.strftime('%m/%y') if earliest_expiry else None,
             'status': status_tags,
             'pack_size': item.pack_size,
@@ -586,6 +596,15 @@ def update_inventory_item(id):
         if item.formula != new_formula:
             changed_fields.append('formula')
         item.formula = new_formula
+    if 'manufacturer' in data:
+        if item.manufacturer != data['manufacturer']:
+            changed_fields.append('manufacturer')
+        item.manufacturer = data['manufacturer']
+    if 'gst_rate' in data:
+        new_gst = float(data['gst_rate']) if data['gst_rate'] is not None else 0.0
+        if item.gst_rate != new_gst:
+            changed_fields.append('gst_rate')
+        item.gst_rate = new_gst
 
     if changed_fields:
         hist = InventoryHistory(
@@ -687,6 +706,7 @@ def search_inventory():
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0,
             'total_qty': total_qty,
             'price': float(max_mrp),
+            'pack_size': item.pack_size,
             'substitutes': []
         })
         

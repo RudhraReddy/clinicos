@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 import { ThemeProvider } from "@/components/theme-provider";
 import AppShell from "@/components/layout/AppShell";
 import { AuthProvider } from "@/lib/auth_context";
+import { SettingsProvider } from "@/lib/settings_context";
 import { Toaster } from "sonner";
 
 export default function RootLayout({
@@ -39,10 +40,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <AppShell>{children}</AppShell>
-            <Toaster richColors closeButton />
-          </AuthProvider>
+          <SettingsProvider>
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+              <Toaster richColors closeButton />
+            </AuthProvider>
+          </SettingsProvider>
         </ThemeProvider>
       </body>
     </html>

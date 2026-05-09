@@ -23,6 +23,8 @@ def _apply_migrations(db):
     stmts = [
         # 2026-05-08: formula column added to product_master
         "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS formula TEXT",
+        # 2026-05-09: updated_at column added to visits
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

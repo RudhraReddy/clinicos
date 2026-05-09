@@ -65,13 +65,29 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
         manufacturer: item.manufacturer || '',
         category: item.category,
         min_stock_level: item.min_stock_level,
-        // unit: item.unit, // Removed
         hsn_code: item.hsn_code || '',
         gst_rate: item.gst_rate || 5,
-        vendors: (item.vendors || []).join(', ')
+        vendors: (item.vendors || []).join(', '),
+        pack_size: item.pack_size || '',
+        formula: item.formula || ''
     })
 
-    // ... handleSubmit modification needed to parse vendors
+    useEffect(() => {
+        if (open && item) {
+            setFormData({
+                item_name: item.item_name,
+                manufacturer: item.manufacturer || '',
+                category: item.category,
+                min_stock_level: item.min_stock_level,
+                hsn_code: item.hsn_code || '',
+                gst_rate: item.gst_rate || 5,
+                vendors: (item.vendors || []).join(', '),
+                pack_size: item.pack_size || '',
+                formula: item.formula || ''
+            })
+        }
+    }, [open, item])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
@@ -188,6 +204,26 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                     className="col-span-3"
                                 />
                             </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="pack_size" className="text-right">Pack Size</Label>
+                                <Input
+                                    id="pack_size"
+                                    value={formData.pack_size}
+                                    onChange={(e) => setFormData({ ...formData, pack_size: e.target.value })}
+                                    className="col-span-3"
+                                    placeholder="e.g. 1x10, 100ml"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="formula" className="text-right">Formula</Label>
+                                <Input
+                                    id="formula"
+                                    value={formData.formula}
+                                    onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
+                                    className="col-span-3"
+                                    placeholder="Active chemical formula"
+                                />
+                            </div>
                         </div>
 
                         <div className="mt-6">
@@ -232,8 +268,34 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                             <Input
                                                 type="number"
                                                 className="h-7 text-xs"
-                                                value={batch.quantity}
-                                                onChange={(e) => updateBatch(batch.id, 'quantity', parseInt(e.target.value) || 0)}
+                                                value={(() => {
+                                                    const pack = item.pack_size?.toLowerCase() || ''
+                                                    if (pack.includes('s') || pack.includes('x')) {
+                                                        const match = pack.match(/(\d+)/)
+                                                        if (match) {
+                                                            const num = parseInt(match[0])
+                                                            if (!isNaN(num) && num > 1) {
+                                                                return Math.round(batch.quantity * num)
+                                                            }
+                                                        }
+                                                    }
+                                                    return batch.quantity
+                                                })()}
+                                                onChange={(e) => {
+                                                    const inputVal = parseFloat(e.target.value) || 0
+                                                    const pack = item.pack_size?.toLowerCase() || ''
+                                                    let divisor = 1
+                                                    if (pack.includes('s') || pack.includes('x')) {
+                                                        const match = pack.match(/(\d+)/)
+                                                        if (match) {
+                                                            const num = parseInt(match[0])
+                                                            if (!isNaN(num) && num > 1) {
+                                                                divisor = num
+                                                            }
+                                                        }
+                                                    }
+                                                    updateBatch(batch.id, 'quantity', inputVal / divisor)
+                                                }}
                                             />
                                         </div>
                                         <div className="col-span-3 space-y-1">

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth_context"
 import { ProfileSwitcher } from "@/components/profile-switcher"
+import { GlobalSettingsDialog } from "@/components/GlobalSettingsDialog"
 
 const staffNavItems = [
     { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -69,9 +70,10 @@ export function Sidebar({ className }: SidebarProps) {
                     <ProfileSwitcher />
                 </div>
                 <div>
-                    <p className="text-xs text-muted-foreground mb-2 text-center uppercase tracking-wider font-semibold">Theme</p>
-                    <div className="flex justify-center">
+                    <p className="text-xs text-muted-foreground mb-2 text-center uppercase tracking-wider font-semibold">Preferences</p>
+                    <div className="flex justify-center items-center gap-2">
                         <ThemeToggle />
+                        <GlobalSettingsDialog />
                     </div>
                 </div>
             </div>

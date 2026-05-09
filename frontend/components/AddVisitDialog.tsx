@@ -27,12 +27,17 @@ interface AddVisitDialogProps {
     initialTime?: string
 }
 
+const getCurrentTimeStr = () => {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+};
+
 export function AddVisitDialog({ open, onOpenChange, onSuccess, trigger, initialDate, initialTime }: AddVisitDialogProps) {
     const [submitting, setSubmitting] = useState(false)
     const [formData, setFormData] = useState({
         patient_id: "",
         visit_date: initialDate || getTodayIST(),
-        visit_time: initialTime || "",
+        visit_time: initialTime || getCurrentTimeStr(),
         reason: "",
         addToQueue: true,
         visiting_fee: "",
@@ -50,7 +55,7 @@ export function AddVisitDialog({ open, onOpenChange, onSuccess, trigger, initial
             setFormData(prev => ({
                 ...prev,
                 visit_date: initialDate || getTodayIST(),
-                visit_time: initialTime || ""
+                visit_time: initialTime || getCurrentTimeStr()
             }))
             // Reset history when reopening
             if (!initialDate) {

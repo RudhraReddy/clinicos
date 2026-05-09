@@ -142,6 +142,7 @@ class Visit(db.Model):
     payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid
     
     created_at = db.Column(db.DateTime, default=get_ist_now)
+    updated_at = db.Column(db.DateTime, default=get_ist_now, onupdate=get_ist_now)
 
 class Bill(db.Model):
     __tablename__ = 'bills'

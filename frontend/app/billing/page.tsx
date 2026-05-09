@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { useSettings } from "@/lib/settings_context"
 
 export interface BillItem {
     item_id: string;
@@ -40,6 +41,21 @@ export interface BillItem {
     mrp: number;
     gst: number;
     total: number;
+    pack_size?: string;
+}
+
+const getPackMultiplier = (packSize?: string) => {
+    const pack = packSize?.toLowerCase() || ''
+    if (pack.includes('s') || pack.includes('x')) {
+        const match = pack.match(/(\d+)/)
+        if (match) {
+            const num = parseInt(match[0])
+            if (!isNaN(num) && num > 1) {
+                return num
+            }
+        }
+    }
+    return 1
 }
 
 function BillingContent() {
@@ -81,28 +97,7 @@ function BillingContent() {
     const [printDialogOpen, setPrintDialogOpen] = useState(false)
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
 
-    const [clinicName, setClinicName] = useState("Teja Reddy Clinic")
-    const [clinicAddress, setClinicAddress] = useState("#3145 Here and there, TS 500081")
-    const [clinicPhone, setClinicPhone] = useState("+91 98765 43210")
-    const [referenceDoctor, setReferenceDoctor] = useState("")
-
-    const [settingsOpen, setSettingsOpen] = useState(false)
-    const [settingsNameDraft, setSettingsNameDraft] = useState("")
-    const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
-    const [settingsPhoneDraft, setSettingsPhoneDraft] = useState("")
-    const [settingsReferenceDoctorDraft, setSettingsReferenceDoctorDraft] = useState("")
-
-    // Load clinic settings from localStorage
-    useEffect(() => {
-        const storedName = localStorage.getItem("clinic_name")
-        const storedAddress = localStorage.getItem("clinic_address")
-        const storedPhone = localStorage.getItem("clinic_phone")
-        const storedRefDoc = localStorage.getItem("clinic_ref_doc")
-        if (storedName) setClinicName(storedName)
-        if (storedAddress !== null) setClinicAddress(storedAddress)
-        if (storedPhone !== null) setClinicPhone(storedPhone)
-        if (storedRefDoc !== null) setReferenceDoctor(storedRefDoc)
-    }, [])
+    const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
 
     // Load patient if ID present in URL
     useEffect(() => {
@@ -156,14 +151,17 @@ function BillingContent() {
     }, [itemQuery])
 
     const addToBill = (item: InventorySearchResult) => {
+        const multiplier = getPackMultiplier(item.pack_size)
+        const unitMRP = (item.price || 0) / multiplier
         const newItem: BillItem = {
             item_id: item.id.toString(),
             item_name: item.item_name,
             batch_number: "Auto-FIFO",
             qty: 1,
-            mrp: item.price || 0,
+            mrp: unitMRP,
             gst: item.gst_rate || 0,
-            total: 0,
+            total: unitMRP,
+            pack_size: item.pack_size,
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
@@ -192,7 +190,7 @@ function BillingContent() {
                 payment_type: paymentType,
                 items_used: billItems.map(i => ({
                     item_id: i.item_id,
-                    quantity: i.qty,
+                    quantity: i.qty / getPackMultiplier(i.pack_size),
                 })),
             }
 
@@ -230,86 +228,6 @@ function BillingContent() {
                     <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
                     <p className="text-muted-foreground">Create invoices and manage history.</p>
                 </div>
-                <Dialog open={settingsOpen} onOpenChange={(open) => {
-                    setSettingsOpen(open)
-                    if (open) {
-                        setSettingsNameDraft(clinicName)
-                        setSettingsAddressDraft(clinicAddress)
-                        setSettingsPhoneDraft(clinicPhone)
-                        setSettingsReferenceDoctorDraft(referenceDoctor)
-                    }
-                }}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                            <Settings className="h-4 w-4 mr-2" />
-                            Clinic Settings
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Clinic Settings</DialogTitle>
-                            <DialogDescription>
-                                These values appear on printed invoices and are saved locally in your browser.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 pt-2">
-                            <div className="space-y-1">
-                                <Label htmlFor="settings-clinic-name">Clinic Name</Label>
-                                <Input
-                                    id="settings-clinic-name"
-                                    value={settingsNameDraft}
-                                    onChange={(e) => setSettingsNameDraft(e.target.value)}
-                                    placeholder="MediCare Clinic"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="settings-clinic-address">Clinic Address</Label>
-                                <Textarea
-                                    id="settings-clinic-address"
-                                    value={settingsAddressDraft}
-                                    onChange={(e) => setSettingsAddressDraft(e.target.value)}
-                                    placeholder="123 Health St, Medical District, City"
-                                    rows={3}
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="settings-clinic-phone">Clinic Phone</Label>
-                                <Input
-                                    id="settings-clinic-phone"
-                                    value={settingsPhoneDraft}
-                                    onChange={(e) => setSettingsPhoneDraft(e.target.value)}
-                                    placeholder="+91 98765 43210"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="settings-clinic-refdoc">Reference Doctor</Label>
-                                <Input
-                                    id="settings-clinic-refdoc"
-                                    value={settingsReferenceDoctorDraft}
-                                    onChange={(e) => setSettingsReferenceDoctorDraft(e.target.value)}
-                                    placeholder="Dr. John Doe"
-                                />
-                            </div>
-                            <Button
-                                className="w-full"
-                                onClick={() => {
-                                    localStorage.setItem("clinic_name", settingsNameDraft)
-                                    localStorage.setItem("clinic_address", settingsAddressDraft)
-                                    localStorage.setItem("clinic_phone", settingsPhoneDraft)
-                                    localStorage.setItem("clinic_ref_doc", settingsReferenceDoctorDraft)
-                                    setClinicName(settingsNameDraft)
-                                    setClinicAddress(settingsAddressDraft)
-                                    setClinicPhone(settingsPhoneDraft)
-                                    setReferenceDoctor(settingsReferenceDoctorDraft)
-                                    setSettingsOpen(false)
-                                    toast.success("Clinic settings saved")
-                                }}
-                            >
-                                Save
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -319,29 +237,54 @@ function BillingContent() {
                 </TabsList>
 
                 <TabsContent value="new" className="space-y-6">
-                    {/* Patient Section */}
+                    {/* Patient & Actions Section */}
                     <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Patient Details</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="max-w-xl space-y-4">
-                                <Label>Select Patient</Label>
-                                <PatientSearch
-                                    selectedPatient={patient}
-                                    onSelect={(p) => {
-                                        setPatient(p)
-                                        setPatientId(p?.patient_id || "")
-                                    }}
-                                />
-                                {patient && (
-                                    <div className="flex justify-end gap-2">
-                                        <Button variant="secondary" size="sm" onClick={() => setShowQR(true)}>
-                                            <Smartphone className="mr-2 h-4 w-4" />
-                                            Upload via QR
+                        <CardContent className="p-6">
+                            <div className="flex flex-col md:flex-row gap-6 md:items-start justify-between">
+                                <div className="flex-1 max-w-xl space-y-4">
+                                    <Label>Select Patient</Label>
+                                    <PatientSearch
+                                        selectedPatient={patient}
+                                        onSelect={(p) => {
+                                            setPatient(p)
+                                            setPatientId(p?.patient_id || "")
+                                        }}
+                                    />
+                                    {patient && (
+                                        <div className="flex justify-start gap-2">
+                                            <Button variant="secondary" size="sm" onClick={() => setShowQR(true)}>
+                                                <Smartphone className="mr-2 h-4 w-4" />
+                                                Upload via QR
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 bg-muted/30 p-4 rounded-lg border">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="payment-type" className="text-sm font-medium">
+                                            Payment Method
+                                        </Label>
+                                        <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
+                                            <SelectTrigger id="payment-type" className="w-[140px] bg-background">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="CASH">Cash</SelectItem>
+                                                <SelectItem value="CARD">Card</SelectItem>
+                                                <SelectItem value="UPI">UPI</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="text-sm font-medium text-foreground h-5 flex items-center">
+                                            {billItems.length > 0 ? `Total: ₹${calculateTotal().toFixed(2)}` : 'Total: ₹0.00'}
+                                        </span>
+                                        <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill} className="w-full sm:w-auto">
+                                            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Create Bill
                                         </Button>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -379,7 +322,7 @@ function BillingContent() {
                                                 <div className="flex justify-between">
                                                     <span className="font-medium">{item.item_name}</span>
                                                     <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
-                                                        {item.total_qty && item.total_qty > 0 ? `${item.total_qty} in stock` : "Out of Stock"}
+                                                        {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-muted-foreground">
@@ -449,34 +392,13 @@ function BillingContent() {
                                 </Table>
                             </div>
 
-                            <div className="flex justify-between items-center gap-3 mt-4">
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="payment-type" className="text-sm font-medium whitespace-nowrap">
-                                        Payment Method
-                                    </Label>
-                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
-                                        <SelectTrigger id="payment-type" className="w-[160px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CASH">Cash</SelectItem>
-                                            <SelectItem value="CARD">Card</SelectItem>
-                                            <SelectItem value="UPI">UPI</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            {billItems.length > 0 && (
+                                <div className="flex justify-end mt-4">
+                                    <span className="text-lg font-bold">
+                                        Total: ₹{calculateTotal().toFixed(2)}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    {billItems.length > 0 && (
-                                        <span className="text-sm font-medium">
-                                            Total: ₹{calculateTotal().toFixed(2)}
-                                        </span>
-                                    )}
-                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill}>
-                                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Create Bill
-                                    </Button>
-                                </div>
-                            </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

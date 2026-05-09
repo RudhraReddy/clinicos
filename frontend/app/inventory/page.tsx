@@ -28,21 +28,26 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from 'next/link'
+import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
+import { format } from "date-fns"
+import { useSettings } from "@/lib/settings_context"
 
 function AllChangesPanel() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [dateFrom, setDateFrom] = useState('')
-    const [dateTo, setDateTo] = useState('')
+    const [date, setDate] = useState<DateRange | undefined>()
     const [filterType, setFilterType] = useState('ALL') // 'ALL', 'SALE', 'ADJUSTMENT', 'PURCHASE'
 
     const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
 
-    const load = async (from = dateFrom, to = dateTo) => {
+    const load = async (range = date) => {
         setLoading(true)
         try {
-            const res = await api.getInventoryAllChanges(from || undefined, to || undefined)
+            const from = range?.from ? format(range.from, 'yyyy-MM-dd') : undefined;
+            const to = range?.to ? format(range.to, 'yyyy-MM-dd') : range?.from ? format(range.from, 'yyyy-MM-dd') : undefined;
+            const res = await api.getInventoryAllChanges(from, to)
             setData(res)
         } catch {
             setData(null)
@@ -52,10 +57,9 @@ function AllChangesPanel() {
     }
 
     const resetDates = () => {
-        setDateFrom('')
-        setDateTo('')
+        setDate(undefined)
         setFilterType('ALL')
-        load('', '')
+        load(undefined)
     }
 
     const toggleExpandAll = () => {
@@ -84,14 +88,10 @@ function AllChangesPanel() {
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <div className="flex gap-3 items-end flex-wrap">
                     <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">From</label>
-                        <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
+                        <label className="text-xs text-muted-foreground mb-1 block">Date Filter</label>
+                        <DatePickerWithRange date={date} setDate={setDate} className="w-[260px]" />
                     </div>
-                    <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">To</label>
-                        <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
-                    </div>
-                    <Button onClick={() => load()} variant="outline">Apply</Button>
+                    <Button onClick={() => load(date)} variant="outline">Apply</Button>
                     <Button onClick={resetDates} variant="ghost" size="icon" title="Reset Dates">
                         <RotateCcw className="h-4 w-4" />
                     </Button>
@@ -247,6 +247,7 @@ function AllChangesPanel() {
 }
 
 export default function InventoryPage() {
+    const { appFontSize } = useSettings()
     const [role, setRole] = useState<string>('')
     const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -414,8 +415,26 @@ export default function InventoryPage() {
 
     // Column Visibility State
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
-        'item_name', 'pack_size', 'manufacturer', 'vendor', 'quantity', 'expiry_date', 'status', 'formula'
+        'id', 'item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'expiry_date', 'status', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value'
     ]))
+
+    useEffect(() => {
+        if (appFontSize > 16) {
+            setVisibleColumns(prev => {
+                const next = new Set(prev)
+                const toRemove = ['id', 'manufacturer', 'vendor', 'pack_size', 'price', 'expiry_date', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value']
+                toRemove.forEach(c => next.delete(c))
+                return next
+            })
+        } else {
+            setVisibleColumns(prev => {
+                const next = new Set(prev)
+                const toAdd = ['id', 'item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'expiry_date', 'status', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value']
+                toAdd.forEach(c => next.add(c))
+                return next
+            })
+        }
+    }, [appFontSize])
 
     const toggleColumn = (col: string) => {
         const newSet = new Set(visibleColumns)
@@ -779,33 +798,22 @@ export default function InventoryPage() {
                                                 </TableCell>}
                                                 {visibleColumns.has('pack_size') && <TableCell className="text-muted-foreground text-xs">{item.pack_size || '-'}</TableCell>}
                                                 {visibleColumns.has('quantity') && <TableCell className="font-medium text-foreground">
-                                                    {item.quantity}
                                                     {(() => {
-                                                        // Parse pack size for total count
-                                                        // User logic: "only for onces with 's'" (e.g. 10s). 
-                                                        // We also support 'x' (e.g. 1x10) as it's common.
                                                         const pack = item.pack_size?.toLowerCase() || ''
                                                         if (pack.includes('s') || pack.includes('x')) {
                                                             const match = pack.match(/(\d+)/)
                                                             if (match) {
                                                                 const num = parseInt(match[0])
                                                                 if (!isNaN(num) && num > 1) {
-                                                                    return (
-                                                                        <div className="text-[10px] text-muted-foreground font-normal">
-                                                                            ({(item.quantity * num).toLocaleString()} total)
-                                                                        </div>
-                                                                    )
+                                                                    return Math.round(item.quantity * num).toLocaleString()
                                                                 }
                                                             }
                                                         }
-                                                        return null
+                                                        return item.quantity
                                                     })()}
                                                 </TableCell>}
                                                 {visibleColumns.has('price') && <TableCell>
-                                                    {item.min_price && item.max_price && item.min_price !== item.max_price
-                                                        ? `$${item.min_price} - $${item.max_price}`
-                                                        : `$${item.price}`
-                                                    }
+                                                    {`$${item.price}`}
                                                 </TableCell>}
                                                 {visibleColumns.has('gst_rate') && <TableCell>
                                                     {item.gst_rate ? `${item.gst_rate}%` : '-'}

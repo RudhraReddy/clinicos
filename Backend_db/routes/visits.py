@@ -49,7 +49,8 @@ def get_all_visits():
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'payment_status': v.payment_status,
-            'created_at': v.created_at.isoformat() if v.created_at else None
+            'created_at': v.created_at.isoformat() if v.created_at else None,
+            'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })
     return jsonify(results), 200
 
@@ -66,7 +67,8 @@ def get_patient_visits(patient_id):
             'visit_time': v.visit_time.strftime('%H:%M') if v.visit_time else None,
             'reason': v.reason,
             'status': v.status,
-            'created_at': v.created_at.isoformat() if v.created_at else None
+            'created_at': v.created_at.isoformat() if v.created_at else None,
+            'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })
     return jsonify(results), 200
 
@@ -87,7 +89,8 @@ def get_visit(visit_id):
         'visiting_fee': visit.visiting_fee,
         'amount_paid': visit.amount_paid,
         'payment_status': visit.payment_status,
-        'created_at': visit.created_at.isoformat() if visit.created_at else None
+        'created_at': visit.created_at.isoformat() if visit.created_at else None,
+        'updated_at': visit.updated_at.isoformat() if hasattr(visit, 'updated_at') and visit.updated_at else None
     }), 200
 
 @visits.route('/visits/<visit_id>', methods=['PUT'])
@@ -109,6 +112,8 @@ def update_visit(visit_id):
         visit.visit_date = datetime.strptime(data['visit_date'], '%Y-%m-%d').date() if data['visit_date'] else None
     if 'visit_time' in data:
         visit.visit_time = datetime.strptime(data['visit_time'], '%H:%M').time() if data['visit_time'] else None
+        
+    visit.updated_at = get_ist_now()
         
     db.session.commit()
     return jsonify({'message': 'Visit updated successfully'}), 200

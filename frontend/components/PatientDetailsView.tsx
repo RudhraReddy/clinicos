@@ -22,6 +22,7 @@ import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2, Chevr
 import { Badge } from "@/components/ui/badge"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
+import { useSettings } from "@/lib/settings_context"
 
 interface PatientDetailsViewProps {
     patient: Patient
@@ -39,6 +40,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
     const [lightboxState, setLightboxState] = useState<{ image: any; context: any[] } | null>(null)
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
+    const { clinicName, clinicAddress, clinicPhone, referenceDoctor, appFontSize } = useSettings()
 
     // Visit History collapsible state
     const [visitHistoryOpen, setVisitHistoryOpen] = useState(false)
@@ -164,7 +166,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                         <DialogTitle className="text-2xl font-bold">{patient.name}</DialogTitle>
                         <DialogDescription className="sr-only">Detailed view of patient history including visits, images, and billing.</DialogDescription>
                         <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                            <span>ID: <span className="font-mono text-foreground">{patient.patient_id}</span></span>
+                            {appFontSize <= 16 && <span>ID: <span className="font-mono text-foreground">{patient.patient_id}</span></span>}
                             <span>Phone: <span className="text-foreground">{patient.phone_number}</span></span>
                             {patient.age && <span>Age: <span className="text-foreground">{patient.age}</span></span>}
                             {patient.sex && <span>Sex: <span className="text-foreground">{patient.sex}</span></span>}
@@ -398,10 +400,11 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                     open={invoiceOpen}
                     onOpenChange={(v) => { setInvoiceOpen(v); if (!v) setInvoiceId(null) }}
                     invoiceId={invoiceId}
-                    clinicName="MediCare Clinic"
-                    clinicAddress=""
-                    clinicPhone=""
-                    clinicLicense=""
+                    clinicName={clinicName}
+                    clinicAddress={clinicAddress}
+                    clinicPhone={clinicPhone}
+                    clinicLicense="TG/WLU/2025-140763"
+                    referenceDoctor={referenceDoctor}
                 />
             </DialogContent>
         </Dialog>

@@ -290,3 +290,8 @@ These three strings are passed as props at two call sites and are currently hard
 - `frontend/components/PatientDetailsView.tsx` lines ~388–390 — all three hardcoded
 
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context. The settings edit UI should be admin-only.
+
+## Recent Changes / Notes
+
+- **Date Filtering:** Replaced two-input date filters with `DatePickerWithRange` (`components/ui/date-range-picker.tsx`) using `react-day-picker`. This single calendar can be used to select both a single date or a range of dates. Used in Inventory "All Changes" and Invoice History tabs.
+- **Invoice History:** Added client-side search (invoice number/vendor) and date range filtering to the `/inventory/history` tab. Additionally, implemented table-column dropdown filters for `Vendor` and `Source`, and a range filter for `Total Amount`. Updated the "Back to Inventory" button with an arrow icon.

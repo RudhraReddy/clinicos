@@ -19,11 +19,13 @@ import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
 import { PatientDetailsView } from "@/components/PatientDetailsView"
 import { useAuth } from "@/lib/auth_context"
+import { useSettings } from "@/lib/settings_context"
 
 const PAGE_LIMIT = 50
 
 export default function PatientsPage() {
     const { role } = useAuth()
+    const { appFontSize } = useSettings()
     const [patients, setPatients] = useState<Patient[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -149,11 +151,14 @@ export default function PatientsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Public ID</TableHead>
+                                        {appFontSize <= 16 && <TableHead>Public ID</TableHead>}
                                         <TableHead>Name</TableHead>
                                         <TableHead>Phone</TableHead>
-                                        <TableHead>Date of Birth</TableHead>
-                                        <TableHead>Joined</TableHead>
+                                        <TableHead>Age</TableHead>
+                                        {appFontSize <= 16 && <TableHead>Sex</TableHead>}
+                                        {appFontSize <= 16 && <TableHead>Address</TableHead>}
+                                        {appFontSize <= 16 && <TableHead>Reference</TableHead>}
+                                        {appFontSize <= 16 && <TableHead>Joined</TableHead>}
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -167,13 +172,28 @@ export default function PatientsPage() {
                                     ) : (
                                         filteredPatients.map((patient, index) => (
                                             <TableRow key={`${patient.patient_id}-${index}`}>
-                                                <TableCell className="font-medium font-mono text-xs text-muted-foreground">
-                                                    {patient.patient_id}
-                                                </TableCell>
+                                                {appFontSize <= 16 && (
+                                                    <TableCell className="font-medium font-mono text-xs text-muted-foreground">
+                                                        {patient.patient_id}
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="font-semibold">{patient.name}</TableCell>
                                                 <TableCell>{patient.phone_number}</TableCell>
-                                                <TableCell>{patient.dob ? new Date(patient.dob).toLocaleDateString() : "N/A"}</TableCell>
-                                                <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
+                                                <TableCell>
+                                                    {patient.age || (patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : "N/A")}
+                                                </TableCell>
+                                                {appFontSize <= 16 && (
+                                                    <TableCell>{patient.sex || "N/A"}</TableCell>
+                                                )}
+                                                {appFontSize <= 16 && (
+                                                    <TableCell className="max-w-[150px] truncate" title={patient.address || ""}>{patient.address || "N/A"}</TableCell>
+                                                )}
+                                                {appFontSize <= 16 && (
+                                                    <TableCell className="max-w-[150px] truncate" title={patient.reference || ""}>{patient.reference || "N/A"}</TableCell>
+                                                )}
+                                                {appFontSize <= 16 && (
+                                                    <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
+                                                )}
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
                                                         {role === 'doctor' ? (

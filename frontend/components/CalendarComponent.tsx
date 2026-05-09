@@ -306,6 +306,8 @@ export function CalendarComponent({ visits, onEventDrop, onSelectSlot, onSelectE
                     toolbar={false}
                     formats={formats}
                     style={{ height: "100%" }}
+                    min={new Date(1970, 0, 1, 8, 0, 0)}
+                    max={new Date(1970, 0, 1, 21, 0, 0)}
 
                     // Custom Event Component
                     components={{

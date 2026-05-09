@@ -24,6 +24,7 @@ export interface Visit {
     status: string;
     reason?: string;
     created_at?: string;
+    updated_at?: string;
     phone_number?: string;
     dob?: string;
     visiting_fee?: number;
@@ -85,6 +86,7 @@ export interface InventorySearchResult {
     gst_rate: number;
     total_qty: number;
     price: number;
+    pack_size?: string;
     substitutes: any[];
 }
 

@@ -2,11 +2,12 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar as CalendarIcon, UserPlus, Loader2, Users, Phone, CreditCard } from "lucide-react"
-import { getTodayIST } from "@/lib/utils"
+import { Calendar as CalendarIcon, UserPlus, Loader2, Users, Phone, CreditCard, Pencil, Trash2 } from "lucide-react"
+import { cn, getTodayIST } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth_context"
+import { useSettings } from "@/lib/settings_context"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { AddVisitDialog } from "@/components/AddVisitDialog"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
@@ -19,88 +20,7 @@ import { DndProvider } from "react-dnd"
 import { HTML5Backend } from "react-dnd-html5-backend"
 import { format } from "date-fns"
 
-const StatusActions = ({
-  visitId,
-  status,
-  onUpdate
-}: {
-  visitId: string;
-  status: string;
-  onUpdate: () => void
-}) => {
-  const [updating, setUpdating] = useState(false);
 
-  const handleUpdate = async (newStatus: string) => {
-    try {
-      setUpdating(true);
-      await api.updateVisit(visitId, { status: newStatus });
-      onUpdate();
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      alert("Failed to update status");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const statusLower = status.toLowerCase();
-
-  if (statusLower === 'done') {
-    return (
-      <div className="flex items-center justify-center w-32 h-7 bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 border border-green-200 dark:border-green-500/30 rounded-full text-[10px] font-medium">
-        Done
-      </div>
-    );
-  }
-
-  if (statusLower === 'cancelled') {
-    return (
-      <div className="flex items-center justify-center w-32 h-7 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-full text-[10px] font-medium">
-        Cancelled
-      </div>
-    );
-  }
-
-  if (statusLower === 'in_progress') {
-    return (
-      <button
-        disabled={updating}
-        onClick={() => handleUpdate('done')}
-        className="flex items-center justify-center w-32 h-7 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 rounded-full text-[10px] font-medium hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-      >
-        {updating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-        In progress
-      </button>
-    );
-  }
-
-  // Default: Scheduled/Next
-  return (
-    <div className="inline-flex items-center p-0.5 rounded-full border bg-gray-50 dark:bg-slate-900 border-gray-200 dark:border-slate-800 text-[10px] font-medium w-32 h-7">
-      <button
-        disabled={updating}
-        className="flex-1 h-full rounded-l-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors border-r dark:border-slate-800"
-        onClick={() => { }} // Next
-      >
-        Next
-      </button>
-      <button
-        disabled={updating}
-        className="flex-1 h-full hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900/40 dark:hover:text-blue-400 transition-colors border-r dark:border-slate-800"
-        onClick={() => handleUpdate('in_progress')}
-      >
-        {updating ? "..." : "Now"}
-      </button>
-      <button
-        disabled={updating}
-        className="flex-1 h-full rounded-r-full hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/40 dark:hover:text-red-400 transition-colors"
-        onClick={() => handleUpdate('cancelled')}
-      >
-        &times;
-      </button>
-    </div>
-  );
-}
 
 function formatTime(timeStr: string | null | undefined, createdAt?: string | null) {
   if (!timeStr) {
@@ -125,6 +45,25 @@ function formatTime(timeStr: string | null | undefined, createdAt?: string | nul
   } catch (e) {
     return timeStr;
   }
+}
+
+function formatUpdatedTime(updatedAtStr?: string, createdAtStr?: string) {
+  if (!updatedAtStr) return null;
+  try {
+    const created = createdAtStr ? new Date(createdAtStr).getTime() : 0;
+    const updated = new Date(updatedAtStr).getTime();
+    if (Math.abs(updated - created) > 5000) {
+      const date = new Date(updatedAtStr);
+      const h = date.getHours();
+      const m = date.getMinutes().toString().padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${m} ${ampm}`;
+    }
+  } catch (e) {
+    // Ignore error
+  }
+  return null;
 }
 
 const PatientContactPopover = ({ patientId }: { patientId: string }) => {
@@ -188,6 +127,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
 
 export default function Dashboard() {
+  const { appFontSize } = useSettings()
+  const [showCalendar, setShowCalendar] = useState(true)
+
+  useEffect(() => {
+    if (appFontSize > 16) {
+      setShowCalendar(false)
+    } else {
+      setShowCalendar(true)
+    }
+  }, [appFontSize])
+
   const [addPatientOpen, setAddPatientOpen] = useState(false)
 
   // Dialog State
@@ -303,6 +253,179 @@ export default function Dashboard() {
     !['in_progress', 'done', 'cancelled'].includes(v.status.toLowerCase())
   ).length;
 
+  const renderQuickActions = () => (
+    <Card>
+      <CardHeader className="pb-3 pt-5 px-5">
+        <CardTitle className="text-lg">Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 px-5 pb-5">
+        <AddVisitDialog
+          open={quickAddOpen}
+          onOpenChange={setQuickAddOpen}
+          onSuccess={handleVisitCreated}
+          trigger={
+            <Button
+              variant="outline"
+              className="w-full justify-start h-10 text-sm font-normal"
+            >
+              <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
+              Make Appointment
+            </Button>
+          }
+        />
+        <Button
+          variant="outline"
+          className="w-full justify-start h-10 text-sm font-normal"
+          onClick={() => setAddPatientOpen(true)}
+        >
+          <UserPlus className="mr-3 h-4 w-4 text-muted-foreground" />
+          New Patient
+        </Button>
+        <Button variant="outline" className="w-full justify-start h-10 text-sm font-normal" asChild>
+          <Link href="/patients">
+            <Users className="mr-3 h-4 w-4 text-muted-foreground" />
+            Manage Patients
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
+  const handleDeleteVisit = async (visitId: string) => {
+    if (confirm("Are you sure you want to delete this visit?")) {
+      try {
+        await api.updateVisit(visitId, { status: 'deleted' });
+        fetchVisits();
+      } catch (err) {
+        console.error("Failed to delete visit:", err);
+        alert("Failed to delete visit");
+      }
+    }
+  };
+
+  const handleDoneAndBill = async (visit: Visit) => {
+    try {
+      if (visit.status !== 'done') {
+        await api.updateVisit(visit.visit_id, { status: 'done' });
+      }
+      router.push(`/billing?patient_id=${visit.patient_id}&visit_id=${visit.visit_id}`);
+    } catch (err) {
+      console.error("Failed to complete visit for billing:", err);
+      alert("Failed to complete visit for billing");
+    }
+  };
+
+  const renderTodaysList = () => (
+    <Card className="flex-1 flex flex-col overflow-hidden">
+      <CardHeader className="pb-3 pt-5 px-5 shrink-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Today&apos;s List</CardTitle>
+          <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-1 rounded-md">
+            {loading ? "..." : waitingCount} Waiting
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-y-auto p-0 custom-scrollbar">
+        <style jsx global>{`
+          /* Custom Scrollbar for Today's List */
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 20px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8; /* slate-400 */
+          }
+          :global(.dark) .custom-scrollbar::-webkit-webkit-scrollbar-thumb {
+            background-color: #475569; /* slate-600 */
+          }
+        `}</style>
+        {loading ? (
+          <div className="py-10 text-center text-muted-foreground text-sm">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+            Loading...
+          </div>
+        ) : orderedTodayVisits.length === 0 ? (
+          <div className="py-4 mx-5 text-center text-muted-foreground text-sm border-2 border-dashed rounded-lg mt-2">
+            No appointments today.
+          </div>
+        ) : (
+          <div className="space-y-0 text-sm">
+            {orderedTodayVisits.map((visit) => (
+              <div
+                key={visit.visit_id}
+                className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b last:border-0 border-border/50 hover:bg-muted/30 transition-all rounded-sm px-5"
+              >
+                <div className="space-y-0.5 text-left overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm leading-none truncate">{visit.patient_name}</p>
+                    {visit.patient_id && <PatientContactPopover patientId={visit.patient_id} />}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {visit.reason || "No reason"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end mr-1">
+                    <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                      {formatTime(visit.visit_time, visit.created_at)}
+                    </span>
+                    {formatUpdatedTime(visit.updated_at, visit.created_at) && (
+                      <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 tabular-nums">
+                        Edited {formatUpdatedTime(visit.updated_at, visit.created_at)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="flex items-center gap-1">
+                    {/* Done & Bill */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-500/20 dark:hover:text-green-400"
+                      onClick={() => handleDoneAndBill(visit)}
+                      title="Done & Bill"
+                    >
+                      <CreditCard className="h-4 w-4 text-muted-foreground hover:text-green-600 dark:hover:text-green-400 transition-colors" />
+                    </Button>
+
+                    {/* Edit */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20 dark:hover:text-blue-400"
+                      onClick={() => onSelectEvent(visit)}
+                      title="Edit Appointment"
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors" />
+                    </Button>
+
+                    {/* Delete */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                      onClick={() => handleDeleteVisit(visit.visit_id)}
+                      title="Delete Appointment"
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
@@ -320,146 +443,44 @@ export default function Dashboard() {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="visits">All Visits</TabsTrigger>
             </TabsList>
+            <Button variant="outline" size="sm" onClick={() => setShowCalendar(!showCalendar)}>
+              {showCalendar ? "Hide Calendar" : "Show Calendar"}
+            </Button>
           </div>
 
           <TabsContent value="overview" className="flex-1 overflow-hidden m-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-              {/* Left Column: Interactive Calendar (Span 2) */}
-              <div className="lg:col-span-2 h-full overflow-hidden">
-                <CalendarComponent
-                  visits={visits}
-                  onEventDrop={handleEventDrop}
-                  onSelectSlot={handleSelectSlot}
-                  onSelectEvent={onSelectEvent}
-                />
-              </div>
-
-              {/* Right Column: Actions & Today's List */}
-              <div className="lg:col-span-1 h-full flex flex-col gap-6 pr-1 overflow-hidden">
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader className="pb-3 pt-5 px-5">
-                    <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 px-5 pb-5">
-                    <AddVisitDialog
-                      open={quickAddOpen}
-                      onOpenChange={setQuickAddOpen}
-                      onSuccess={handleVisitCreated}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start h-10 text-sm font-normal"
-                        >
-                          <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
-                          Make Appointment
-                        </Button>
-                      }
+              {showCalendar ? (
+                <>
+                  {/* Left Column: Interactive Calendar (Span 2) */}
+                  <div className="lg:col-span-2 h-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <CalendarComponent
+                      visits={visits}
+                      onEventDrop={handleEventDrop}
+                      onSelectSlot={handleSelectSlot}
+                      onSelectEvent={onSelectEvent}
                     />
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-10 text-sm font-normal"
-                      onClick={() => setAddPatientOpen(true)}
-                    >
-                      <UserPlus className="mr-3 h-4 w-4 text-muted-foreground" />
-                      New Patient
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start h-10 text-sm font-normal" asChild>
-                      <Link href="/patients">
-                        <Users className="mr-3 h-4 w-4 text-muted-foreground" />
-                        Manage Patients
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
+                  </div>
 
-                {/* Today's Appointments */}
-                <Card className="flex-1 flex flex-col overflow-hidden">
-                  <CardHeader className="pb-3 pt-5 px-5 shrink-0">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Today&apos;s List</CardTitle>
-                      <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-                        {loading ? "..." : waitingCount} Waiting
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto p-0 custom-scrollbar">
-                    <style jsx global>{`
-                  /* Custom Scrollbar for Today's List */
-                  .custom-scrollbar::-webkit-scrollbar {
-                    width: 6px;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: #cbd5e1; /* slate-300 */
-                    border-radius: 20px;
-                  }
-                  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background-color: #94a3b8; /* slate-400 */
-                  }
-                  :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: #475569; /* slate-600 */
-                  }
-                `}</style>
-                    {loading ? (
-                      <div className="py-10 text-center text-muted-foreground text-sm">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                        Loading...
-                      </div>
-                    ) : orderedTodayVisits.length === 0 ? (
-                      <div className="py-4 mx-5 text-center text-muted-foreground text-sm border-2 border-dashed rounded-lg mt-2">
-                        No appointments today.
-                      </div>
-                    ) : (
-                      <div className="space-y-0 text-sm">
-                        {orderedTodayVisits.map((visit) => (
-                          <div
-                            key={visit.visit_id}
-                            className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b last:border-0 border-border/50 hover:bg-muted/30 transition-all rounded-sm px-5"
-                          >
-                            <div className="space-y-0.5 text-left overflow-hidden">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm leading-none truncate">{visit.patient_name}</p>
-                                {visit.patient_id && <PatientContactPopover patientId={visit.patient_id} />}
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {visit.reason || "No reason"}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                {visit.status.toLowerCase() === 'done' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-full"
-                                    asChild
-                                  >
-                                    <Link href={`/billing?patient_id=${visit.patient_id}&visit_id=${visit.visit_id}`}>
-                                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
-                                      <span className="sr-only">Billing</span>
-                                    </Link>
-                                  </Button>
-                                )}
-                                <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                                  {formatTime(visit.visit_time, visit.created_at)}
-                                </span>
-                              </div>
-                              <StatusActions
-                                visitId={visit.visit_id}
-                                status={visit.status}
-                                onUpdate={fetchVisits}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                  {/* Right Column: Actions & Today's List */}
+                  <div className="lg:col-span-1 h-full flex flex-col gap-6 pr-1 overflow-hidden transition-all duration-300">
+                    {renderQuickActions()}
+                    {renderTodaysList()}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Left Column: Today's List (Span 2) */}
+                  <div className="lg:col-span-2 h-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    {renderTodaysList()}
+                  </div>
+
+                  {/* Right Column: Quick Actions */}
+                  <div className="lg:col-span-1 h-full flex flex-col gap-6 pr-1 overflow-hidden transition-all duration-300">
+                    {renderQuickActions()}
+                  </div>
+                </>
+              )}
             </div>
           </TabsContent>
 

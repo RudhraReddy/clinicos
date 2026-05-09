@@ -79,21 +79,36 @@ export function ViewBatchesDialog({ item }: ViewBatchesDialogProps) {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    batches.map((batch) => (
-                                        <TableRow key={batch.id}>
-                                            <TableCell className="font-medium">
-                                                {batch.expiry_date || 'No Expiry'}
-                                            </TableCell>
-                                            <TableCell>{batch.quantity}</TableCell>
-                                            <TableCell>${batch.mrp.toFixed(2)}</TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">
-                                                {batch.vendor || '-'}
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground font-mono">
-                                                {batch.invoice_number || '-'}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                    batches.map((batch) => {
+                                        const getMultipliedQty = (qty: number, packSize?: string) => {
+                                            const pack = packSize?.toLowerCase() || ''
+                                            if (pack.includes('s') || pack.includes('x')) {
+                                                const match = pack.match(/(\d+)/)
+                                                if (match) {
+                                                    const num = parseInt(match[0])
+                                                    if (!isNaN(num) && num > 1) {
+                                                        return Math.round(qty * num)
+                                                    }
+                                                }
+                                            }
+                                            return qty
+                                        }
+                                        return (
+                                            <TableRow key={batch.id}>
+                                                <TableCell className="font-medium">
+                                                    {batch.expiry_date || 'No Expiry'}
+                                                </TableCell>
+                                                <TableCell>{getMultipliedQty(batch.quantity, item.pack_size)}</TableCell>
+                                                <TableCell>${batch.mrp.toFixed(2)}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {batch.vendor || '-'}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground font-mono">
+                                                    {batch.invoice_number || '-'}
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })
                                 )}
                             </TableBody>
                         </Table>
