@@ -1,3 +1,5 @@
+import datetime as _dt
+import os
 import uuid
 from functools import wraps
 
@@ -10,6 +12,8 @@ from extensions import db, get_ist_now
 from models import User
 
 auth_bp = Blueprint('auth', __name__)
+
+_SESSION_HOURS = 8
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +40,6 @@ def _validate_password_strength(password: str):
 
 def _verify_totp(code: str) -> bool:
     """Validates a TOTP code against TOTP_SECRET env var."""
-    import os
     secret = os.environ.get('TOTP_SECRET', '')
     if not secret:
         return False
@@ -124,8 +127,6 @@ def register():
 
 @auth_bp.route('/auth/login', methods=['POST'])
 def login():
-    import datetime
-
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
@@ -138,10 +139,10 @@ def login():
         return jsonify({'error': 'Invalid email or password'}), 401
 
     if not user.is_active:
-        return jsonify({'error': 'Account disabled'}), 403
+        return jsonify({'error': 'Invalid email or password'}), 401
 
-    now = get_ist_now()
-    exp = now + datetime.timedelta(hours=8)
+    now_utc = _dt.datetime.utcnow()
+    exp = now_utc + _dt.timedelta(hours=_SESSION_HOURS)
 
     payload = {
         'user_id': user.id,
@@ -163,7 +164,7 @@ def login():
         httponly=True,
         secure=not current_app.debug,
         samesite='Strict',
-        max_age=28800,
+        max_age=_SESSION_HOURS * 3600,
     )
     return resp, 200
 
@@ -171,14 +172,14 @@ def login():
 @auth_bp.route('/auth/logout', methods=['POST'])
 def logout():
     resp = jsonify({'message': 'Logged out'})
-    resp.set_cookie('auth_token', '', max_age=0, httponly=True, samesite='Strict')
+    resp.set_cookie('auth_token', '', max_age=0, httponly=True, samesite='Strict', secure=not current_app.debug)
     return resp, 200
 
 
 @auth_bp.route('/auth/me', methods=['GET'])
 @require_auth
 def me():
-    user = User.query.get(g.current_user['user_id'])
+    user = db.session.get(User, g.current_user['user_id'])
     if not user:
         return jsonify({'error': 'User not found'}), 404
     return jsonify({
@@ -215,7 +216,7 @@ def reset_password():
 
     user = User.query.filter_by(email=email).first()
     if not user:
-        return jsonify({'error': 'Email not found'}), 400
+        return jsonify({'error': 'Invalid request'}), 400
 
     # Validate new password strength
     pw_error = _validate_password_strength(new_password)
