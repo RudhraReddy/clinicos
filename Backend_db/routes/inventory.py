@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
-from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice
+from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem
 from sqlalchemy import func
 import io
 import csv
@@ -9,7 +9,7 @@ import os
 import requests as http_requests
 
 from utils import parse_expiry_date
-from .auth import require_auth, log_activity
+from .auth import require_auth, require_admin, log_activity
 
 def _parse_vision_response(vision_result: dict) -> dict:
     """
@@ -804,6 +804,45 @@ def update_inventory_item(id):
 
     return jsonify({'message': 'Item updated successfully'}), 200
 
+@inventory.route('/inventory/<string:id>', methods=['DELETE'])
+@require_auth
+@require_admin
+def delete_inventory_item(id):
+    """
+    Restricted physical deletion of a Product from Master Inventory.
+    Safeguards historical billing snapshots while purging active stock data.
+    """
+    item = ProductMaster.query.get_or_404(id)
+    item_name = item.item_name
+    
+    try:
+        # Step 1: Maintain transactional context by nullifying the FK link in Bills rather than cascading deletion
+        BillItem.query.filter_by(product_id=id).update({"product_id": None}, synchronize_session=False)
+        
+        # Step 2: Hard purge active operational records tying storage to the product ID
+        InventoryHistory.query.filter_by(product_id=id).delete(synchronize_session=False)
+        InventoryBatch.query.filter_by(product_id=id).delete(synchronize_session=False)
+        
+        # Step 3: Finalize master table deletion
+        db.session.delete(item)
+        db.session.commit()
+        
+        log_activity(
+            action='DELETE',
+            resource_type='inventory_product',
+            resource_id=id,
+            resource_label=item_name,
+            details='Full inventory node purge executed',
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+        return jsonify({'message': f'Product {item_name} has been permanently expunged.'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Database rollback executed due to constraint fault: {str(e)}'}), 500
+
 @inventory.route('/inventory/batch/<int:id>', methods=['PUT'])
 @require_auth
 def update_inventory_batch(id):
@@ -998,6 +1037,18 @@ def import_inventory():
     try:
         import_id = f"IMPORT-{get_ist_now().strftime('%Y%m%d-%H%M%S')}"
         source_type = f"CSV_{mode.upper()}"
+        
+        # PRE-FLUSH PARENT INVOICE: To satisfy Foreign Key constraints on Batch Inserts inside the loop
+        sys_invoice = PurchaseInvoice(
+            invoice_number=import_id,
+            vendor_name="System Import",
+            total_amount=0,
+            source=source_type,
+            image_path=""
+        )
+        db.session.add(sys_invoice)
+        db.session.flush()
+
         total_import_value = 0
         
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
@@ -1123,14 +1174,8 @@ def import_inventory():
                 
             processed_count += 1
             
-        sys_invoice = PurchaseInvoice(
-            invoice_number=import_id,
-            vendor_name="System Import",
-            total_amount=total_import_value,
-            source=source_type,
-            image_path=""
-        )
-        db.session.add(sys_invoice)
+        # Finalize parent summation
+        sys_invoice.total_amount = total_import_value
             
         db.session.commit()
         return jsonify({'message': f'Processed {processed_count} items'}), 200

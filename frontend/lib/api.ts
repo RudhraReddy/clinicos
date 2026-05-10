@@ -213,6 +213,12 @@ export const api = {
         });
     },
 
+    async deleteInventoryItem(id: string): Promise<void> {
+        return fetchApi(`/api/inventory/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
     async updateInventoryBatch(id: number, data: { expiry_date?: string, quantity?: number, mrp?: number, purchase_rate?: number }): Promise<void> {
         return fetchApi(`/api/inventory/batch/${id}`, {
             method: 'PUT',
