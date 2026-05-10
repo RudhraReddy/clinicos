@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth_context"
 import { useRouter } from "next/navigation"
 import {
@@ -12,11 +13,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Users, Activity, ShieldCheck, LogIn, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit } from "lucide-react"
+import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -41,6 +45,14 @@ const ACTION_COLORS: Record<string, string> = {
   DELETE: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   LOGIN: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   LOGOUT: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+}
+
+const ACTION_ICONS: Record<string, React.ElementType> = {
+  CREATE: PlusCircle,
+  UPDATE: Pencil,
+  DELETE: Trash2,
+  LOGIN: LogIn,
+  LOGOUT: LogOut,
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -106,18 +118,63 @@ function OverviewTab() {
 
       {/* Recent activity */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {stats.recent_activity.map(e => (
-              <div key={e.id} className="flex items-center gap-3 text-sm py-1 border-b last:border-0">
-                <span className="text-xs text-muted-foreground w-32 shrink-0">{fmtTime(e.timestamp)}</span>
-                <Badge variant="outline" className={`${ACTION_COLORS[e.action] || ''} text-xs`}>{e.action}</Badge>
-                <span className="font-medium">{e.username ?? '—'}</span>
-                <span className="text-muted-foreground">{e.resource_type}</span>
-                <span className="truncate text-muted-foreground">{e.resource_label}</span>
-              </div>
-            ))}
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            Recent System Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <div className="flex flex-col gap-1 px-1">
+            {stats.recent_activity.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No recent activity recorded.</p>
+            ) : (
+              stats.recent_activity.map((e, idx) => {
+                const Icon = ACTION_ICONS[e.action] || Activity
+                const colorClass = ACTION_COLORS[e.action] || ''
+                const actionLabel = e.action === 'CREATE' ? 'created' : e.action === 'UPDATE' ? 'updated' : e.action === 'DELETE' ? 'deleted' : e.action === 'LOGIN' ? 'logged in' : e.action === 'LOGOUT' ? 'logged out' : e.action.toLowerCase()
+                
+                return (
+                  <div key={e.id} className="relative flex gap-4 pb-6 last:pb-2 group">
+                    {/* Connector line */}
+                    {idx !== stats.recent_activity.length - 1 && (
+                      <span className="absolute left-[15px] top-8 -bottom-1 w-px bg-muted-foreground/20 group-last:hidden" aria-hidden="true" />
+                    )}
+                    
+                    {/* Status dot/icon */}
+                    <div className={cn(
+                      "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm ring-4 ring-background",
+                      colorClass
+                    )}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </div>
+
+                    {/* Item Info */}
+                    <div className="flex flex-1 flex-col min-w-0 pt-0.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-x-3 gap-y-1">
+                        <p className="text-sm leading-snug font-medium text-foreground/90">
+                          <span className="font-semibold text-foreground">{e.username || 'System'}</span>
+                          {' '}
+                          <span className="text-muted-foreground font-normal">{actionLabel}</span>
+                          {' '}
+                          {e.resource_type && e.resource_type !== 'auth' && (
+                            <span className="capitalize text-primary/80 font-medium tracking-tight">{e.resource_type.replace('_', ' ')}</span>
+                          )}
+                        </p>
+                        <time className="text-xs whitespace-nowrap tabular-nums text-muted-foreground bg-secondary/50 border border-muted/30 px-2 py-0.5 rounded-full inline-flex self-start sm:self-auto">
+                          {fmtTime(e.timestamp)}
+                        </time>
+                      </div>
+                      {e.resource_label && (
+                        <p className="mt-1 text-xs text-muted-foreground/70 truncate italic pl-1 border-l-2 border-muted ml-0.5">
+                          {e.resource_label}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </CardContent>
       </Card>
@@ -354,6 +411,16 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<ActivityLogFilters>({})
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
+  const [date, setDate] = useState<DateRange | undefined>()
+
+  useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      date_from: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
+      date_to: date?.to ? format(date.to, 'yyyy-MM-dd') : date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
+    }))
+    setPage(1)
+  }, [date])
 
   const LIMIT = 50
 
@@ -426,14 +493,8 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">From</label>
-              <input type="date" className="text-sm border rounded px-2 py-1 bg-background"
-                onChange={e => setFilter('date_from', e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">To</label>
-              <input type="date" className="text-sm border rounded px-2 py-1 bg-background"
-                onChange={e => setFilter('date_to', e.target.value)} />
+              <label className="text-xs text-muted-foreground">Date Range</label>
+              <DatePickerWithRange date={date} setDate={setDate} className="w-[260px]" />
             </div>
           </div>
         </CardContent>
@@ -462,19 +523,48 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
             </CardHeader>
             {isOpen && (
               <CardContent className="pt-0">
-                <div className="space-y-1">
-                  {dayEntries.map(e => (
-                    <div key={e.id} className="flex items-start gap-3 py-1.5 border-b last:border-0 text-sm">
-                      <span className="text-xs text-muted-foreground w-20 shrink-0 mt-0.5">
-                        {new Date(e.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
-                      </span>
-                      <Badge className={`${ACTION_COLORS[e.action] || ''} text-xs shrink-0`}>{e.action}</Badge>
-                      <span className="font-medium shrink-0 w-24 truncate">{e.username ?? '—'}</span>
-                      <span className="text-muted-foreground shrink-0">{e.resource_type ?? ''}</span>
-                      <span className="flex-1 truncate">{e.resource_label}</span>
-                      {e.details && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{e.details}</span>}
-                    </div>
-                  ))}
+                <div className="flex flex-col gap-1 px-2 py-4 border-t">
+                  {dayEntries.map((e, idx) => {
+                    const Icon = ACTION_ICONS[e.action] || Activity
+                    const colorClass = ACTION_COLORS[e.action] || ''
+                    const actionLabel = e.action === 'CREATE' ? 'created' : e.action === 'UPDATE' ? 'updated' : e.action === 'DELETE' ? 'deleted' : e.action === 'LOGIN' ? 'logged in' : e.action === 'LOGOUT' ? 'logged out' : e.action.toLowerCase()
+
+                    return (
+                      <div key={e.id} className="relative flex gap-3 pb-3 last:pb-0 group items-start">
+                        {idx !== dayEntries.length - 1 && (
+                          <span className="absolute left-[13px] top-7 -bottom-3 w-px bg-muted-foreground/20 group-last:hidden" aria-hidden="true" />
+                        )}
+                        <div className={cn(
+                          "relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border shadow-sm ring-4 ring-background",
+                          colorClass
+                        )}>
+                          <Icon className="h-3 w-3" />
+                        </div>
+                        <div className="flex-1 flex flex-col min-w-0 pt-0.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center flex-wrap gap-x-2 text-sm leading-none min-w-0 flex-1">
+                              <span className="font-semibold text-foreground shrink-0">{e.username || 'System'}</span>
+                              <span className="text-muted-foreground shrink-0">{actionLabel}</span>
+                              {e.resource_type && e.resource_type !== 'auth' && (
+                                <span className="capitalize text-primary/80 font-medium shrink-0">{e.resource_type.replace('_', ' ')}</span>
+                              )}
+                              {e.resource_label && (
+                                <span className="text-muted-foreground/60 truncate italic max-w-md">— {e.resource_label}</span>
+                              )}
+                            </div>
+                            <time className="text-[11px] tabular-nums text-muted-foreground shrink-0 whitespace-nowrap">
+                              {new Date(e.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true, hour: 'numeric', minute: '2-digit' })}
+                            </time>
+                          </div>
+                          {e.details && (
+                            <p className="mt-0.5 text-[11px] text-muted-foreground/50 truncate font-mono select-all">
+                              {e.details}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             )}
