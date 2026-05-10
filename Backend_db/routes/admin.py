@@ -1,10 +1,12 @@
 import datetime as _dt
 
+import os
+import shutil
 from flask import Blueprint, g, jsonify, request
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from extensions import db, get_ist_now
-from models import AuditLog, User, DoctorStaffAssignment
+from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient
 from routes.auth import require_admin, require_auth
 
 admin_bp = Blueprint('admin', __name__)
@@ -170,14 +172,29 @@ def admin_stats():
     active_count = User.query.filter_by(is_active=True).count()
     inactive_count = User.query.filter_by(is_active=False).count()
 
-    # Logins today (IST)
+    # Time definitions
     today_ist = get_ist_now().replace(hour=0, minute=0, second=0, microsecond=0)
+
     logins_today = AuditLog.query.filter(
         AuditLog.action == 'LOGIN',
         AuditLog.timestamp >= today_ist,
     ).count()
 
+    # Daily activities
+    activities_today = AuditLog.query.filter(
+        AuditLog.timestamp >= today_ist
+    ).count()
+
+    visits_today = Visit.query.filter(
+        Visit.created_at >= today_ist
+    ).count()
+
+    bills_today = Bill.query.filter(
+        Bill.created_at >= today_ist
+    ).count()
+
     total_audit = AuditLog.query.count()
+    total_patients = Patient.query.count()
 
     # Recent 10 activity entries
     recent = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(10).all()
@@ -187,7 +204,11 @@ def admin_stats():
         'active_users': active_count,
         'inactive_users': inactive_count,
         'logins_today': logins_today,
+        'activities_today': activities_today,
+        'visits_today': visits_today,
+        'bills_today': bills_today,
         'total_audit_entries': total_audit,
+        'total_patients': total_patients,
         'recent_activity': [
             {
                 'id': e.id,
@@ -202,4 +223,54 @@ def admin_stats():
             }
             for e in recent
         ],
+    }), 200
+
+
+@admin_bp.route('/admin/diagnostics', methods=['GET'])
+@require_auth
+@require_admin
+def admin_diagnostics():
+    """
+    On-demand system health and resource diagnostics gathering.
+    Calculates database footprint, dynamic disk usage and system health checks.
+    """
+    # 1. OCR Status Detection
+    ocr_active = bool(os.environ.get('GOOGLE_CLOUD_API_KEY', '').strip())
+
+    # 2. File Storage Telemetry (Images/Invoices)
+    storage_base = os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads')
+    media_used_bytes = 0
+    if os.path.exists(storage_base):
+        try:
+            for dirpath, dirnames, filenames in os.walk(storage_base):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if os.path.isfile(fp) and not os.path.islink(fp):
+                        media_used_bytes += os.path.getsize(fp)
+        except Exception:
+            pass
+
+    # System Disk Snapshot (Container Context)
+    try:
+        d_total, d_used, d_free = shutil.disk_usage("/")
+    except Exception:
+        d_total, d_used, d_free = 0, 0, 0
+
+    # 3. Database Size Inquiry (Postgres Safe fallback)
+    db_size_bytes = 0
+    try:
+        db_size_bytes = db.session.execute(text("SELECT pg_database_size(current_database())")).scalar() or 0
+    except Exception:
+        db_size_bytes = 0  # Graceful fallback for SQLite fallback tests
+
+    return jsonify({
+        'ocr_configured': ocr_active,
+        'db_size_bytes': int(db_size_bytes),
+        'media_size_bytes': int(media_used_bytes),
+        'system_disk': {
+            'total': d_total,
+            'used': d_used,
+            'free': d_free
+        },
+        'timestamp': get_ist_now().isoformat()
     }), 200
