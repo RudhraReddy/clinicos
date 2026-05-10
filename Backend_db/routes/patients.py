@@ -1,5 +1,7 @@
 
-from flask import Blueprint, request, jsonify, g
+import io
+import csv
+from flask import Blueprint, request, jsonify, g, send_file
 from models import Patient
 from extensions import db, get_ist_now
 from sqlalchemy import func
@@ -128,3 +130,145 @@ def update_patient(patient_id):
     )
 
     return jsonify({'message': 'Patient updated'}), 200
+
+
+@patients.route('/patients/export', methods=['GET'])
+@require_auth
+def export_patients():
+    """
+    Generates a streamable CSV record of all registered clinic patients.
+    """
+    all_patients = Patient.query.order_by(Patient.created_at.desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Headers
+    writer.writerow(['Patient ID', 'Name', 'Phone Number', 'Age', 'Sex', 'Address', 'Reference', 'Registration Date'])
+    
+    for p in all_patients:
+        writer.writerow([
+            p.patient_id,
+            p.name,
+            p.phone_number,
+            p.age if p.age is not None else '',
+            p.sex or '',
+            p.address or '',
+            p.reference or '',
+            p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else ''
+        ])
+        
+    output.seek(0)
+    filename = f'patients_export_{get_ist_now().strftime("%Y%m%d_%H%M")}.csv'
+    
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+@patients.route('/patients/import', methods=['POST'])
+@require_auth
+def import_patients():
+    """
+    High-efficiency CSV processor for bulk hydrating patient database.
+    Deduplicates automatically via (Name + Phone) unique-combination validation.
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'File attachment absent'}), 400
+        
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({'error': 'Filename cannot be parsed'}), 400
+        
+    try:
+        # Read and stream
+        content = file.stream.read().decode("UTF8", errors='ignore')
+        stream = io.StringIO(content, newline=None)
+        csv_input = csv.DictReader(stream)
+        
+        if not csv_input.fieldnames:
+             return jsonify({'error': 'Uploaded document must contain column headers.'}), 400
+             
+        inserted = 0
+        updated = 0
+        
+        def safe_get(row, variants):
+            for v in variants:
+                for k in row.keys():
+                    if k and k.strip().lower() == v.lower():
+                        return row[k]
+            return None
+
+        for row in csv_input:
+            p_name = safe_get(row, ['Name', 'Patient Name'])
+            p_phone = safe_get(row, ['Phone Number', 'Phone', 'Contact'])
+            
+            if not p_name or not p_phone:
+                continue # Ignore junk/incomplete rows
+                
+            raw_name = p_name.strip()
+            raw_phone = p_phone.strip()
+            
+            # Pre-emptive duplicate collision prevention
+            existing = Patient.query.filter(
+                func.lower(Patient.name) == raw_name.lower(),
+                Patient.phone_number == raw_phone
+            ).first()
+            
+            # Data sanitation
+            raw_age = safe_get(row, ['Age', 'Years'])
+            try:
+                clean_age = int(float(raw_age)) if raw_age else None
+            except:
+                clean_age = None
+                
+            sex_val = safe_get(row, ['Sex', 'Gender'])
+            addr_val = safe_get(row, ['Address', 'Residence'])
+            ref_val = safe_get(row, ['Reference', 'Referred By'])
+            
+            if existing:
+                # Perform subtle attribute alignment
+                if clean_age is not None: existing.age = clean_age
+                if sex_val: existing.sex = str(sex_val).strip()
+                if addr_val: existing.address = str(addr_val).strip()
+                if ref_val: existing.reference = str(ref_val).strip()
+                updated += 1
+            else:
+                # Genesis insert
+                new_entity = Patient(
+                    patient_id=Patient.generate_patient_id(),
+                    name=raw_name,
+                    phone_number=raw_phone,
+                    age=clean_age,
+                    sex=str(sex_val).strip() if sex_val else None,
+                    address=str(addr_val).strip() if addr_val else None,
+                    reference=str(ref_val).strip() if ref_val else None,
+                    created_by_user_id=g.current_user.get('user_id')
+                )
+                db.session.add(new_entity)
+                inserted += 1
+        
+        db.session.commit()
+        
+        log_activity(
+            action='IMPORT',
+            resource_type='patients',
+            resource_id=f"BULK-{get_ist_now().strftime('%H%M%S')}",
+            resource_label='Patient CSV Sync',
+            details=f"Ingested {inserted} new entities, Synchronized {updated} assets.",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+        
+        return jsonify({
+            'message': 'Ingestion successful',
+            'counts': {'new': inserted, 'updated': updated}
+        }), 200
+        
+    except Exception as ex:
+        db.session.rollback()
+        return jsonify({'error': f'Backend parser fault: {str(ex)}'}), 500

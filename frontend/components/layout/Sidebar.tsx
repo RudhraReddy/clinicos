@@ -101,7 +101,7 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
                 <div className="border-t border-muted/30">
                     <p className="text-[10px] text-muted-foreground/60 tracking-wider">
-                        SYSTEM VERSION: v2.2.1
+                        SYSTEM VERSION: v2.2.2
                     </p>
                 </div>
             </div>

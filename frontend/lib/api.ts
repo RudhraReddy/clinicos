@@ -195,6 +195,25 @@ export const api = {
         });
     },
 
+    async exportPatients() {
+        window.location.href = `${API_BASE_URL}/api/patients/export`
+    },
+
+    async importPatients(file: File) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`${API_BASE_URL}/api/patients/import`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error || 'File verification failed on server')
+        }
+        return res.json()
+    },
+
     // Inventory APIs
     async getInventory(): Promise<InventoryItem[]> {
         return fetchApi('/api/inventory');
@@ -210,6 +229,12 @@ export const api = {
         return fetchApi(`/api/inventory/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
+        });
+    },
+
+    async deleteInventoryItem(id: string): Promise<void> {
+        return fetchApi(`/api/inventory/${id}`, {
+            method: 'DELETE',
         });
     },
 

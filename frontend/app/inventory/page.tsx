@@ -13,7 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw } from "lucide-react"
+import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,7 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
 import { useSettings } from "@/lib/settings_context"
+import { toast } from "sonner"
 
 function AllChangesPanel() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -319,6 +320,19 @@ export default function InventoryPage() {
             setError(err instanceof Error ? err.message : "Failed to load inventory")
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleDeleteProduct = async (id: string, name: string) => {
+        if (!window.confirm(`PERMANENT DELETE WARNING!\n\nAre you absolutely certain you wish to permanently purge "${name}" and all associated batches from inventory?\n\nThis action strictly targets ADMIN rights and CANNOT be reversed.`)) {
+            return
+        }
+        try {
+            await api.deleteInventoryItem(id)
+            toast.success(`Successfully purged ${name} from server registry.`)
+            loadData()
+        } catch {
+            toast.error("Deletion attempt prohibited. Check authentication or backend logs.")
         }
     }
 
@@ -849,6 +863,17 @@ export default function InventoryPage() {
                                                         </Button>
                                                         <ViewBatchesDialog item={item} />
                                                         <EditInventoryDialog item={item} onSuccess={loadData} />
+                                                        {role === 'admin' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                                title="Permanently delete product"
+                                                                onClick={() => handleDeleteProduct(item.id, item.item_name)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
