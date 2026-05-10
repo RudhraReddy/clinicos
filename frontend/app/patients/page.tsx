@@ -13,13 +13,14 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText } from "lucide-react"
+import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, Download, Upload } from "lucide-react"
 import { api, type Patient } from "@/lib/api"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
 import { PatientDetailsView } from "@/components/PatientDetailsView"
 import { useAuth } from "@/lib/auth_context"
 import { useSettings } from "@/lib/settings_context"
+import { toast } from "sonner"
 
 const PAGE_LIMIT = 50
 
@@ -35,6 +36,28 @@ export default function PatientsPage() {
     const [viewMode, setViewMode] = useState<'full' | 'visits-only'>('full')
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
     const [page, setPage] = useState(1)
+    const [importing, setImporting] = useState(false)
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setImporting(true)
+        try {
+            const res = await api.importPatients(file)
+            toast.success(`Batch Sync Complete: Added ${res.counts?.new || 0}, Updated ${res.counts?.updated || 0}.`)
+            loadData(1) // reload from page 1
+        } catch (err: any) {
+            toast.error(err.message || "Failed to ingest patient document.")
+        } finally {
+            setImporting(false)
+            e.target.value = ""
+        }
+    }
+
+    const handleExport = () => {
+        toast.info("Aggregating registry for download...")
+        api.exportPatients()
+    }
 
     const [searchQuery, setSearchQuery] = useState("")
 
@@ -76,20 +99,44 @@ export default function PatientsPage() {
                     </p>
                 </div>
 
-                <AddPatientDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    onSuccess={() => {
-                        setDialogOpen(false)
-                        loadData(page)
-                    }}
-                    trigger={
-                        <Button>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Add Patient
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm h-9">
+                        <Download className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                        Export Registry
+                    </Button>
+
+                    <div className="relative">
+                        <input
+                            type="file"
+                            id="bulk-import-csv"
+                            className="hidden"
+                            accept=".csv"
+                            onChange={handleImport}
+                            disabled={importing}
+                        />
+                        <Button variant="outline" size="sm" asChild className="shadow-sm h-9" disabled={importing}>
+                            <label htmlFor="bulk-import-csv" className="cursor-pointer flex items-center text-sm">
+                                {importing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5 text-muted-foreground" />}
+                                {importing ? 'Loading...' : 'Import List'}
+                            </label>
                         </Button>
-                    }
-                />
+                    </div>
+
+                    <AddPatientDialog
+                        open={dialogOpen}
+                        onOpenChange={setDialogOpen}
+                        onSuccess={() => {
+                            setDialogOpen(false)
+                            loadData(page)
+                        }}
+                        trigger={
+                            <Button className="shadow-sm h-9" size="sm">
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                New Patient
+                            </Button>
+                        }
+                    />
+                </div>
 
                 {selectedPatient && (
                     <>
