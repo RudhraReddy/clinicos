@@ -2,7 +2,7 @@
 
 A full-stack clinic management system built with a **Next.js** frontend and a **Flask/PostgreSQL** backend. The system handles patient registration, appointment scheduling, inventory management, billing, and image/prescription storage.
 
-**Current Release Version:** `v2.2.1`
+**Current Release Version:** `v2.2.2`
 
 ---
 
