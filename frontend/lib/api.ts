@@ -575,9 +575,31 @@ export async function getAdminStats() {
     active_users: number
     inactive_users: number
     logins_today: number
+    activities_today: number
+    visits_today: number
+    bills_today: number
     total_audit_entries: number
+    total_patients: number
     recent_activity: ActivityEntry[]
   }>
+}
+
+export interface SystemDiagnostics {
+  ocr_configured: boolean
+  db_size_bytes: number
+  media_size_bytes: number
+  system_disk: {
+    total: number
+    used: number
+    free: number
+  }
+  timestamp: string
+}
+
+export async function getSystemDiagnostics() {
+  const res = await fetch('/api/admin/diagnostics', { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to run diagnostics')
+  return res.json() as Promise<SystemDiagnostics>
 }
 
 export async function getAdminUsers(role?: string) {
