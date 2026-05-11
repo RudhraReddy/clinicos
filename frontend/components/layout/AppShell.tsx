@@ -46,7 +46,7 @@ export default function AppShell({
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 min-w-0 overflow-x-hidden p-8 bg-gray-50/50 dark:bg-background min-h-screen">
+            <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-8 bg-gray-50/50 dark:bg-background min-h-screen">
                 <div className="w-full">
                     {children}
                 </div>
