@@ -35,6 +35,10 @@ services:
         value: https://clinicos-frontend.onrender.com
       - key: OCR_SERVICE_URL
         sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: TOTP_SECRET
+        sync: false
 
   - type: web
     name: clinicos-frontend

@@ -36,6 +36,10 @@ def _apply_migrations(db):
         "ALTER TABLE inventory_batches ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
         "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS user_id VARCHAR(36)",
         "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS username VARCHAR(100)",
+        # 2026-05-11: location dimension columns added to bills, purchase_invoices, visits
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
