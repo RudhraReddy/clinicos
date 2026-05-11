@@ -22,6 +22,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Plus, Calendar, Loader2, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { api, type Visit, type Patient } from "@/lib/api"
 
 export default function VisitsPage() {
@@ -284,44 +285,74 @@ export default function VisitsPage() {
                             <p className="text-sm mt-2">Click &quot;Add Visit&quot; to create your first visit record</p>
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Visit Date</TableHead>
-                                    <TableHead>Visit Time</TableHead>
-                                    <TableHead>Patient</TableHead>
-                                    <TableHead>Patient ID</TableHead>
-                                    <TableHead>Visit ID</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Reason</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        <>
+                            {/* Desktop table */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Visit Date</TableHead>
+                                            <TableHead>Visit Time</TableHead>
+                                            <TableHead>Patient</TableHead>
+                                            <TableHead>Patient ID</TableHead>
+                                            <TableHead>Visit ID</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Reason</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
+                                            <TableRow
+                                                key={visit.visit_id}
+                                                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
+                                                onClick={() => window.location.href = `/visits/${visit.visit_id}`}
+                                            >
+                                                <TableCell className="font-medium">
+                                                    {new Date(visit.visit_date).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">
+                                                    {formatTime(visit.visit_time, visit.created_at)}
+                                                </TableCell>
+                                                <TableCell className="font-semibold">{visit.patient_name}</TableCell>
+                                                <TableCell className="font-mono text-xs text-muted-foreground">
+                                                    {getPatientPublicIdFromVisit(visit)}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs text-muted-foreground">
+                                                    {visit.visit_id}
+                                                </TableCell>
+                                                <TableCell>{visit.status}</TableCell>
+                                                <TableCell>{visit.reason || "-"}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Mobile card list */}
+                            <div className="md:hidden divide-y">
                                 {visits.sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()).map((visit) => (
-                                    <TableRow
+                                    <div
                                         key={visit.visit_id}
-                                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
+                                        className="py-3 px-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
                                         onClick={() => window.location.href = `/visits/${visit.visit_id}`}
                                     >
-                                        <TableCell className="font-medium">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <span className="font-semibold text-sm">{visit.patient_name}</span>
+                                            <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'}>
+                                                {visit.status}
+                                            </Badge>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                            <span className="font-mono">{visit.visit_id}</span>
+                                            {' · '}
                                             {new Date(visit.visit_date).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs">
+                                            {' · '}
                                             {formatTime(visit.visit_time, visit.created_at)}
-                                        </TableCell>
-                                        <TableCell className="font-semibold">{visit.patient_name}</TableCell>
-                                        <TableCell className="font-mono text-xs text-muted-foreground">
-                                            {getPatientPublicIdFromVisit(visit)}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs text-muted-foreground">
-                                            {visit.visit_id}
-                                        </TableCell>
-                                        <TableCell>{visit.status}</TableCell>
-                                        <TableCell>{visit.reason || "-"}</TableCell>
-                                    </TableRow>
+                                        </div>
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
