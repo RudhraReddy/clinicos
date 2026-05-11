@@ -91,7 +91,7 @@ export function ViewBatchesDialog({ item }: ViewBatchesDialogProps) {
                                                     }
                                                 }
                                             }
-                                            return qty
+                                            return Math.round(qty)
                                         }
                                         return (
                                             <TableRow key={batch.id}>

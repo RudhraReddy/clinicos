@@ -384,7 +384,7 @@ export default function StatusPage() {
                       <div className="h-1.5 bg-slate-200 dark:bg-muted/60 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full bg-gradient-to-r ${PALETTE_CLS[i]}`} style={{width:`${(item.revenue/max)*100}%`}}/>
                       </div>
-                      <div className="text-[10px] text-muted-foreground">{item.qty_sold} units sold</div>
+                      <div className="text-[10px] text-muted-foreground">{Math.round(item.qty_sold)} count sold</div>
                     </div>
                   )
                 })}
