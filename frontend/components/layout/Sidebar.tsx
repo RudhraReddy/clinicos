@@ -2,13 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2 } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/auth_context"
-import { ProfileSwitcher } from "@/components/profile-switcher"
 import { GlobalSettingsDialog } from "@/components/GlobalSettingsDialog"
+import { StaffLocationSwitcher } from "@/components/staff-location-switcher"
 
 const staffNavItems = [
     { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -26,13 +26,23 @@ const doctorNavItems = [
     { title: "Status", href: "/status", icon: BarChart2 },
 ]
 
+const adminNavItems = [
+    { title: "Dashboard", href: "/", icon: LayoutDashboard },
+    { title: "Patients", href: "/patients", icon: Users },
+    { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Billing", href: "/billing", icon: CreditCard },
+    { title: "Gallery", href: "/gallery", icon: ImageIcon },
+    { title: "Status", href: "/status", icon: BarChart2 },
+    { title: "Admin", href: "/admin", icon: Shield },
+]
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function Sidebar({ className }: SidebarProps) {
     const pathname = usePathname()
-    const { role } = useAuth()
+    const { role, logout, user } = useAuth()
 
-    const filteredNavItems = role === 'doctor' ? doctorNavItems : staffNavItems
+    const filteredNavItems = role === 'admin' ? adminNavItems : role === 'doctor' ? doctorNavItems : staffNavItems
 
     return (
         <div className={cn("pb-0 min-h-screen border-r bg-white dark:bg-[#181818] flex flex-col justify-between", className)}>
@@ -66,16 +76,33 @@ export function Sidebar({ className }: SidebarProps) {
             </div>
 
             <div className="mt-auto px-4 py-4 border-t bg-muted/20 space-y-4">
-                <div>
-                    <p className="text-xs text-muted-foreground mb-2 text-center uppercase tracking-wider font-semibold">Profile</p>
-                    <ProfileSwitcher />
-                </div>
+                {role === 'doctor' && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2 text-center uppercase tracking-wider font-semibold">View</p>
+                        <StaffLocationSwitcher />
+                    </div>
+                )}
                 <div>
                     <p className="text-xs text-muted-foreground mb-2 text-center uppercase tracking-wider font-semibold">Preferences</p>
                     <div className="flex justify-center items-center gap-2">
                         <ThemeToggle />
                         <GlobalSettingsDialog />
                     </div>
+                </div>
+                <div>
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-muted-foreground hover:text-destructive"
+                        onClick={logout}
+                    >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        {user?.username ?? 'Logout'}
+                    </Button>
+                </div>
+                <div className="border-t border-muted/30">
+                    <p className="text-[10px] text-muted-foreground/60 tracking-wider">
+                        SYSTEM VERSION: v2.2.2
+                    </p>
                 </div>
             </div>
         </div>

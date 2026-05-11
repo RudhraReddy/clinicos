@@ -25,6 +25,17 @@ def _apply_migrations(db):
         "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS formula TEXT",
         # 2026-05-09: updated_at column added to visits
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP",
+        # Auth: created_by_user_id columns on visits, patient_images, and bills
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE patient_images ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(50)",
+        # 2026-05-09: Audit system — user tagging on remaining tables
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE inventory_batches ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(36)",
+        "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS user_id VARCHAR(36)",
+        "ALTER TABLE inventory_history ADD COLUMN IF NOT EXISTS username VARCHAR(100)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
@@ -36,7 +47,9 @@ def create_app():
     app = Flask(__name__)
 
     allowed_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
-    CORS(app, origins=allowed_origins)
+    CORS(app, origins=allowed_origins, supports_credentials=True)
+
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-change-in-prod')
 
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
