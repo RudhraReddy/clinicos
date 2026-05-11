@@ -295,6 +295,13 @@ export default function DoctorDashboard() {
 
     return (
         <div>
+            <input
+                id="image-upload-input"
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+            />
             {/* ── MOBILE LAYOUT (hidden md+) ── */}
             <div className="md:hidden flex flex-col">
 
@@ -386,7 +393,7 @@ export default function DoctorDashboard() {
                         </div>
 
                         {/* Timeline chips — horizontal scroll */}
-                        <div className="flex gap-1.5 px-4 py-2 overflow-x-auto border-b bg-muted/30" style={{WebkitOverflowScrolling:'touch'}}>
+                        <div className="flex gap-1.5 px-4 py-2 overflow-x-auto border-b bg-muted/30">
                             <button
                                 type="button"
                                 onClick={() => setSelectedDateFilter(null)}
@@ -546,13 +553,6 @@ export default function DoctorDashboard() {
                                                     >
                                                         <Plus className="h-3 w-3" /> Add Image
                                                     </button>
-                                                    <input
-                                                        id="image-upload-input"
-                                                        type="file"
-                                                        accept="image/*"
-                                                        style={{ display: 'none' }}
-                                                        onChange={handleImageUpload}
-                                                    />
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowQR(true)}
