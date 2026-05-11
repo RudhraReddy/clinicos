@@ -170,6 +170,7 @@ function AllChangesPanel() {
                                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                                     Manual Changes ({day.manual.length})
                                 </h4>
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -197,6 +198,7 @@ function AllChangesPanel() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </div>
                         )}
 
@@ -205,6 +207,7 @@ function AllChangesPanel() {
                                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                                     Sales ({day.sales.length})
                                 </h4>
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -228,6 +231,7 @@ function AllChangesPanel() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </div>
                         )}
 
@@ -607,7 +611,9 @@ export default function InventoryPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <>
+                        {/* Desktop table — hidden on mobile */}
+                        <div className="hidden md:block overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -857,6 +863,42 @@ export default function InventoryPage() {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        {/* Mobile card list — shown only on mobile */}
+                        <div className="md:hidden divide-y">
+                            {filteredInventory.length === 0 ? (
+                                <p className="text-center py-8 text-muted-foreground text-sm">No items found.</p>
+                            ) : (
+                                filteredInventory.map((item) => (
+                                    <div key={item.id} className="py-3 px-1 flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-semibold text-sm truncate">{item.item_name}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-1.5">
+                                                <span>{item.category}</span>
+                                                <span>·</span>
+                                                <span className={cn(
+                                                    item.status.includes("LOW STOCK") && "text-red-600 font-semibold"
+                                                )}>
+                                                    {item.quantity} units
+                                                    {item.status.includes("LOW STOCK") && " ⚠"}
+                                                </span>
+                                                {item.expiry_date && (
+                                                    <>
+                                                        <span>·</span>
+                                                        <span>Exp {item.expiry_date}</span>
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <EditInventoryDialog item={item} onSuccess={loadData} />
+                                            <ViewBatchesDialog item={item} />
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
