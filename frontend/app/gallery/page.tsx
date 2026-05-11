@@ -177,6 +177,7 @@ export default function GalleryPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -243,6 +244,7 @@ export default function GalleryPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -263,6 +265,7 @@ export default function GalleryPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -314,6 +317,7 @@ export default function GalleryPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -326,6 +330,7 @@ export default function GalleryPage() {
                             <p className="text-sm text-muted-foreground">Images are permanently deleted 30 days after being trashed.</p>
                         </CardHeader>
                         <CardContent>
+                            <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -398,6 +403,7 @@ export default function GalleryPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
