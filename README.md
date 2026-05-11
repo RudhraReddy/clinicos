@@ -2,13 +2,15 @@
 
 A full-stack clinic management system built with a **Next.js** frontend and a **Flask/PostgreSQL** backend. The system handles patient registration, appointment scheduling, inventory management, billing, and image/prescription storage.
 
+**Current Release Version:** `v2.2.2`
+
 ---
 
 ## Project Structure
 
 ```
 clinic_related/
-├── frontend/               # Next.js 14 (App Router) — UI
+├── frontend/               # Next.js 16 (App Router) — UI
 │   ├── app/                # Page routes
 │   │   ├── page.tsx            # Dashboard (/)
 │   │   ├── patients/           # Patient management
@@ -23,7 +25,7 @@ clinic_related/
 │   │   └── ui/                 # shadcn/ui primitives
 │   └── lib/
 │       ├── api.ts              # All API calls (single source of truth)
-│       └── auth_context.tsx    # Role-based auth (localStorage)
+│       └── auth_context.tsx    # Role-based auth (Server Sessions)
 │
 ├── Backend_db/             # Flask REST API
 │   ├── app.py              # App factory + Flask entrypoint
@@ -40,7 +42,7 @@ clinic_related/
 │   └── archive/            # Old migration scripts (not in use)
 │
 ├── models/
-│   └── invoice_ocr.py      # AI-powered invoice scanner (PaddleOCR / AI Studio)
+│   └── invoice_ocr.py      # (Legacy AI-powered scanner, replaced by Google Cloud Vision)
 │
 └── .vscode/
     └── tasks.json          # VSCode task runner for starting services
@@ -52,18 +54,18 @@ clinic_related/
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS, shadcn/ui |
 | State | React useState/useEffect, Context API |
 | Backend | Python 3.11, Flask, Flask-SQLAlchemy, Flask-CORS |
 | Database | PostgreSQL (`clinic_db`) |
-| OCR | PaddleOCR / AI Studio via `invoice_ocr.py` |
+| OCR | Google Cloud Vision API (REST integration) |
 | Drag & Drop | react-dnd (calendar appointments) |
 
 ---
 
 ## User Roles
 
-The app has three roles stored in `localStorage` under the key `clinic_role`. No server-side auth — role switching is done via the Profile Switcher in the sidebar.
+The application uses server-side authentication with role-based access control (RBAC) for `frontdesk`, `doctor`, and `admin` users. Auth sessions are managed via `/api/auth/me` and verified token logic.
 
 | Role | Access |
 |---|---|
@@ -115,6 +117,7 @@ Pass: vs@9699
 - **Gallery** — Patient images separated into Prescriptions / Patient Images / Invoice Images
 - **Doctor View** — Prescription carousel, patient image timeline grouped by visit date
 - **QR Upload** — Generate a QR code on desktop; scan with phone to upload images directly
+- **Admin Control Center** — Modernized analytics engine featuring realtime KPIs, dynamic audit logs, unified user role distribution summaries, and an on-demand **Infrastructure Diagnostics** suite monitoring storage assets and database footprint
 
 ---
 

@@ -34,6 +34,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { useSettings } from "@/lib/settings_context"
+import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 export interface BillItem {
     item_id: string;
@@ -97,8 +100,9 @@ function BillingContent() {
     const [loadingHistory, setLoadingHistory] = useState(false)
 
     // History filters
-    const [filterDateFrom, setFilterDateFrom] = useState('')
-    const [filterDateTo, setFilterDateTo] = useState('')
+    const [dateRange, setDateRange] = useState<DateRange | undefined>()
+    const filterDateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
+    const filterDateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
     const [filterPaymentType, setFilterPaymentType] = useState('')
     const [historyPage, setHistoryPage] = useState(1)
     const [historyTotal, setHistoryTotal] = useState(0)
@@ -468,24 +472,8 @@ function BillingContent() {
                             {/* Filter bar */}
                             <div className="flex flex-wrap items-end gap-3">
                                 <div className="space-y-1">
-                                    <Label htmlFor="filter-date-from" className="text-xs">From</Label>
-                                    <Input
-                                        id="filter-date-from"
-                                        type="date"
-                                        className="w-[160px]"
-                                        value={filterDateFrom}
-                                        onChange={(e) => setFilterDateFrom(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="filter-date-to" className="text-xs">To</Label>
-                                    <Input
-                                        id="filter-date-to"
-                                        type="date"
-                                        className="w-[160px]"
-                                        value={filterDateTo}
-                                        onChange={(e) => setFilterDateTo(e.target.value)}
-                                    />
+                                    <Label className="text-xs">Date Range</Label>
+                                    <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-[260px]" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Payment Type</Label>
@@ -510,8 +498,7 @@ function BillingContent() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => {
-                                            setFilterDateFrom('')
-                                            setFilterDateTo('')
+                                            setDateRange(undefined)
                                             setFilterPaymentType('')
                                             setHistoryPage(1)
                                             loadHistory(1)

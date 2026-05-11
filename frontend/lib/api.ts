@@ -195,6 +195,25 @@ export const api = {
         });
     },
 
+    async exportPatients() {
+        window.location.href = `${API_BASE_URL}/api/patients/export`
+    },
+
+    async importPatients(file: File) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`${API_BASE_URL}/api/patients/import`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error || 'File verification failed on server')
+        }
+        return res.json()
+    },
+
     // Inventory APIs
     async getInventory(): Promise<InventoryItem[]> {
         return fetchApi('/api/inventory');
@@ -210,6 +229,12 @@ export const api = {
         return fetchApi(`/api/inventory/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
+        });
+    },
+
+    async deleteInventoryItem(id: string): Promise<void> {
+        return fetchApi(`/api/inventory/${id}`, {
+            method: 'DELETE',
         });
     },
 
@@ -470,5 +495,177 @@ export const api = {
         }
     },
 };
+
+// Auth API helpers
+export async function login(username: string, password: string) {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Login failed')
+  }
+  return res.json() as Promise<{ user_id: string; username: string; role: string }>
+}
+
+export async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+}
+
+export async function getMe() {
+  const res = await fetch('/api/auth/me', { credentials: 'include' })
+  if (!res.ok) return null
+  return res.json() as Promise<{ user_id: string; username: string; role: string; location_label?: string }>
+}
+
+export async function verifyTotp(totp_code: string) {
+  const res = await fetch('/api/auth/verify-totp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ totp_code }),
+  })
+  return { ok: res.ok }
+}
+
+export async function register(data: {
+  totp_code: string
+  username: string
+  password: string
+  role: 'staff' | 'doctor' | 'admin'
+  location_label?: string
+}) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Registration failed')
+  }
+}
+
+export async function getAssignedStaff() {
+  const res = await fetch('/api/auth/users/me/assigned-staff', { credentials: 'include' })
+  if (!res.ok) return []
+  return res.json() as Promise<Array<{ user_id: string; username: string; role: string; location_label?: string }>>
+}
+
+// --- Admin APIs ---
+
+export interface AdminUser {
+  user_id: string
+  username: string
+  email: string
+  role: 'staff' | 'doctor' | 'admin'
+  is_active: boolean
+  location_label?: string | null
+  created_at: string
+  assigned_staff_ids?: string[]
+}
+
+export interface ActivityEntry {
+  id: number
+  user_id: string | null
+  username: string | null
+  action: string
+  resource_type: string | null
+  resource_id: string | null
+  resource_label: string | null
+  details: string | null
+  timestamp: string
+  ip_address: string | null
+}
+
+export interface ActivityLogFilters {
+  user_id?: string
+  action?: string
+  resource_type?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  limit?: number
+}
+
+export async function getAdminStats() {
+  const res = await fetch('/api/admin/stats', { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load stats')
+  return res.json() as Promise<{
+    users_by_role: Record<string, number>
+    active_users: number
+    inactive_users: number
+    logins_today: number
+    activities_today: number
+    visits_today: number
+    bills_today: number
+    total_audit_entries: number
+    total_patients: number
+    recent_activity: ActivityEntry[]
+  }>
+}
+
+export interface SystemDiagnostics {
+  ocr_configured: boolean
+  db_size_bytes: number
+  media_size_bytes: number
+  system_disk: {
+    total: number
+    used: number
+    free: number
+  }
+  timestamp: string
+}
+
+export async function getSystemDiagnostics() {
+  const res = await fetch('/api/admin/diagnostics', { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to run diagnostics')
+  return res.json() as Promise<SystemDiagnostics>
+}
+
+export async function getAdminUsers(role?: string) {
+  const qs = role ? `?role=${role}` : ''
+  const res = await fetch(`/api/admin/users${qs}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load users')
+  return res.json() as Promise<AdminUser[]>
+}
+
+export async function updateAdminUser(userId: string, data: { role?: string; is_active?: boolean; location_label?: string | null }) {
+  const res = await fetch(`/api/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Update failed')
+  }
+}
+
+export async function getActivityLog(filters: ActivityLogFilters = {}) {
+  const params = new URLSearchParams()
+  if (filters.user_id) params.set('user_id', filters.user_id)
+  if (filters.action) params.set('action', filters.action)
+  if (filters.resource_type) params.set('resource_type', filters.resource_type)
+  if (filters.date_from) params.set('date_from', filters.date_from)
+  if (filters.date_to) params.set('date_to', filters.date_to)
+  if (filters.page) params.set('page', String(filters.page))
+  if (filters.limit) params.set('limit', String(filters.limit))
+  const qs = params.toString()
+  const res = await fetch(`/api/admin/activity-log${qs ? `?${qs}` : ''}`, { credentials: 'include' })
+  if (!res.ok) throw new Error('Failed to load activity log')
+  return res.json() as Promise<{
+    total: number
+    page: number
+    limit: number
+    pages: number
+    entries: ActivityEntry[]
+  }>
+}
 
 export { ApiError };

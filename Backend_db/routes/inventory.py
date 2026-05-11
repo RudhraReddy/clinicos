@@ -1,7 +1,7 @@
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
-from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice
+from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem
 from sqlalchemy import func
 import io
 import csv
@@ -9,6 +9,7 @@ import os
 import requests as http_requests
 
 from utils import parse_expiry_date
+from .auth import require_auth, require_admin, log_activity
 
 def _parse_vision_response(vision_result: dict) -> dict:
     """
@@ -401,6 +402,7 @@ def _transform_ocr_result(ocr_result: dict) -> dict:
 inventory = Blueprint('inventory', __name__)
 
 @inventory.route('/inventory', methods=['GET'])
+@require_auth
 def get_inventory():
     """
     Returns Master ProductMaster Items + Aggregated Stock
@@ -482,6 +484,7 @@ def get_inventory():
     return jsonify(results), 200
 
 @inventory.route('/inventory_analytics', methods=['GET'])
+@require_auth
 def get_inventory_analytics():
     from models import PurchaseInvoice, BillItem, ProductMaster, InventoryBatch, Visit, Bill
     from datetime import date, timedelta
@@ -635,6 +638,7 @@ def get_inventory_analytics():
     }), 200
 
 @inventory.route('/inventory/<string:product_id>/history', methods=['GET'])
+@require_auth
 def get_inventory_history(product_id):
     """Returns paginated movement history for a specific inventory item"""
     product = ProductMaster.query.get(product_id)
@@ -675,6 +679,7 @@ def get_inventory_history(product_id):
     }), 200
 
 @inventory.route('/inventory/<string:id>/batches', methods=['GET'])
+@require_auth
 def get_inventory_batches(id):
     """Returns all active batches for a specific inventory item"""
     batches = InventoryBatch.query.filter_by(product_id=id).filter(InventoryBatch.quantity > 0).all()
@@ -700,6 +705,7 @@ def get_inventory_batches(id):
     return jsonify(results), 200
 
 @inventory.route('/inventory', methods=['POST'])
+@require_auth
 def add_inventory_item():
     """Creates a new Master Item (No stock initially)"""
     data = request.get_json()
@@ -710,13 +716,26 @@ def add_inventory_item():
         manufacturer=data.get('supplier', ''),
         category=data.get('category', ''),
         pack_size=data.get('pack_size', ''),
-        hsn_code=data.get('hsn_code', '')
+        hsn_code=data.get('hsn_code', ''),
+        created_by_user_id=g.current_user.get('user_id'),
     )
     db.session.add(new_item)
     db.session.commit()
+
+    log_activity(
+        action='CREATE',
+        resource_type='inventory_product',
+        resource_id=new_item.id,
+        resource_label=data['item_name'],
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Master Item added', 'id': new_item.id}), 201
 
 @inventory.route('/inventory/<string:id>', methods=['PUT'])
+@require_auth
 def update_inventory_item(id):
     item = ProductMaster.query.get_or_404(id)
     data = request.get_json()
@@ -764,14 +783,68 @@ def update_inventory_item(id):
             product_id=id,
             change_amount=0,
             type='ADJUSTMENT',
-            notes=f"Item fields updated: {', '.join(changed_fields)}"
+            notes=f"Item fields updated: {', '.join(changed_fields)}",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
         )
         db.session.add(hist)
 
     db.session.commit()
+
+    log_activity(
+        action='UPDATE',
+        resource_type='inventory_product',
+        resource_id=id,
+        resource_label=item.item_name,
+        details=f"Fields: {', '.join(changed_fields)}" if changed_fields else None,
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
     return jsonify({'message': 'Item updated successfully'}), 200
 
+@inventory.route('/inventory/<string:id>', methods=['DELETE'])
+@require_auth
+@require_admin
+def delete_inventory_item(id):
+    """
+    Restricted physical deletion of a Product from Master Inventory.
+    Safeguards historical billing snapshots while purging active stock data.
+    """
+    item = ProductMaster.query.get_or_404(id)
+    item_name = item.item_name
+    
+    try:
+        # Step 1: Maintain transactional context by nullifying the FK link in Bills rather than cascading deletion
+        BillItem.query.filter_by(product_id=id).update({"product_id": None}, synchronize_session=False)
+        
+        # Step 2: Hard purge active operational records tying storage to the product ID
+        InventoryHistory.query.filter_by(product_id=id).delete(synchronize_session=False)
+        InventoryBatch.query.filter_by(product_id=id).delete(synchronize_session=False)
+        
+        # Step 3: Finalize master table deletion
+        db.session.delete(item)
+        db.session.commit()
+        
+        log_activity(
+            action='DELETE',
+            resource_type='inventory_product',
+            resource_id=id,
+            resource_label=item_name,
+            details='Full inventory node purge executed',
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+        return jsonify({'message': f'Product {item_name} has been permanently expunged.'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Database rollback executed due to constraint fault: {str(e)}'}), 500
+
 @inventory.route('/inventory/batch/<int:id>', methods=['PUT'])
+@require_auth
 def update_inventory_batch(id):
     batch = InventoryBatch.query.get_or_404(id)
     data = request.get_json()
@@ -800,7 +873,9 @@ def update_inventory_batch(id):
                     batch_id=batch.id,
                     change_amount=diff,
                     type='ADJUSTMENT',
-                    notes='Manual Batch Update'
+                    notes='Manual Batch Update',
+                    user_id=g.current_user.get('user_id'),
+                    username=g.current_user.get('username'),
                 )
                 db.session.add(hist)
         except: pass
@@ -822,12 +897,23 @@ def update_inventory_batch(id):
 
     if changes:
         db.session.commit()
+        log_activity(
+            action='UPDATE',
+            resource_type='inventory_batch',
+            resource_id=str(id),
+            resource_label=f"Batch {id} ({batch.product_id})",
+            details='; '.join(changes),
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
         return jsonify({'message': 'Batch updated', 'changes': changes}), 200
     else:
-        db.session.commit() 
+        db.session.commit()
         return jsonify({'message': 'No significant changes or just price updated'}), 200
 
 @inventory.route('/inventory/search', methods=['GET'])
+@require_auth
 def search_inventory():
     query = request.args.get('q', '').lower().strip()
     if not query: return jsonify([])
@@ -866,6 +952,7 @@ def search_inventory():
     return jsonify(results), 200
 
 @inventory.route('/inventory/export', methods=['GET'])
+@require_auth
 def export_inventory():
     items = ProductMaster.query.all()
     
@@ -903,6 +990,7 @@ def export_inventory():
     )
 
 @inventory.route('/inventory/invoices/<invoice_number>/export', methods=['GET'])
+@require_auth
 def export_invoice(invoice_number):
     batches = InventoryBatch.query.filter_by(purchase_invoice_number=invoice_number).all()
     
@@ -936,6 +1024,7 @@ def export_invoice(invoice_number):
     )
 
 @inventory.route('/inventory/import', methods=['POST'])
+@require_auth
 def import_inventory():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -948,6 +1037,18 @@ def import_inventory():
     try:
         import_id = f"IMPORT-{get_ist_now().strftime('%Y%m%d-%H%M%S')}"
         source_type = f"CSV_{mode.upper()}"
+        
+        # PRE-FLUSH PARENT INVOICE: To satisfy Foreign Key constraints on Batch Inserts inside the loop
+        sys_invoice = PurchaseInvoice(
+            invoice_number=import_id,
+            vendor_name="System Import",
+            total_amount=0,
+            source=source_type,
+            image_path=""
+        )
+        db.session.add(sys_invoice)
+        db.session.flush()
+
         total_import_value = 0
         
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
@@ -1073,14 +1174,8 @@ def import_inventory():
                 
             processed_count += 1
             
-        sys_invoice = PurchaseInvoice(
-            invoice_number=import_id,
-            vendor_name="System Import",
-            total_amount=total_import_value,
-            source=source_type,
-            image_path=""
-        )
-        db.session.add(sys_invoice)
+        # Finalize parent summation
+        sys_invoice.total_amount = total_import_value
             
         db.session.commit()
         return jsonify({'message': f'Processed {processed_count} items'}), 200
@@ -1090,6 +1185,7 @@ def import_inventory():
         return jsonify({'error': str(e)}), 500
 
 @inventory.route('/inventory/invoices', methods=['GET'])
+@require_auth
 def get_invoices():
     invoices = PurchaseInvoice.query.order_by(PurchaseInvoice.upload_date.desc()).all()
     results = []
@@ -1106,6 +1202,7 @@ def get_invoices():
     return jsonify(results), 200
 
 @inventory.route('/inventory/invoices/<invoice_number>', methods=['GET'])
+@require_auth
 def get_invoice_detail(invoice_number):
     inv = PurchaseInvoice.query.get_or_404(invoice_number)
     batches = InventoryBatch.query.filter_by(purchase_invoice_number=invoice_number).all()
@@ -1141,6 +1238,7 @@ def get_invoice_detail(invoice_number):
     }), 200
 
 @inventory.route('/inventory/invoices/<invoice_number>/image', methods=['GET'])
+@require_auth
 def get_invoice_image(invoice_number):
     inv = PurchaseInvoice.query.get_or_404(invoice_number)
     if inv.image_path and os.path.exists(inv.image_path):
@@ -1148,6 +1246,7 @@ def get_invoice_image(invoice_number):
     return jsonify({'error': 'Image not found'}), 404
 
 @inventory.route('/inventory/upload', methods=['POST'])
+@require_auth
 def upload_inventory_report():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -1176,6 +1275,7 @@ def upload_inventory_report():
         return jsonify({'error': str(e)}), 500
 
 @inventory.route('/inventory/save_invoice', methods=['POST'])
+@require_auth
 def save_invoice():
     data = request.get_json()
     
@@ -1201,7 +1301,8 @@ def save_invoice():
             vendor_name=data.get('vendor_name', ''),
             image_path=image_path,
             source=source_type,
-            upload_date=get_ist_now()
+            upload_date=get_ist_now(),
+            created_by_user_id=g.current_user.get('user_id'),
         )
         db.session.add(new_inv)
     
@@ -1287,22 +1388,36 @@ def save_invoice():
                 mrp=mrp,
                 purchase_rate=rate,
                 gst_rate=p_gst,
-                expiry_date=expiry
+                expiry_date=expiry,
+                created_by_user_id=g.current_user.get('user_id'),
             )
             db.session.add(new_batch)
             db.session.flush()
-            
+
             history = InventoryHistory(
                 product_id=item.id,
                 batch_id=new_batch.id,
                 purchase_invoice_number=invoice_no,
                 change_amount=total_stock_qty,
                 type='PURCHASE',
-                notes=f"Invoice: {invoice_no}, Batch: {p_batch}"
+                notes=f"Invoice: {invoice_no}, Batch: {p_batch}",
+                user_id=g.current_user.get('user_id'),
+                username=g.current_user.get('username'),
             )
             db.session.add(history)
-            
+
         db.session.commit()
+
+        log_activity(
+            action='CREATE',
+            resource_type='purchase_invoice',
+            resource_id=invoice_no,
+            resource_label=f"{data.get('vendor_name', 'Unknown Vendor')} — {invoice_no}",
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+
         return jsonify({'message': 'Invoice Saved', 'invoice_number': invoice_no}), 200
 
     except Exception as e:
@@ -1311,6 +1426,7 @@ def save_invoice():
 
 
 @inventory.route('/inventory/all-changes', methods=['GET'])
+@require_auth
 def get_all_inventory_changes():
     """Returns all inventory history grouped by date, split into MANUAL and SALES"""
     from collections import defaultdict
