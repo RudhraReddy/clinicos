@@ -14,6 +14,7 @@ class Patient(db.Model):
     address = db.Column(db.Text)
     reference = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=get_ist_now)
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
     # Def to generate unique patient_id
     @staticmethod
@@ -38,6 +39,7 @@ class PurchaseInvoice(db.Model):
     image_path = db.Column(db.String(255)) # Path to saved image
     source = db.Column(db.String(50)) # 'OCR', 'MANUAL', 'CSV_UPDATE', 'CSV_OVERWRITE'
     location = db.Column(db.String(50), nullable=True, default='Main') # For Dimensionality
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
 class ProductMaster(db.Model):
     """
@@ -62,6 +64,7 @@ class ProductMaster(db.Model):
     generic_tags = db.Column(db.Text) # Comma Separated
     # NOTE: New column — run ALTER TABLE product_master ADD COLUMN formula TEXT; in production
     formula = db.Column(db.Text, nullable=True)
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
     # Relationships
     batches = db.relationship('InventoryBatch', backref='product', lazy=True)
@@ -97,10 +100,11 @@ class InventoryBatch(db.Model):
 
     # Current Stock
     quantity = db.Column(db.Numeric(10, 2), default=0.0)
-    
+
     # Original Invoice Details (For History)
     initial_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Qty at time of purchase (Paid + Free)
     free_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Free Qty included in initial
+    created_by_user_id = db.Column(db.String(36), nullable=True)
 
 
 class InventoryHistory(db.Model):
@@ -116,12 +120,13 @@ class InventoryHistory(db.Model):
     bill_id = db.Column(db.String(50), db.ForeignKey('bills.invoice_id'), nullable=True) # Sales
     purchase_invoice_number = db.Column(db.String(50), db.ForeignKey('purchase_invoices.invoice_number'), nullable=True) # Stock In
     
-    # change_amount = db.Column(db.Numeric(10, 2), nullable=False)
     change_amount = db.Column(db.Numeric(10, 2), nullable=False)
     # Type: PURCHASE, SALE, EXPIRED, RETURN, ADJUSTMENT
-    type = db.Column(db.String(50), nullable=False) 
+    type = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     notes = db.Column(db.Text)
+    user_id = db.Column(db.String(36), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
 
 # --- Visits & Billing ---
 
@@ -135,8 +140,9 @@ class Visit(db.Model):
     visit_date = db.Column(db.Date)
     visit_time = db.Column(db.Time)
     status = db.Column(db.String(20), default='in_progress') # in_progress, Done, cancelled
-    doctor_id = db.Column(db.String(50)) # User ID of doctor
-    
+    doctor_id = db.Column(db.String(50)) # User ID of doctor (deprecated)
+    created_by_user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
+
     # Financials
     visiting_fee = db.Column(db.Integer, default=0)
     amount_paid = db.Column(db.Integer, default=0)
@@ -156,7 +162,7 @@ class Bill(db.Model):
     payment_type = db.Column(db.String(50)) # CASH, CARD, INSURANCE
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
-    created_by_user_id = db.Column(db.String(50)) # Admin/Staff ID
+    created_by_user_id = db.Column(db.String(50), db.ForeignKey('users.id'), nullable=True) # Admin/Staff ID
     location = db.Column(db.String(50), nullable=True, default='Main')
 
 
@@ -191,6 +197,7 @@ class PatientImage(db.Model):
     tag = db.Column(db.String(50)) # e.g., 'Prescription', 'Lab', 'X-Ray'
     timestamp = db.Column(db.DateTime, default=get_ist_now)
     deleted_at = db.Column(db.DateTime, nullable=True, default=None)
+    created_by_user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
 
 class UploadSession(db.Model):
     """
@@ -218,3 +225,41 @@ class ExpenseLedger(db.Model):
     receipt_path = db.Column(db.String(255))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=get_ist_now)
+
+# --- Auth ---
+
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.String(36), primary_key=True)  # UUID4
+    email = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False)  # 'staff' | 'doctor' | 'admin'
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+    location_label = db.Column(db.String(100), nullable=True)
+
+class DoctorStaffAssignment(db.Model):
+    __tablename__ = 'doctor_staff_assignments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    doctor_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    staff_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+    __table_args__ = (db.UniqueConstraint('doctor_id', 'staff_id'),)
+
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(36), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
+    action = db.Column(db.String(20), nullable=False)
+    resource_type = db.Column(db.String(50), nullable=True)
+    resource_id = db.Column(db.String(100), nullable=True)
+    resource_label = db.Column(db.String(200), nullable=True)
+    details = db.Column(db.Text, nullable=True)
+    timestamp = db.Column(db.DateTime, default=get_ist_now, index=True)
+    ip_address = db.Column(db.String(45), nullable=True)
