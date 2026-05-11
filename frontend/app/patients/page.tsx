@@ -195,111 +195,195 @@ export default function PatientsPage() {
                         </div>
                     ) : (
                         <>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        {appFontSize <= 16 && <TableHead>Public ID</TableHead>}
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Phone</TableHead>
-                                        <TableHead>Age</TableHead>
-                                        {appFontSize <= 16 && <TableHead>Sex</TableHead>}
-                                        {appFontSize <= 16 && <TableHead>Address</TableHead>}
-                                        {appFontSize <= 16 && <TableHead>Reference</TableHead>}
-                                        {appFontSize <= 16 && <TableHead>Joined</TableHead>}
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredPatients.length === 0 ? (
+                            {/* Desktop table */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                No patients found.
-                                            </TableCell>
+                                            {appFontSize <= 16 && <TableHead>Public ID</TableHead>}
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Phone</TableHead>
+                                            <TableHead>Age</TableHead>
+                                            {appFontSize <= 16 && <TableHead>Sex</TableHead>}
+                                            {appFontSize <= 16 && <TableHead>Address</TableHead>}
+                                            {appFontSize <= 16 && <TableHead>Reference</TableHead>}
+                                            {appFontSize <= 16 && <TableHead>Joined</TableHead>}
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    ) : (
-                                        filteredPatients.map((patient, index) => (
-                                            <TableRow key={`${patient.patient_id}-${index}`}>
-                                                {appFontSize <= 16 && (
-                                                    <TableCell className="font-medium font-mono text-xs text-muted-foreground">
-                                                        {patient.patient_id}
-                                                    </TableCell>
-                                                )}
-                                                <TableCell className="font-semibold">{patient.name}</TableCell>
-                                                <TableCell>{patient.phone_number}</TableCell>
-                                                <TableCell>
-                                                    {patient.age || (patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : "N/A")}
-                                                </TableCell>
-                                                {appFontSize <= 16 && (
-                                                    <TableCell>{patient.sex || "N/A"}</TableCell>
-                                                )}
-                                                {appFontSize <= 16 && (
-                                                    <TableCell className="max-w-[150px] truncate" title={patient.address || ""}>{patient.address || "N/A"}</TableCell>
-                                                )}
-                                                {appFontSize <= 16 && (
-                                                    <TableCell className="max-w-[150px] truncate" title={patient.reference || ""}>{patient.reference || "N/A"}</TableCell>
-                                                )}
-                                                {appFontSize <= 16 && (
-                                                    <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
-                                                )}
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        {role === 'doctor' ? (
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                                setSelectedPatient(patient)
-                                                                setViewMode('full')
-                                                                setViewDialogOpen(true)
-                                                            }} title="View Patient Details">
-                                                                <Eye className="h-4 w-4" />
-                                                                <span className="sr-only">View</span>
-                                                            </Button>
-                                                        ) : (
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                                setSelectedPatient(patient)
-                                                                setViewMode('visits-only')
-                                                                setViewDialogOpen(true)
-                                                            }} title="View Visit Logs">
-                                                                <FileText className="h-4 w-4" />
-                                                                <span className="sr-only">View Visits</span>
-                                                            </Button>
-                                                        )}
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                                                            setSelectedPatient(patient)
-                                                            setEditDialogOpen(true)
-                                                        }}>
-                                                            <Edit className="h-4 w-4" />
-                                                            <span className="sr-only">Edit</span>
-                                                        </Button>
-                                                    </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredPatients.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                    No patients found.
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                            {/* Pagination controls */}
-                            <div className="flex items-center justify-between pt-4 border-t mt-4">
-                                <p className="text-sm text-muted-foreground">
-                                    Page {page} &middot; {patients.length} records
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setPage(p => p - 1)}
-                                        disabled={page === 1}
-                                    >
-                                        <ChevronLeft className="h-4 w-4 mr-1" />
-                                        Previous
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setPage(p => p + 1)}
-                                        disabled={patients.length < PAGE_LIMIT}
-                                    >
-                                        Next
-                                        <ChevronRight className="h-4 w-4 ml-1" />
-                                    </Button>
+                                        ) : (
+                                            filteredPatients.map((patient, index) => (
+                                                <TableRow key={`${patient.patient_id}-${index}`}>
+                                                    {appFontSize <= 16 && (
+                                                        <TableCell className="font-medium font-mono text-xs text-muted-foreground">
+                                                            {patient.patient_id}
+                                                        </TableCell>
+                                                    )}
+                                                    <TableCell className="font-semibold">{patient.name}</TableCell>
+                                                    <TableCell>{patient.phone_number}</TableCell>
+                                                    <TableCell>
+                                                        {patient.age || (patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : "N/A")}
+                                                    </TableCell>
+                                                    {appFontSize <= 16 && (
+                                                        <TableCell>{patient.sex || "N/A"}</TableCell>
+                                                    )}
+                                                    {appFontSize <= 16 && (
+                                                        <TableCell className="max-w-[150px] truncate" title={patient.address || ""}>{patient.address || "N/A"}</TableCell>
+                                                    )}
+                                                    {appFontSize <= 16 && (
+                                                        <TableCell className="max-w-[150px] truncate" title={patient.reference || ""}>{patient.reference || "N/A"}</TableCell>
+                                                    )}
+                                                    {appFontSize <= 16 && (
+                                                        <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
+                                                    )}
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            {role === 'doctor' ? (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                                    setSelectedPatient(patient)
+                                                                    setViewMode('full')
+                                                                    setViewDialogOpen(true)
+                                                                }} title="View Patient Details">
+                                                                    <Eye className="h-4 w-4" />
+                                                                    <span className="sr-only">View</span>
+                                                                </Button>
+                                                            ) : (
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                                    setSelectedPatient(patient)
+                                                                    setViewMode('visits-only')
+                                                                    setViewDialogOpen(true)
+                                                                }} title="View Visit Logs">
+                                                                    <FileText className="h-4 w-4" />
+                                                                    <span className="sr-only">View Visits</span>
+                                                                </Button>
+                                                            )}
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                                setSelectedPatient(patient)
+                                                                setEditDialogOpen(true)
+                                                            }}>
+                                                                <Edit className="h-4 w-4" />
+                                                                <span className="sr-only">Edit</span>
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                                {/* Desktop pagination controls */}
+                                <div className="flex items-center justify-between pt-4 border-t mt-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        Page {page} &middot; {patients.length} records
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPage(p => p - 1)}
+                                            disabled={page === 1}
+                                        >
+                                            <ChevronLeft className="h-4 w-4 mr-1" />
+                                            Previous
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPage(p => p + 1)}
+                                            disabled={patients.length < PAGE_LIMIT}
+                                        >
+                                            Next
+                                            <ChevronRight className="h-4 w-4 ml-1" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mobile card list */}
+                            <div className="md:hidden">
+                                {filteredPatients.length === 0 ? (
+                                    <p className="text-center py-8 text-muted-foreground text-sm">
+                                        No patients found.
+                                    </p>
+                                ) : (
+                                    <div className="divide-y">
+                                        {filteredPatients.map((patient, index) => (
+                                            <div key={`mob-${patient.patient_id}-${index}`} className="flex items-center justify-between py-3 px-1">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-semibold text-sm truncate">{patient.name}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        <span className="font-mono">{patient.patient_id}</span>
+                                                        {(patient.age || patient.dob) && (
+                                                            <span> &middot; {patient.age || Math.floor((Date.now() - new Date(patient.dob!).getTime()) / (1000 * 60 * 60 * 24 * 365.25))} yrs</span>
+                                                        )}
+                                                        {patient.sex && <span> &middot; {patient.sex}</span>}
+                                                        {patient.phone_number && <span> &middot; {patient.phone_number}</span>}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1 ml-2 shrink-0">
+                                                    {role === 'doctor' ? (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                            setSelectedPatient(patient)
+                                                            setViewMode('full')
+                                                            setViewDialogOpen(true)
+                                                        }} title="View Patient Details">
+                                                            <Eye className="h-4 w-4" />
+                                                            <span className="sr-only">View</span>
+                                                        </Button>
+                                                    ) : (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                            setSelectedPatient(patient)
+                                                            setViewMode('visits-only')
+                                                            setViewDialogOpen(true)
+                                                        }} title="View Visit Logs">
+                                                            <FileText className="h-4 w-4" />
+                                                            <span className="sr-only">View Visits</span>
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                        setSelectedPatient(patient)
+                                                        setEditDialogOpen(true)
+                                                    }}>
+                                                        <Edit className="h-4 w-4" />
+                                                        <span className="sr-only">Edit</span>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {/* Mobile pagination controls */}
+                                <div className="flex items-center justify-between pt-4 border-t mt-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        Page {page} &middot; {patients.length} records
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setPage(p => p - 1)}
+                                            disabled={page === 1}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            <span className="sr-only">Previous</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setPage(p => p + 1)}
+                                            disabled={patients.length < PAGE_LIMIT}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                            <span className="sr-only">Next</span>
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </>

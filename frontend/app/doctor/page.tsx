@@ -19,6 +19,7 @@ export default function DoctorDashboard() {
     const [visits, setVisits] = useState<Visit[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
+    const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
 
     // Active Console State
     // const [rxHistory, setRxHistory] = useState<any[]>([]) // Removed
@@ -199,7 +200,10 @@ export default function DoctorDashboard() {
     const handleDeleteVisit = async (visitId: string) => {
         try {
             await api.deleteVisit(visitId)
-            if (selectedVisitId === visitId) setSelectedVisitId(null)
+            if (selectedVisitId === visitId) {
+                setSelectedVisitId(null)
+                setMobileDetailOpen(false)
+            }
             setVisits(prev => prev.filter(v => v.visit_id !== visitId))
             toast.success("Visit deleted")
         } catch (err) {
@@ -258,6 +262,19 @@ export default function DoctorDashboard() {
         return orderedImages;
     }, [patientImages, selectedVisit, patientHistory, selectedDateFilter]);
 
+    const allTimelineDates = useMemo(() => {
+        const s = new Set<string>()
+        ;[selectedVisit, ...patientHistory].filter((v): v is Visit => !!v).forEach(v => {
+            if (v.visit_date) s.add(v.visit_date)
+        })
+        patientImages.forEach(img => {
+            if (img.timestamp) {
+                try { s.add(new Date(img.timestamp).toISOString().split('T')[0]) } catch {}
+            }
+        })
+        return Array.from(s).sort().reverse()
+    }, [patientImages, selectedVisit, patientHistory])
+
     // Navigation Handlers
     const handleNextImage = () => {
         if (!lightboxState) return
@@ -278,7 +295,205 @@ export default function DoctorDashboard() {
     }
 
     return (
-        <div className="h-[calc(100vh-60px)] flex bg-background overflow-hidden relative">
+        <div>
+            <input
+                id="image-upload-input"
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+            />
+            {/* ── MOBILE LAYOUT (hidden md+) ── */}
+            <div className="md:hidden flex flex-col">
+
+                {/* Stat strip */}
+                <div className="flex border-b bg-card">
+                    <div className="flex-1 text-center py-2.5 border-r">
+                        <p className="text-2xl font-bold">{orderedTodayVisits.length}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Today</p>
+                    </div>
+                    <div className="flex-1 text-center py-2.5 border-r">
+                        <p className="text-2xl font-bold">{orderedTodayVisits.filter(v => v.status === 'done').length}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Done</p>
+                    </div>
+                    <div className="flex-1 text-center py-2.5">
+                        <p className="text-2xl font-bold">{orderedTodayVisits.filter(v => v.status !== 'done' && v.status !== 'cancelled').length}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Waiting</p>
+                    </div>
+                </div>
+
+                {mobileDetailOpen && selectedVisit ? (
+                    /* ── MOBILE DETAIL PANEL ── */
+                    <div className="flex flex-col">
+                        {/* Back + name header */}
+                        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/10 border-b border-primary/20">
+                            <button
+                                type="button"
+                                className="text-sm font-semibold text-primary"
+                                onClick={() => setMobileDetailOpen(false)}
+                            >
+                                ← Back
+                            </button>
+                            <span className="flex-1 font-bold text-sm truncate">{selectedVisit.patient_name}</span>
+                            <Badge variant={selectedVisit.status === 'done' ? 'secondary' : 'outline'} className="text-[10px] uppercase">
+                                {selectedVisit.status}
+                            </Badge>
+                        </div>
+
+                        {/* Meta chips */}
+                        <div className="flex flex-wrap gap-1.5 px-4 py-2 bg-card border-b">
+                            {selectedVisit.dob && (
+                                <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
+                                    {Math.floor((Date.now() - new Date(selectedVisit.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25))} yrs
+                                </span>
+                            )}
+                            {selectedVisit.visit_time && (
+                                <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
+                                    {selectedVisit.visit_time.substring(0, 5)}
+                                </span>
+                            )}
+                            {selectedVisit.reason && (
+                                <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
+                                    {selectedVisit.reason}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Patient Pictures card header */}
+                        <div className="flex items-center justify-between px-4 py-2 bg-card border-b">
+                            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                <ImageIcon className="h-3.5 w-3.5" /> Patient Pictures
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {!showTrash && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => document.getElementById('image-upload-input')?.click()}
+                                            className="text-[10px] font-semibold px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                                        >
+                                            + Add
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowQR(true)}
+                                            className="text-[10px] font-semibold px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                                        >
+                                            QR
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTrash(prev => !prev)}
+                                    className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${showTrash ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}
+                                >
+                                    {showTrash ? 'Back' : 'Trash'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Timeline chips — horizontal scroll */}
+                        <div className="flex gap-1.5 px-4 py-2 overflow-x-auto border-b bg-muted/30">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedDateFilter(null)}
+                                className={`text-xs px-3 py-1 rounded-full border flex-shrink-0 transition-colors ${selectedDateFilter === null ? 'bg-primary/10 border-primary/20 text-primary font-semibold' : 'bg-card border-border text-muted-foreground'}`}
+                            >
+                                All History
+                            </button>
+                            {allTimelineDates.map(date => {
+                                const hasImages = patientImages.some(img => {
+                                    try { return new Date(img.timestamp).toISOString().split('T')[0] === date } catch { return false }
+                                })
+                                return (
+                                    <button
+                                        key={date}
+                                        type="button"
+                                        onClick={() => setSelectedDateFilter(date)}
+                                        className={`text-xs px-3 py-1 rounded-full border flex-shrink-0 transition-colors ${selectedDateFilter === date ? 'bg-primary/10 border-primary/20 text-primary font-semibold' : 'bg-card border-border text-muted-foreground'}`}
+                                    >
+                                        {new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}
+                                        {hasImages && <span className="ml-1 opacity-50">·</span>}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        {/* 2-col image grid */}
+                        <div className="grid grid-cols-2 gap-2 p-3 bg-card">
+                            {filteredImages.length === 0 ? (
+                                <div className="col-span-2 py-10 flex flex-col items-center text-muted-foreground opacity-50">
+                                    <ImageIcon className="h-8 w-8 mb-2" />
+                                    <span className="text-sm">No images</span>
+                                </div>
+                            ) : (
+                                filteredImages.map(img => (
+                                    <div
+                                        key={img.id}
+                                        className="aspect-square rounded-md overflow-hidden border bg-muted cursor-pointer relative group"
+                                        onClick={() => setLightboxState({ image: img, context: filteredImages })}
+                                    >
+                                        <img
+                                            src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
+                                            alt={img.notes || ''}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                        />
+                                        {img.notes && (
+                                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] px-1.5 py-1 truncate">
+                                                {img.notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    /* ── MOBILE QUEUE LIST ── */
+                    <div>
+                        <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30 border-b">
+                            {today}
+                        </p>
+                        {loading ? (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : orderedTodayVisits.length === 0 ? (
+                            <p className="text-center py-12 text-sm text-muted-foreground">No appointments today.</p>
+                        ) : (
+                            orderedTodayVisits.map(visit => (
+                                <div
+                                    key={visit.visit_id}
+                                    className={`flex items-center gap-2 px-4 py-3 border-b cursor-pointer transition-colors ${selectedVisitId === visit.visit_id ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted/40'} ${visit.status === 'done' ? 'opacity-50' : ''}`}
+                                    onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
+                                >
+                                    <span className="font-bold text-sm min-w-[38px] flex-shrink-0">{visit.visit_time?.substring(0, 5) || 'ASAP'}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm truncate">{visit.patient_name}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{visit.reason || '—'}</p>
+                                    </div>
+                                    <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'} className="text-[10px] uppercase flex-shrink-0">
+                                        {visit.status}
+                                    </Badge>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 flex-shrink-0"
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* ── DESKTOP LAYOUT (hidden on mobile) ── */}
+            <div className="hidden md:flex h-[calc(100vh-60px)] bg-background overflow-hidden relative">
             {/* MAIN CONTENT AREA (Left, ~75%) */}
             <div className="flex-1 flex flex-col min-w-0 p-6 gap-6 overflow-hidden">
                 {selectedVisit ? (
@@ -338,13 +553,6 @@ export default function DoctorDashboard() {
                                                     >
                                                         <Plus className="h-3 w-3" /> Add Image
                                                     </button>
-                                                    <input
-                                                        id="image-upload-input"
-                                                        type="file"
-                                                        accept="image/*"
-                                                        style={{ display: 'none' }}
-                                                        onChange={handleImageUpload}
-                                                    />
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowQR(true)}
@@ -760,7 +968,7 @@ export default function DoctorDashboard() {
                             orderedTodayVisits.map(visit => (
                                 <div
                                     key={visit.visit_id}
-                                    onClick={() => setSelectedVisitId(visit.visit_id)}
+                                    onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
                                     className={`p-3 rounded-md border transition-all duration-200 cursor-pointer flex justify-between items-center
                                 ${selectedVisitId === visit.visit_id
                                             ? 'bg-primary/10 border-primary shadow-sm'
@@ -797,6 +1005,7 @@ export default function DoctorDashboard() {
 
             </div >
 
+            </div>
         </div>
     )
 }

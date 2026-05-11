@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
+import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 import { PatientSearch } from "@/components/PatientSearch"
 import { useAuth } from "@/lib/auth_context"
@@ -382,6 +383,7 @@ function BillingContent() {
                             </div>
 
                             {/* Table */}
+                            <div className="overflow-x-auto">
                             <div className="border rounded-md flex-1">
                                 <Table>
                                     <TableHeader>
@@ -448,6 +450,7 @@ function BillingContent() {
                                     </TableBody>
                                 </Table>
                             </div>
+                            </div>
 
                             {billItems.length > 0 && (
                                 <div className="flex justify-end mt-4">
@@ -512,73 +515,131 @@ function BillingContent() {
                                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                 </div>
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Invoice ID</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Patient</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                            <TableHead>Payment</TableHead>
-                                            <TableHead>Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
+                                <>
+                                    {/* Desktop table */}
+                                    <div className="hidden md:block">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Invoice ID</TableHead>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Patient</TableHead>
+                                                    <TableHead>Amount</TableHead>
+                                                    <TableHead>Payment</TableHead>
+                                                    <TableHead>Action</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {history.map(bill => (
+                                                    <TableRow key={bill.invoice_id}>
+                                                        <TableCell className="font-mono">{bill.invoice_id}</TableCell>
+                                                        <TableCell>{bill.date}</TableCell>
+                                                        <TableCell>{bill.patient_name}</TableCell>
+                                                        <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
+                                                        <TableCell>{bill.payment_type}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        setPrintInvoiceId(bill.invoice_id)
+                                                                        setPrintDialogOpen(true)
+                                                                    }}
+                                                                >
+                                                                    <Printer className="h-4 w-4 mr-1" />
+                                                                    Print
+                                                                </Button>
+                                                                {role === 'doctor' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/30 dark:border-rose-900/50"
+                                                                        onClick={async () => {
+                                                                            if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
+                                                                                try {
+                                                                                    await api.deleteBill(bill.invoice_id)
+                                                                                    toast.success("Bill successfully deleted and stock restored.")
+                                                                                    loadHistory(historyPage)
+                                                                                } catch (err) {
+                                                                                    console.error(err)
+                                                                                    toast.error("Failed to delete bill")
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4 mr-1" />
+                                                                        Delete
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                                {history.length === 0 && (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                            No bills found.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden divide-y border rounded-lg overflow-hidden">
                                         {history.map(bill => (
-                                            <TableRow key={bill.invoice_id}>
-                                                <TableCell className="font-mono">{bill.invoice_id}</TableCell>
-                                                <TableCell>{bill.date}</TableCell>
-                                                <TableCell>{bill.patient_name}</TableCell>
-                                                <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
-                                                <TableCell>{bill.payment_type}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
+                                            <div key={bill.invoice_id} className="flex flex-col gap-1 p-3 bg-background">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-mono text-xs text-muted-foreground">{bill.invoice_id}</span>
+                                                    <span className="font-bold text-sm">₹{bill.total_amount.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="flex-1 text-xs text-muted-foreground">{bill.patient_name} · {bill.date}</span>
+                                                    <Badge variant="outline" className="text-[10px]">{bill.payment_type}</Badge>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        onClick={() => {
+                                                            setPrintInvoiceId(bill.invoice_id)
+                                                            setPrintDialogOpen(true)
+                                                        }}
+                                                    >
+                                                        <Printer className="h-4 w-4" />
+                                                    </Button>
+                                                    {role === 'doctor' && (
                                                         <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setPrintInvoiceId(bill.invoice_id)
-                                                                setPrintDialogOpen(true)
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
+                                                                    try {
+                                                                        await api.deleteBill(bill.invoice_id)
+                                                                        toast.success("Bill successfully deleted and stock restored.")
+                                                                        loadHistory(historyPage)
+                                                                    } catch (err) {
+                                                                        console.error(err)
+                                                                        toast.error("Failed to delete bill")
+                                                                    }
+                                                                }
                                                             }}
                                                         >
-                                                            <Printer className="h-4 w-4 mr-1" />
-                                                            Print
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
-                                                        {role === 'admin' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/30 dark:border-rose-900/50"
-                                                                onClick={async () => {
-                                                                    if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
-                                                                        try {
-                                                                            await api.deleteBill(bill.invoice_id)
-                                                                            toast.success("Bill successfully deleted and stock restored.")
-                                                                            loadHistory(historyPage)
-                                                                        } catch (err) {
-                                                                            console.error(err)
-                                                                            toast.error("Failed to delete bill")
-                                                                        }
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Trash2 className="h-4 w-4 mr-1" />
-                                                                Delete
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
+                                                    )}
+                                                </div>
+                                            </div>
                                         ))}
                                         {history.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                    No bills found.
-                                                </TableCell>
-                                            </TableRow>
+                                            <div className="text-center py-8 text-sm text-muted-foreground">
+                                                No bills found.
+                                            </div>
                                         )}
-                                    </TableBody>
-                                </Table>
+                                    </div>
+                                </>
                             )}
 
                             {/* Pagination */}

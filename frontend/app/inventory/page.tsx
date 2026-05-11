@@ -35,6 +35,20 @@ import { format } from "date-fns"
 import { useSettings } from "@/lib/settings_context"
 import { toast } from "sonner"
 
+const getDisplayQuantity = (quantity: number, pack_size?: string) => {
+    const pack = pack_size?.toLowerCase() || ''
+    if (pack.includes('s') || pack.includes('x')) {
+        const match = pack.match(/(\d+)/)
+        if (match) {
+            const num = parseInt(match[0])
+            if (!isNaN(num) && num > 1) {
+                return Math.round(quantity * num)
+            }
+        }
+    }
+    return Math.round(quantity)
+}
+
 function AllChangesPanel() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null)
@@ -172,6 +186,7 @@ function AllChangesPanel() {
                                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                                     Manual Changes ({day.manual.length})
                                 </h4>
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -199,6 +214,7 @@ function AllChangesPanel() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </div>
                         )}
 
@@ -207,6 +223,7 @@ function AllChangesPanel() {
                                 <h4 className="text-sm font-semibold text-muted-foreground mb-2">
                                     Sales ({day.sales.length})
                                 </h4>
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -230,6 +247,7 @@ function AllChangesPanel() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </div>
                         )}
 
@@ -512,58 +530,56 @@ export default function InventoryPage() {
 
                 <TabsContent value="inventory" className="space-y-6 mt-0">
             <div className="flex gap-2 items-center flex-wrap justify-between">
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Button variant="outline" onClick={() => window.location.href = '/inventory/history'}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        View History
+                <div className="flex flex-row items-center gap-2 overflow-x-auto pb-1 w-full md:w-auto scrollbar-hide">
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => window.location.href = '/inventory/history'}>
+                        <FileText className="mr-1.5 h-3.5 w-3.5" />
+                        History
                     </Button>
-                    <Link href="/inventory/invoice_edit?manual=true">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Manual Entry
+                    <Link href="/inventory/invoice_edit?manual=true" className="shrink-0">
+                        <Button size="sm">
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            Manual
                         </Button>
                     </Link>
                     <UploadInventoryReportDialog
                         trigger={
-                            <Button>
-                                <Package className="mr-2 h-4 w-4" />
-                                Upload Report
+                            <Button size="sm" className="shrink-0">
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
+                                Upload
                             </Button>
                         }
                     />
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="shrink-0 ml-auto">
+                                <Columns className="mr-1.5 h-3.5 w-3.5" />
+                                Columns
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56" align="end">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none mb-2">Toggle Columns</h4>
+                                {allColumns.map(col => (
+                                    <div key={col.id} className="flex items-center space-x-2 rounded px-2 hover:bg-accent py-1">
+                                        <input
+                                            type="checkbox"
+                                            id={`col-${col.id}`}
+                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            checked={visibleColumns.has(col.id)}
+                                            onChange={() => toggleColumn(col.id)}
+                                        />
+                                        <label
+                                            htmlFor={`col-${col.id}`}
+                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                                        >
+                                            {col.label}
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </div>
-
-                {/* Column Toggle */}
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className="ml-auto">
-                            <Columns className="mr-2 h-4 w-4" />
-                            Columns
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56" align="end">
-                        <div className="space-y-2">
-                            <h4 className="font-medium leading-none mb-2">Toggle Columns</h4>
-                            {allColumns.map(col => (
-                                <div key={col.id} className="flex items-center space-x-2 rounded px-2 hover:bg-accent py-1">
-                                    <input
-                                        type="checkbox"
-                                        id={`col-${col.id}`}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                        checked={visibleColumns.has(col.id)}
-                                        onChange={() => toggleColumn(col.id)}
-                                    />
-                                    <label
-                                        htmlFor={`col-${col.id}`}
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                                    >
-                                        {col.label}
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </PopoverContent>
-                </Popover>
             </div>
 
 
@@ -621,7 +637,9 @@ export default function InventoryPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <>
+                        {/* Desktop table — hidden on mobile */}
+                        <div className="hidden md:block overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -806,19 +824,7 @@ export default function InventoryPage() {
                                                 </TableCell>}
                                                 {visibleColumns.has('pack_size') && <TableCell className="text-muted-foreground text-xs">{item.pack_size || '-'}</TableCell>}
                                                 {visibleColumns.has('quantity') && <TableCell className="font-medium text-foreground">
-                                                    {(() => {
-                                                        const pack = item.pack_size?.toLowerCase() || ''
-                                                        if (pack.includes('s') || pack.includes('x')) {
-                                                            const match = pack.match(/(\d+)/)
-                                                            if (match) {
-                                                                const num = parseInt(match[0])
-                                                                if (!isNaN(num) && num > 1) {
-                                                                    return Math.round(item.quantity * num).toLocaleString()
-                                                                }
-                                                            }
-                                                        }
-                                                        return item.quantity
-                                                    })()}
+                                                    {getDisplayQuantity(item.quantity, item.pack_size).toLocaleString()}
                                                 </TableCell>}
                                                 {visibleColumns.has('price') && <TableCell>
                                                     {`$${item.price}`}
@@ -882,6 +888,42 @@ export default function InventoryPage() {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        {/* Mobile card list — shown only on mobile */}
+                        <div className="md:hidden divide-y">
+                            {filteredInventory.length === 0 ? (
+                                <p className="text-center py-8 text-muted-foreground text-sm">No items found.</p>
+                            ) : (
+                                filteredInventory.map((item) => (
+                                    <div key={item.id} className="py-3 px-1 flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-semibold text-sm truncate">{item.item_name}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-1.5">
+                                                <span>{item.category}</span>
+                                                <span>·</span>
+                                                <span className={cn(
+                                                    item.status.includes("LOW STOCK") && "text-red-600 font-semibold"
+                                                )}>
+                                                    {getDisplayQuantity(item.quantity, item.pack_size)} count
+                                                    {item.status.includes("LOW STOCK") && " ⚠"}
+                                                </span>
+                                                {item.expiry_date && (
+                                                    <>
+                                                        <span>·</span>
+                                                        <span>Exp {item.expiry_date}</span>
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <EditInventoryDialog item={item} onSuccess={loadData} />
+                                            <ViewBatchesDialog item={item} />
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
