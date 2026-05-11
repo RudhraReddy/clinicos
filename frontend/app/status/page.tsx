@@ -268,7 +268,7 @@ export default function StatusPage() {
                   />
                 )
               )}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-muted">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-muted">
                 {[
                   {label:"Visit Fees", val: pd?.fees??0, color:"text-teal-600"},
                   {label:"Medicine", val: pd?.medicine??0, color:"text-blue-600"},
@@ -291,7 +291,7 @@ export default function StatusPage() {
           {/* ── TODAY & MONTH KPIs ── */}
           <div className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Period Breakdown</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <KpiCard title="Today — Visit Fees" value={fmt(inv.today_visit_fees)} sub="collected today" icon={IndianRupee} color="text-teal-600"/>
               <KpiCard title="Today — Medicine" value={fmt(inv.today_medicine)} sub="sold today" icon={Package} color="text-blue-600"/>
               <KpiCard title="This Month — Fees" value={fmt(inv.month_visit_fees)} sub="visit income" icon={TrendingUp} color="text-indigo-600"/>
