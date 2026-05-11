@@ -37,6 +37,7 @@ class PurchaseInvoice(db.Model):
     upload_date = db.Column(db.DateTime, default=get_ist_now)
     image_path = db.Column(db.String(255)) # Path to saved image
     source = db.Column(db.String(50)) # 'OCR', 'MANUAL', 'CSV_UPDATE', 'CSV_OVERWRITE'
+    location = db.Column(db.String(50), nullable=True, default='Main') # For Dimensionality
 
 class ProductMaster(db.Model):
     """
@@ -141,6 +142,7 @@ class Visit(db.Model):
     amount_paid = db.Column(db.Integer, default=0)
     payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid
     
+    location = db.Column(db.String(50), nullable=True, default='Main')
     created_at = db.Column(db.DateTime, default=get_ist_now)
     updated_at = db.Column(db.DateTime, default=get_ist_now, onupdate=get_ist_now)
 
@@ -155,6 +157,7 @@ class Bill(db.Model):
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
     created_by_user_id = db.Column(db.String(50)) # Admin/Staff ID
+    location = db.Column(db.String(50), nullable=True, default='Main')
 
 
 
@@ -201,3 +204,17 @@ class UploadSession(db.Model):
     status = db.Column(db.String(20), default='WAITING') # WAITING, UPLOADED, COMPLETED
     created_at = db.Column(db.DateTime, default=get_ist_now)
     files = db.Column(db.Text) # JSON string of uploaded files info: [{path, tag, notes}]
+
+class ExpenseLedger(db.Model):
+    __tablename__ = 'expense_ledger'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    category = db.Column(db.String(50), default='Generic') # Utility, Rent, Staffing, Other
+    frequency = db.Column(db.String(20), default='one-time') # one-time, daily, weekly, monthly, yearly
+    date = db.Column(db.Date, default=datetime.now().date)
+    location = db.Column(db.String(50), default='Main')
+    receipt_path = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
