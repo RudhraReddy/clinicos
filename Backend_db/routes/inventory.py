@@ -486,155 +486,250 @@ def get_inventory():
 @inventory.route('/inventory_analytics', methods=['GET'])
 @require_auth
 def get_inventory_analytics():
-    from models import PurchaseInvoice, BillItem, ProductMaster, InventoryBatch, Visit, Bill
-    from datetime import date, timedelta
-    import calendar as cal_mod
+    from models import PurchaseInvoice, BillItem, ProductMaster, InventoryBatch, Visit, Bill, ExpenseLedger
+    from datetime import date, timedelta, datetime
+    from sqlalchemy import extract, desc
 
+    loc = request.args.get('location')
     today = get_ist_now().date()
-
-    # ── Basic totals ────────────────────────────────────────────────────
-    total_purchase_cost  = float(db.session.query(func.sum(PurchaseInvoice.total_amount)).scalar() or 0)
-    total_invoices_count = PurchaseInvoice.query.count()
-    medicine_revenue     = float(db.session.query(func.sum(BillItem.total_value)).scalar() or 0)
-    total_sales_count    = BillItem.query.count()
-    total_current_value  = float(db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity))
-                                 .filter(InventoryBatch.quantity > 0).scalar() or 0)
-
-    # ── Visit fees ──────────────────────────────────────────────────────
-    visit_fees_collected = float(db.session.query(func.sum(Visit.amount_paid)).scalar() or 0)
-    visit_fees_pending   = float(db.session.query(
-        func.sum(Visit.visiting_fee - Visit.amount_paid)
-    ).filter(Visit.payment_status != 'full', Visit.visiting_fee > 0).scalar() or 0)
-    total_visits         = Visit.query.filter(Visit.status != 'deleted').count()
-
-    # This-month helpers
     month_start = today.replace(day=1)
+    year_start = today.replace(month=1, day=1)
 
-    month_medicine = float(db.session.query(func.sum(BillItem.total_value))
-        .join(Bill, Bill.invoice_id == BillItem.bill_id)
-        .filter(func.date(Bill.created_at) >= month_start).scalar() or 0)
+    # Helper to inject location filter uniformly if provided
+    def loc_f(q, model):
+        if loc and loc != 'all':
+            # Ensure model actually has location column attribute to be safe
+            if hasattr(model, 'location'):
+                return q.filter(model.location == loc)
+        return q
 
-    month_visit_fees = float(db.session.query(func.sum(Visit.amount_paid))
-        .filter(func.date(Visit.created_at) >= month_start).scalar() or 0)
+    # ── Ledger Aggregations (The NEW Pie & Expense Feed) ──────────────────
+    ledger_base = ExpenseLedger.query
+    if loc and loc != 'all':
+        ledger_base = ledger_base.filter(ExpenseLedger.location == loc)
+        
+    total_ledger_cost = float(db.session.query(func.sum(ExpenseLedger.amount)).filter(ExpenseLedger.id.in_([x.id for x in ledger_base])).scalar() or 0)
+    
+    month_ledger_q = ledger_base.filter(func.date(ExpenseLedger.date) >= month_start)
+    month_ledger_cost = float(db.session.query(func.sum(ExpenseLedger.amount)).filter(ExpenseLedger.id.in_([x.id for x in month_ledger_q])).scalar() or 0)
+    
+    year_ledger_q = ledger_base.filter(func.date(ExpenseLedger.date) >= year_start)
+    year_ledger_cost = float(db.session.query(func.sum(ExpenseLedger.amount)).filter(ExpenseLedger.id.in_([x.id for x in year_ledger_q])).scalar() or 0)
 
-    # Today helpers
-    today_medicine = float(db.session.query(func.sum(BillItem.total_value))
-        .join(Bill, Bill.invoice_id == BillItem.bill_id)
-        .filter(func.date(Bill.created_at) == today).scalar() or 0)
+    # Ledger Category Breakdown (For Pie Chart)
+    ledger_cats = db.session.query(
+        ExpenseLedger.category,
+        func.sum(ExpenseLedger.amount)
+    ).filter(ExpenseLedger.id.in_([x.id for x in ledger_base])).group_by(ExpenseLedger.category).all()
+    
+    ledger_distribution = [{"label": c or "Generic", "value": float(v)} for c, v in ledger_cats if v]
 
-    today_visit_fees = float(db.session.query(func.sum(Visit.amount_paid))
-        .filter(func.date(Visit.created_at) == today).scalar() or 0)
+    # ── Raw Purchase Invoice Costs (Physical Stock Inflow) ─────────────────
+    pi_q = loc_f(PurchaseInvoice.query, PurchaseInvoice)
+    total_pi_cost = float(db.session.query(func.sum(PurchaseInvoice.total_amount)).filter(PurchaseInvoice.invoice_number.in_([p.invoice_number for p in pi_q])).scalar() or 0)
+    
+    # COMBINED OUTCOMES (Per User Brief: Invoice + Manual Ledger)
+    total_outcome = total_pi_cost + total_ledger_cost
+    
+    month_pi_cost = float(db.session.query(func.sum(PurchaseInvoice.total_amount)).filter(
+        PurchaseInvoice.invoice_number.in_([p.invoice_number for p in pi_q]),
+        func.date(PurchaseInvoice.invoice_date) >= month_start
+    ).scalar() or 0)
+    month_outcome = month_pi_cost + month_ledger_cost
 
-    # ── Weekly income split — last 8 weeks ──────────────────────────────
-    week_start_base = today - timedelta(days=today.weekday())  # Monday of current week
-    weekly_income = []
-    for i in range(7, -1, -1):
-        wk_start = week_start_base - timedelta(weeks=i)
-        wk_end   = wk_start + timedelta(days=6)
-        label    = wk_start.strftime('%-d %b')
+    year_pi_cost = float(db.session.query(func.sum(PurchaseInvoice.total_amount)).filter(
+        PurchaseInvoice.invoice_number.in_([p.invoice_number for p in pi_q]),
+        func.date(PurchaseInvoice.invoice_date) >= year_start
+    ).scalar() or 0)
+    year_outcome = year_pi_cost + year_ledger_cost
 
-        med = float(db.session.query(func.sum(BillItem.total_value))
-            .join(Bill, Bill.invoice_id == BillItem.bill_id)
-            .filter(func.date(Bill.created_at).between(wk_start, wk_end)).scalar() or 0)
+    # ── Medicine Revenue (Pharmacy Income) ────────────────────────────────
+    bill_base = loc_f(Bill.query, Bill)
+    bill_ids = [b.invoice_id for b in bill_base]
+    
+    total_med_rev = 0
+    month_med_rev = 0
+    year_med_rev = 0
+    today_med_rev = 0
 
-        fees = float(db.session.query(func.sum(Visit.amount_paid))
-            .filter(func.date(Visit.created_at).between(wk_start, wk_end)).scalar() or 0)
+    if bill_ids:
+        total_med_rev = float(db.session.query(func.sum(BillItem.total_value)).filter(BillItem.bill_id.in_(bill_ids)).scalar() or 0)
+        month_med_rev = float(db.session.query(func.sum(BillItem.total_value)).join(Bill).filter(
+            Bill.invoice_id.in_(bill_ids), func.date(Bill.created_at) >= month_start
+        ).scalar() or 0)
+        year_med_rev = float(db.session.query(func.sum(BillItem.total_value)).join(Bill).filter(
+            Bill.invoice_id.in_(bill_ids), func.date(Bill.created_at) >= year_start
+        ).scalar() or 0)
+        today_med_rev = float(db.session.query(func.sum(BillItem.total_value)).join(Bill).filter(
+            Bill.invoice_id.in_(bill_ids), func.date(Bill.created_at) == today
+        ).scalar() or 0)
 
-        weekly_income.append({'week': label, 'medicine': med, 'visit_fees': fees})
+    # ── Visit Fees (Consultation Income) ───────────────────────────────────
+    v_q = loc_f(Visit.query, Visit)
+    v_ids = [v.visit_id for v in v_q]
+    
+    total_visit_fees = 0
+    month_visit_fees = 0
+    year_visit_fees = 0
+    today_visit_fees = 0
+    total_visits_count = 0
 
-    # ── Today breakdown by payment type ─────────────────────────────────
-    today_payment_q = db.session.query(
-        Bill.payment_type,
-        func.sum(Bill.total_amount)
-    ).filter(func.date(Bill.created_at) == today)\
-     .group_by(Bill.payment_type).all()
-    today_by_payment = [
-        {'type': (t or 'Other').upper(), 'value': float(v)}
-        for t, v in today_payment_q if v
-    ]
+    if v_ids:
+        total_visit_fees = float(db.session.query(func.sum(Visit.amount_paid)).filter(Visit.visit_id.in_(v_ids)).scalar() or 0)
+        month_visit_fees = float(db.session.query(func.sum(Visit.amount_paid)).filter(Visit.visit_id.in_(v_ids), func.date(Visit.created_at) >= month_start).scalar() or 0)
+        year_visit_fees = float(db.session.query(func.sum(Visit.amount_paid)).filter(Visit.visit_id.in_(v_ids), func.date(Visit.created_at) >= year_start).scalar() or 0)
+        today_visit_fees = float(db.session.query(func.sum(Visit.amount_paid)).filter(Visit.visit_id.in_(v_ids), func.date(Visit.created_at) == today).scalar() or 0)
+        total_visits_count = Visit.query.filter(Visit.visit_id.in_(v_ids), Visit.status != 'deleted').count()
 
-    # ── Category stock breakdown ────────────────────────────────────────
-    cat_stock_q = db.session.query(
-        ProductMaster.category,
-        func.sum(InventoryBatch.mrp * InventoryBatch.quantity)
-    ).join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
-     .filter(InventoryBatch.quantity > 0)\
-     .group_by(ProductMaster.category).all()
+    # Total Income = Medicine + Consult
+    total_income = total_med_rev + total_visit_fees
+    month_income = month_med_rev + month_visit_fees
+    year_income = year_med_rev + year_visit_fees
+    today_income = today_med_rev + today_visit_fees
 
-    category_stock = [{'category': c or 'Uncategorised', 'value': float(v)}
-                      for c, v in cat_stock_q if v]
+    # ── Today breakdown by payment type (Dimensionalized) ────────────────
+    today_payment_q = []
+    if bill_ids:
+        today_payment_q = db.session.query(
+            Bill.payment_type,
+            func.sum(Bill.total_amount)
+        ).filter(Bill.invoice_id.in_(bill_ids), func.date(Bill.created_at) == today).group_by(Bill.payment_type).all()
+    
+    today_by_payment = [{'type': (t or 'Other').upper(), 'value': float(v)} for t, v in today_payment_q if v]
 
-    # ── Category sales breakdown ────────────────────────────────────────
-    cat_sales_q = db.session.query(
-        ProductMaster.category,
-        func.sum(BillItem.total_value)
-    ).join(BillItem, BillItem.product_id == ProductMaster.id)\
-     .group_by(ProductMaster.category).all()
+    # ── Stock Current Total Asset Value ──────────────────────────────────
+    # Asset value is global usually, but could be filtered if inventory batches held locations (omitted for simplicity now)
+    total_current_value = float(db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity)).filter(InventoryBatch.quantity > 0).scalar() or 0)
 
-    category_sales = [{'category': c or 'Uncategorised', 'value': float(v)}
-                      for c, v in cat_sales_q if v]
+    # ── Weekly and Daily distributions for "Busy Matrix" ────────────────
+    # Query counts grouped by DOW (Day of Week) for overall traffic
+    busy_dow_q = db.session.query(
+        extract('dow', Visit.created_at).label('dow'),
+        func.count(Visit.visit_id)
+    ).filter(Visit.status != 'deleted')
+    if v_ids:
+        busy_dow_q = busy_dow_q.filter(Visit.visit_id.in_(v_ids))
+    busy_dow = busy_dow_q.group_by('dow').all()
+    
+    # Map PostgreSQL DOW (0=Sun, 1=Mon...)
+    dow_map = {1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 0: "Sun"}
+    dow_data = [{"d": dow_map.get(int(d), str(d)), "c": c} for d, c in busy_dow]
 
-    # ── Top 5 selling items ─────────────────────────────────────────────
+    # ── 🟢 NEW INVENTORY SPECIFIC QUERIES ─────────────────────────────────
+    # 1. Top Selling Products
     top_items_q = db.session.query(
-        BillItem.item_name,
-        func.sum(BillItem.total_value).label('revenue'),
-        func.sum(BillItem.quantity).label('qty_sold')
-    ).group_by(BillItem.item_name)\
-     .order_by(func.sum(BillItem.total_value).desc())\
-     .limit(5).all()
+        ProductMaster.item_name,
+        func.sum(BillItem.quantity).label('qty'),
+        func.sum(BillItem.total_value).label('rev')
+    ).join(BillItem, ProductMaster.id == BillItem.product_id)\
+    .group_by(ProductMaster.item_name)\
+    .order_by(desc('qty'))\
+    .limit(8).all()
+    
+    top_items = [{'name': t[0], 'qty_sold': float(t[1] or 0), 'revenue': float(t[2] or 0)} for t in top_items_q]
 
-    top_items = [{'name': r.item_name, 'revenue': float(r.revenue), 'qty_sold': int(r.qty_sold)}
-                 for r in top_items_q]
+    # 2. Low Stock Warning
+    low_stock_q = db.session.query(
+        ProductMaster.item_name,
+        func.sum(InventoryBatch.quantity).label('qty'),
+        ProductMaster.min_stock_level
+    ).join(InventoryBatch, ProductMaster.id == InventoryBatch.product_id)\
+    .group_by(ProductMaster.id, ProductMaster.item_name, ProductMaster.min_stock_level)\
+    .having(func.sum(InventoryBatch.quantity) <= ProductMaster.min_stock_level)\
+    .order_by('qty').all()
+    
+    raw_stock_list = [{'name': l[0], 'qty': float(l[1] or 0), 'threshold': l[2]} for l in low_stock_q]
+    out_of_stock = [s for s in raw_stock_list if s['qty'] <= 0]
+    low_stock = [s for s in raw_stock_list if s['qty'] > 0]
 
-    # ── Stock alerts ────────────────────────────────────────────────────
-    three_months = today + timedelta(days=90)
+    # 3. Expiring (Next 120 Days) - Partitioned into Expired vs Expiring Soon
+    expiry_horizon = today + timedelta(days=120)
+    expiring_q = db.session.query(
+        ProductMaster.item_name,
+        InventoryBatch.expiry_date,
+        InventoryBatch.quantity
+    ).join(InventoryBatch, ProductMaster.id == InventoryBatch.product_id)\
+    .filter(InventoryBatch.quantity > 0, InventoryBatch.expiry_date <= expiry_horizon)\
+    .order_by(InventoryBatch.expiry_date).all()
+    
+    raw_expiring = []
+    for e in expiring_q:
+        raw_expiring.append({
+            'name': e[0],
+            'dt': e[1],
+            'expiry': e[1].strftime('%Y-%m-%d') if e[1] else 'N/A',
+            'qty': float(e[2] or 0)
+        })
+        
+    expired = [{ 'name': x['name'], 'expiry': x['expiry'], 'qty': x['qty'] } for x in raw_expiring if x['dt'] and x['dt'] < today]
+    expiring_soon = [{ 'name': x['name'], 'expiry': x['expiry'], 'qty': x['qty'] } for x in raw_expiring if x['dt'] and x['dt'] >= today]
 
-    low_stock_q = db.session.query(ProductMaster)\
-        .join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
-        .group_by(ProductMaster.id)\
-        .having(func.sum(InventoryBatch.quantity) <= ProductMaster.min_stock_level)\
-        .all()
-    low_stock = [{'name': p.item_name, 'qty': int(db.session.query(func.sum(InventoryBatch.quantity))
-                  .filter(InventoryBatch.product_id == p.id).scalar() or 0)} for p in low_stock_q[:5]]
-
-    expiring_q = db.session.query(ProductMaster.item_name, InventoryBatch.expiry_date)\
-        .join(InventoryBatch, InventoryBatch.product_id == ProductMaster.id)\
-        .filter(InventoryBatch.quantity > 0,
-                InventoryBatch.expiry_date != None,
-                InventoryBatch.expiry_date <= three_months)\
-        .order_by(InventoryBatch.expiry_date.asc()).limit(5).all()
-    expiring = [{'name': n, 'expiry': e.strftime('%m/%y')} for n, e in expiring_q]
-    today_visit_fees_pending = float(db.session.query(
-        func.sum(Visit.visiting_fee - Visit.amount_paid)
-    ).filter(func.date(Visit.created_at) == today, Visit.payment_status != 'full', Visit.visiting_fee > 0).scalar() or 0)
+    # 4. Recent Purchase Invoices History
+    inv_history_q = db.session.query(
+        PurchaseInvoice.invoice_number,
+        PurchaseInvoice.invoice_date,
+        PurchaseInvoice.vendor_name,
+        PurchaseInvoice.total_amount
+    ).order_by(desc(PurchaseInvoice.invoice_date)).limit(10).all()
+    
+    invoice_history = [{
+        'id': h[0],
+        'date': h[1].strftime('%Y-%m-%d') if h[1] else 'N/A',
+        'vendor': h[2] or 'Unknown Vendor',
+        'amount': float(h[3] or 0)
+    } for h in inv_history_q]
 
     return jsonify({
-        # Totals
-        'total_purchase_cost':   total_purchase_cost,
-        'total_invoices_count':  total_invoices_count,
-        'medicine_revenue':      medicine_revenue,
-        'total_sales_count':     total_sales_count,
-        'total_current_value':   total_current_value,
-        'visit_fees_collected':  visit_fees_collected,
-        'visit_fees_pending':    visit_fees_pending,
-        'total_visits':          total_visits,
-        # Period
-        'month_medicine':        month_medicine,
-        'month_visit_fees':      month_visit_fees,
-        'today_medicine':        today_medicine,
-        'today_visit_fees':      today_visit_fees,
-        'today_visit_fees_pending': today_visit_fees_pending,
-        # Charts
-        'weekly_income':         weekly_income,
-        'category_stock':        category_stock,
-        'category_sales':        category_sales,
-        'top_items':             top_items,
-        # Alerts
-        'low_stock':             low_stock,
-        'expiring_soon':         expiring,
-        'low_stock_count':       len(low_stock_q),
-        'expiring_count':        len(expiring_q),
-        'today_by_payment':      today_by_payment,
+        # Master Dimension Splits ready for direct frontend feeding
+        'all': {
+            'income': total_income,
+            'outcome': total_outcome,
+            'net': total_income - total_outcome,
+            'pharmRev': total_med_rev,
+            'consultRev': total_visit_fees,
+            'visits': total_visits_count
+        },
+        'year': {
+            'income': year_income,
+            'outcome': year_outcome,
+            'net': year_income - year_outcome,
+            'pharmRev': year_med_rev,
+            'consultRev': year_visit_fees,
+        },
+        'month': {
+            'income': month_income,
+            'outcome': month_outcome,
+            'net': month_income - month_outcome,
+            'pharmRev': month_med_rev,
+            'consultRev': month_visit_fees,
+        },
+        'today': {
+            'income': today_income,
+            'outcome': 0, # Ledger logic for single day outcomes usually zero unless explicitly logged today
+            'net': today_income,
+            'pharmRev': today_med_rev,
+            'consultRev': today_visit_fees,
+        },
+        
+        # Specific Detailed Breakdowns
+        'ledger_expense_pie': ledger_distribution,
+        'sitting_inventory_value': total_current_value,
+        'busy_day_matrix': dow_data,
+        'today_by_payment': today_by_payment,
+
+        # Extended Inventory Data Modules for Dashboard
+        'top_items': top_items,
+        'low_stock': low_stock,
+        'out_of_stock': out_of_stock,
+        'expiring_soon': expiring_soon,
+        'expired': expired,
+        'invoice_history': invoice_history,
+        
+        # Backwards compatibility hooks (legacy items just in case other pages read them)
+        'total_purchase_cost': total_pi_cost,
+        'medicine_revenue': total_med_rev,
+        'total_visits': total_visits_count,
+        'visit_fees_collected': total_visit_fees,
     }), 200
 
 @inventory.route('/inventory/<string:product_id>/history', methods=['GET'])

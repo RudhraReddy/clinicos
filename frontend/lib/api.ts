@@ -245,23 +245,43 @@ export const api = {
         });
     },
 
-    async getInventoryAnalytics(): Promise<{
-        total_purchase_cost: number; total_invoices_count: number;
-        medicine_revenue: number; total_sales_count: number;
-        total_current_value: number; visit_fees_collected: number;
-        visit_fees_pending: number; total_visits: number;
-        month_medicine: number; month_visit_fees: number;
-        today_medicine: number; today_visit_fees: number; today_visit_fees_pending: number;
+    async getInventoryAnalytics(location?: string): Promise<{
+        all: any;
+        year: any;
+        month: any;
+        today: any;
+        ledger_expense_pie: { label: string, value: number }[];
+        sitting_inventory_value: number;
+        busy_day_matrix: { d: string, c: number }[];
+        today_by_payment: { type: string; value: number }[];
+        
+        // Compatibility keys to prevent breaking the old status page
+        total_purchase_cost: number;
+        medicine_revenue: number;
+        total_visits: number;
+        visit_fees_collected: number;
+        total_invoices_count: number;
+        total_sales_count: number;
+        total_current_value: number;
+        visit_fees_pending: number;
+        month_medicine: number;
+        month_visit_fees: number;
+        today_medicine: number;
+        today_visit_fees: number;
+        today_visit_fees_pending: number;
         weekly_income: { week: string; medicine: number; visit_fees: number }[];
         category_stock: { category: string; value: number }[];
         category_sales: { category: string; value: number }[];
         top_items: { name: string; revenue: number; qty_sold: number }[];
         low_stock: { name: string; qty: number }[];
-        expiring_soon: { name: string; expiry: string }[];
-        low_stock_count: number; expiring_count: number;
-        today_by_payment: { type: string; value: number }[];
+        out_of_stock: { name: string; qty: number }[];
+        expired: { name: string; expiry: string; qty: number }[];
+        expiring_soon: { name: string; expiry: string; qty: number }[];
+        low_stock_count: number;
+        expiring_count: number;
     }> {
-        return fetchApi('/api/inventory_analytics');
+        const qs = location && location !== 'all' ? `?location=${encodeURIComponent(location)}` : '';
+        return fetchApi(`/api/inventory_analytics${qs}`);
     },
 
     async exportInventory() {
@@ -494,6 +514,28 @@ export const api = {
             throw new ApiError(response.status, errorText || response.statusText)
         }
     },
+
+    // Ledger APIs
+    async getLedger(location?: string, page = 1, limit = 20): Promise<any[]> {
+        const params = new URLSearchParams();
+        if (location && location !== 'all') params.set('location', location);
+        params.set('page', String(page));
+        params.set('limit', String(limit));
+        return fetchApi(`/api/ledger?${params.toString()}`);
+    },
+
+    async createLedgerItem(data: { title: string, amount: number, category: string, frequency: string, location: string, notes?: string }): Promise<{ id: number }> {
+        return fetchApi('/api/ledger', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    async deleteLedgerItem(id: number): Promise<void> {
+        return fetchApi(`/api/ledger/${id}`, {
+            method: 'DELETE'
+        });
+    }
 };
 
 // Auth API helpers
