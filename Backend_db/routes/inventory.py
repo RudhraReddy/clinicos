@@ -1121,20 +1121,24 @@ def export_inventory():
 
     writer.writerow(['ID', 'Item Name', 'Pack Size', 'Category', 'Min Stock', 'Quantity', 'MRP', 'Expiry Date'])
 
+    batch_agg_rows = db.session.query(
+        InventoryBatch.product_id,
+        func.sum(
+            case((InventoryBatch.quantity > 0, InventoryBatch.quantity), else_=0)
+        ).label('total_qty'),
+        func.max(InventoryBatch.mrp).label('max_mrp'),
+        func.min(
+            case((InventoryBatch.quantity > 0, InventoryBatch.expiry_date), else_=None)
+        ).label('earliest_expiry'),
+    ).group_by(InventoryBatch.product_id).all()
+
+    batch_agg = {row.product_id: row for row in batch_agg_rows}
+
     for item in items:
-        total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(
-            InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0
-        ).scalar() or 0
-
-        # Highest MRP across all batches (use for pricing)
-        max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(
-            InventoryBatch.product_id == item.id
-        ).scalar() or 0.0
-
-        # Earliest active-stock expiry
-        earliest_expiry = db.session.query(func.min(InventoryBatch.expiry_date)).filter(
-            InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0
-        ).scalar()
+        agg = batch_agg.get(item.id)
+        total_qty = float(agg.total_qty or 0) if agg else 0
+        max_mrp = float(agg.max_mrp or 0.0) if agg else 0.0
+        earliest_expiry = agg.earliest_expiry if agg else None
 
         writer.writerow([
             item.id,
@@ -1253,7 +1257,7 @@ def import_inventory():
                     item_name=name.strip(),
                     pack_size=pack_size.strip(),
                     category=get_val(['Category', 'cat']) or '',
-                    min_stock_level=int(get_val(['Min Stock', 'min']) or 10)
+                    min_stock_level=int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
                 )
                 db.session.add(item)
                 db.session.flush()
@@ -1261,7 +1265,11 @@ def import_inventory():
                 cat = get_val(['Category', 'cat'])
                 if cat: item.category = cat
                 min_s = get_val(['Min Stock', 'min'])
-                if min_s: item.min_stock_level = int(min_s)
+                if min_s:
+                    try:
+                        item.min_stock_level = int(float(min_s))
+                    except (ValueError, TypeError):
+                        pass
 
             qty_str = get_val(['Quantity', 'qty', 'Total Quantity']) or '0'
             try:
