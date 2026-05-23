@@ -1446,19 +1446,21 @@ def save_invoice():
     gst_no = data.get('gst_number', '')
     image_path = data.get('image_path', '')
     
+    warnings: list = []
     existing = PurchaseInvoice.query.get(invoice_no)
-    if existing:
-        pass
-    else:
+    is_duplicate_invoice = existing is not None
+
+    if not existing:
         source_type = 'MANUAL'
         if image_path:
             source_type = 'OCR'
-            
+
         new_inv = PurchaseInvoice(
             invoice_number=invoice_no,
             gst_number=gst_no,
             total_amount=data.get('total_amount', 0),
             vendor_name=data.get('vendor_name', ''),
+            invoice_date=get_ist_now().date(),
             image_path=image_path,
             source=source_type,
             upload_date=get_ist_now(),
@@ -1472,32 +1474,31 @@ def save_invoice():
         for p in products:
             p_name = p.get('product_name')
             if not p_name: continue
-            
-            p_mfg = p.get('mfg', '').strip()
-            p_pack = p.get('packs') or p.get('pack') or ''
-            p_batch = p.get('batch') or p.get('batch_number') or ''
-            p_hsn = p.get('hsn') or p.get('hsn_code') or ''
+
+            p_mfg    = p.get('mfg', '').strip()
+            p_pack   = p.get('packs') or p.get('pack') or ''
+            p_batch  = p.get('batch') or p.get('batch_number') or ''
+            p_hsn    = p.get('hsn') or p.get('hsn_code') or ''
             p_formula = (p.get('formula') or '').strip()
-            
-            try: 
+
+            try:
                 p_gst = float(str(p.get('gst', 0) or 0))
                 if p_gst >= 100:
                     p_gst = 0.0
-            except: 
+            except:
                 p_gst = 0.0
 
             matched_id = p.get('matched_id')
             item = None
             if matched_id:
                 item = ProductMaster.query.get(matched_id)
-            
+
             if not item:
                 query = ProductMaster.query.filter(func.lower(ProductMaster.item_name) == p_name.lower())
                 if p_pack:
-                     query = query.filter(ProductMaster.pack_size == str(p_pack))
-                     
+                    query = query.filter(ProductMaster.pack_size == str(p_pack))
                 item = query.first()
-            
+
             if not item:
                 item = ProductMaster(
                     id=ProductMaster.generate_item_id(),
@@ -1517,7 +1518,7 @@ def save_invoice():
                     item.hsn_code = p_hsn
                 if p_formula:
                     item.formula = p_formula
-            
+
             qty = 0
             try: qty = int(float(str(p.get('qty', 0))))
             except: qty = 0
@@ -1525,60 +1526,153 @@ def save_invoice():
             free_qty = 0
             try: free_qty = int(float(str(p.get('free', 0))))
             except: free_qty = 0
-            
+
             total_stock_qty = qty + free_qty
 
             mrp = 0.0
             try: mrp = float(str(p.get('mrp', 0)))
             except: mrp = 0.0
-            
+
             rate = 0.0
             try: rate = float(str(p.get('rate', 0)))
             except: rate = 0.0
-            
-            expiry = parse_expiry_date(p.get('expiry'))
-            
-            new_batch = InventoryBatch(
-                product_id=item.id,
-                purchase_invoice_number=invoice_no,
-                batch_number=p_batch,
-                quantity=total_stock_qty,
-                initial_quantity=total_stock_qty,
-                free_quantity=free_qty,
-                mrp=mrp,
-                purchase_rate=rate,
-                gst_rate=p_gst,
-                expiry_date=expiry,
-                created_by_user_id=g.current_user.get('user_id'),
-            )
-            db.session.add(new_batch)
-            db.session.flush()
 
-            history = InventoryHistory(
-                product_id=item.id,
-                batch_id=new_batch.id,
-                purchase_invoice_number=invoice_no,
-                change_amount=total_stock_qty,
-                type='PURCHASE',
-                notes=f"Invoice: {invoice_no}, Batch: {p_batch}",
-                user_id=g.current_user.get('user_id'),
-                username=g.current_user.get('username'),
-            )
-            db.session.add(history)
+            expiry = parse_expiry_date(p.get('expiry'))
+
+            if is_duplicate_invoice:
+                # Find existing batch for this product+batch_number under the same invoice
+                existing_batch = InventoryBatch.query.filter_by(
+                    purchase_invoice_number=invoice_no,
+                    product_id=item.id,
+                    batch_number=p_batch,
+                ).first()
+
+                if existing_batch:
+                    existing_qty = float(existing_batch.initial_quantity or existing_batch.quantity)
+                    qty_diff = total_stock_qty - existing_qty
+                    mrp_diff = abs(float(existing_batch.mrp or 0) - mrp)
+
+                    if abs(qty_diff) < 0.01 and mrp_diff < 0.01:
+                        # Identical — log history, skip
+                        history = InventoryHistory(
+                            product_id=item.id,
+                            batch_id=existing_batch.id,
+                            purchase_invoice_number=invoice_no,
+                            change_amount=0,
+                            type='ADJUSTMENT',
+                            notes='Duplicate invoice entry — no change made',
+                            user_id=g.current_user.get('user_id'),
+                            username=g.current_user.get('username'),
+                        )
+                        db.session.add(history)
+                        warnings.append(f'{p_name}: duplicate entry — skipped (identical)')
+                    else:
+                        # Difference found — add adjustment batch
+                        adj_batch = InventoryBatch(
+                            product_id=item.id,
+                            purchase_invoice_number=invoice_no,
+                            batch_number=p_batch,
+                            quantity=qty_diff,
+                            initial_quantity=qty_diff,
+                            free_quantity=0,
+                            mrp=mrp,
+                            purchase_rate=rate,
+                            gst_rate=p_gst,
+                            expiry_date=expiry,
+                            created_by_user_id=g.current_user.get('user_id'),
+                        )
+                        db.session.add(adj_batch)
+                        db.session.flush()
+                        history = InventoryHistory(
+                            product_id=item.id,
+                            batch_id=adj_batch.id,
+                            purchase_invoice_number=invoice_no,
+                            change_amount=qty_diff,
+                            type='ADJUSTMENT',
+                            notes=f'Duplicate invoice — qty reconciled: {existing_qty:.0f} → {total_stock_qty:.0f}',
+                            user_id=g.current_user.get('user_id'),
+                            username=g.current_user.get('username'),
+                        )
+                        db.session.add(history)
+                        warnings.append(f'{p_name}: qty adjusted by {qty_diff:+.0f}')
+                else:
+                    # New row not in original invoice — add normally
+                    new_batch = InventoryBatch(
+                        product_id=item.id,
+                        purchase_invoice_number=invoice_no,
+                        batch_number=p_batch,
+                        quantity=total_stock_qty,
+                        initial_quantity=total_stock_qty,
+                        free_quantity=free_qty,
+                        mrp=mrp,
+                        purchase_rate=rate,
+                        gst_rate=p_gst,
+                        expiry_date=expiry,
+                        created_by_user_id=g.current_user.get('user_id'),
+                    )
+                    db.session.add(new_batch)
+                    db.session.flush()
+                    history = InventoryHistory(
+                        product_id=item.id,
+                        batch_id=new_batch.id,
+                        purchase_invoice_number=invoice_no,
+                        change_amount=total_stock_qty,
+                        type='PURCHASE',
+                        notes=f'Duplicate invoice — new line item: {invoice_no}, Batch: {p_batch}',
+                        user_id=g.current_user.get('user_id'),
+                        username=g.current_user.get('username'),
+                    )
+                    db.session.add(history)
+
+            else:
+                # First-time save — normal path
+                new_batch = InventoryBatch(
+                    product_id=item.id,
+                    purchase_invoice_number=invoice_no,
+                    batch_number=p_batch,
+                    quantity=total_stock_qty,
+                    initial_quantity=total_stock_qty,
+                    free_quantity=free_qty,
+                    mrp=mrp,
+                    purchase_rate=rate,
+                    gst_rate=p_gst,
+                    expiry_date=expiry,
+                    created_by_user_id=g.current_user.get('user_id'),
+                )
+                db.session.add(new_batch)
+                db.session.flush()
+
+                history = InventoryHistory(
+                    product_id=item.id,
+                    batch_id=new_batch.id,
+                    purchase_invoice_number=invoice_no,
+                    change_amount=total_stock_qty,
+                    type='PURCHASE',
+                    notes=f'Invoice: {invoice_no}, Batch: {p_batch}',
+                    user_id=g.current_user.get('user_id'),
+                    username=g.current_user.get('username'),
+                )
+                db.session.add(history)
 
         db.session.commit()
 
         log_activity(
-            action='CREATE',
+            action='CREATE' if not is_duplicate_invoice else 'UPDATE',
             resource_type='purchase_invoice',
             resource_id=invoice_no,
             resource_label=f"{data.get('vendor_name', 'Unknown Vendor')} — {invoice_no}",
+            details='Duplicate invoice reconciliation' if is_duplicate_invoice else None,
             user_id=g.current_user.get('user_id'),
             username=g.current_user.get('username'),
             ip_address=request.remote_addr,
         )
 
-        return jsonify({'message': 'Invoice Saved', 'invoice_number': invoice_no}), 200
+        msg = 'Duplicate invoice reconciled' if is_duplicate_invoice else 'Invoice Saved'
+        return jsonify({
+            'message': msg,
+            'invoice_number': invoice_no,
+            'warnings': warnings,
+        }), 200
 
     except Exception as e:
         db.session.rollback()
