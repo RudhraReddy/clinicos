@@ -202,7 +202,9 @@ def import_patients():
                         return row[k]
             return None
 
+        row_count = 0
         for row in csv_input:
+            row_count += 1
             p_name = safe_get(row, ['Name', 'Patient Name'])
             p_phone = safe_get(row, ['Phone Number', 'Phone', 'Contact'])
             
@@ -212,6 +214,15 @@ def import_patients():
             raw_name = p_name.strip()
             raw_phone = p_phone.strip()
             
+            # Boundary Check validations matching database definitions to prevent SQL crashes
+            if len(raw_name) > 100:
+                db.session.rollback()
+                return jsonify({'error': f"Row {row_count + 1}: The patient name exceeds the maximum allowed limit of 100 characters."}), 400
+                
+            if len(raw_phone) > 20:
+                db.session.rollback()
+                return jsonify({'error': f"Row {row_count + 1}: The value '{raw_phone}' exceeds the maximum phone number limit of 20 characters. Please double check that columns are correctly aligned."}), 400
+
             # Pre-emptive duplicate collision prevention
             existing = Patient.query.filter(
                 func.lower(Patient.name) == raw_name.lower(),
@@ -226,15 +237,26 @@ def import_patients():
                 clean_age = None
                 
             sex_val = safe_get(row, ['Sex', 'Gender'])
+            clean_sex = str(sex_val).strip() if sex_val else None
+            if clean_sex and len(clean_sex) > 10:
+                db.session.rollback()
+                return jsonify({'error': f"Row {row_count + 1}: Sex field '{clean_sex}' exceeds the maximum limit of 10 characters."}), 400
+
             addr_val = safe_get(row, ['Address', 'Residence'])
-            ref_val = safe_get(row, ['Reference', 'Referred By'])
+            clean_addr = str(addr_val).strip() if addr_val else None
             
+            ref_val = safe_get(row, ['Reference', 'Referred By'])
+            clean_ref = str(ref_val).strip() if ref_val else None
+            if clean_ref and len(clean_ref) > 100:
+                db.session.rollback()
+                return jsonify({'error': f"Row {row_count + 1}: Reference field exceeds the maximum limit of 100 characters."}), 400
+
             if existing:
                 # Perform subtle attribute alignment
                 if clean_age is not None: existing.age = clean_age
-                if sex_val: existing.sex = str(sex_val).strip()
-                if addr_val: existing.address = str(addr_val).strip()
-                if ref_val: existing.reference = str(ref_val).strip()
+                if clean_sex: existing.sex = clean_sex
+                if clean_addr: existing.address = clean_addr
+                if clean_ref: existing.reference = clean_ref
                 updated += 1
             else:
                 # Genesis insert
@@ -243,9 +265,9 @@ def import_patients():
                     name=raw_name,
                     phone_number=raw_phone,
                     age=clean_age,
-                    sex=str(sex_val).strip() if sex_val else None,
-                    address=str(addr_val).strip() if addr_val else None,
-                    reference=str(ref_val).strip() if ref_val else None,
+                    sex=clean_sex,
+                    address=clean_addr,
+                    reference=clean_ref,
                     created_by_user_id=g.current_user.get('user_id')
                 )
                 db.session.add(new_entity)
