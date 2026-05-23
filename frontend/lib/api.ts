@@ -215,8 +215,9 @@ export const api = {
     },
 
     // Inventory APIs
-    async getInventory(): Promise<InventoryItem[]> {
-        return fetchApi('/api/inventory');
+    async getInventory(expiryMonths?: number): Promise<InventoryItem[]> {
+        const qs = expiryMonths ? `?expiry_months=${expiryMonths}` : '';
+        return fetchApi(`/api/inventory${qs}`);
     },
 
     async getInventoryBatches(id: string): Promise<InventoryBatch[]> {
@@ -324,7 +325,7 @@ export const api = {
         return await res.json();
     },
 
-    async saveInvoice(data: any): Promise<{ message: string; invoice_number: string }> {
+    async saveInvoice(data: any): Promise<{ message: string; invoice_number: string; warnings?: string[] }> {
         return fetchApi('/api/inventory/save_invoice', {
             method: 'POST',
             body: JSON.stringify(data),
