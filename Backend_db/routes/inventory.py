@@ -396,7 +396,7 @@ def _transform_ocr_result(ocr_result: dict) -> dict:
         'invoice_number': metadata.get('invoice_no') or '',
         'gst_number': metadata.get('gst_no') or '',
         'total_amount': str(total_amount) if total_amount != '' else '',
-        'vendor_name': '',
+        'vendor_name': metadata.get('vendor_name') or '',
     }
 
 inventory = Blueprint('inventory', __name__)
