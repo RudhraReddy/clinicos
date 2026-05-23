@@ -413,58 +413,114 @@ def get_inventory():
         expiry_months = 6
     today = get_ist_now().date()
     items = ProductMaster.query.order_by(ProductMaster.item_name.asc()).all()
+    if not items:
+        return jsonify([]), 200
+
+    product_ids = [item.id for item in items]
+
+    # ── Query 1: batch aggregates (replaces 5 per-product queries) ─────────
+    batch_stats_rows = db.session.query(
+        InventoryBatch.product_id,
+        func.sum(InventoryBatch.quantity).label('total_qty'),
+        func.max(InventoryBatch.mrp).label('max_mrp'),
+        func.min(InventoryBatch.mrp).label('min_mrp'),
+        func.sum(InventoryBatch.mrp * InventoryBatch.quantity).label('total_value'),
+        func.min(
+            case(
+                (InventoryBatch.quantity > 0, InventoryBatch.expiry_date),
+                else_=None
+            )
+        ).label('earliest_expiry'),
+    ).filter(InventoryBatch.product_id.in_(product_ids))\
+     .group_by(InventoryBatch.product_id).all()
+
+    stats_map = {
+        r.product_id: {
+            'total_qty': float(r.total_qty or 0),
+            'max_mrp': float(r.max_mrp or 0),
+            'min_mrp': float(r.min_mrp or 0),
+            'total_value': float(r.total_value or 0),
+            'earliest_expiry': r.earliest_expiry,
+        }
+        for r in batch_stats_rows
+    }
+
+    # ── Query 2: current MRP = first active batch FIFO per product ─────────
+    ranked_sq = db.session.query(
+        InventoryBatch.product_id,
+        InventoryBatch.mrp,
+        func.row_number().over(
+            partition_by=InventoryBatch.product_id,
+            order_by=InventoryBatch.expiry_date.asc()
+        ).label('rn')
+    ).filter(
+        InventoryBatch.product_id.in_(product_ids),
+        InventoryBatch.quantity > 0
+    ).subquery()
+
+    current_mrp_rows = db.session.query(
+        ranked_sq.c.product_id,
+        ranked_sq.c.mrp
+    ).filter(ranked_sq.c.rn == 1).all()
+
+    current_mrp_map = {r.product_id: float(r.mrp) for r in current_mrp_rows}
+
+    # ── Query 3: vendor names for active stock ─────────────────────────────
+    vendor_rows = db.session.query(
+        InventoryBatch.product_id,
+        PurchaseInvoice.vendor_name
+    ).join(
+        PurchaseInvoice,
+        InventoryBatch.purchase_invoice_number == PurchaseInvoice.invoice_number
+    ).filter(
+        InventoryBatch.product_id.in_(product_ids),
+        InventoryBatch.quantity > 0,
+        PurchaseInvoice.vendor_name.isnot(None)
+    ).distinct().all()
+
+    vendors_map: dict = {}
+    for pid, vname in vendor_rows:
+        if pid not in vendors_map:
+            vendors_map[pid] = []
+        if vname and vname not in vendors_map[pid]:
+            vendors_map[pid].append(vname)
+
+    # ── Build results ──────────────────────────────────────────────────────
+    empty_stats = {
+        'total_qty': 0.0, 'max_mrp': 0.0, 'min_mrp': 0.0,
+        'total_value': 0.0, 'earliest_expiry': None
+    }
     results = []
+
     for item in items:
-        # Aggregate Quantity from Batches
-        total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0
-        
-        # Calculate Price Range (Min/Max MRP) from Batches
-        max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
-        min_mrp = db.session.query(func.min(InventoryBatch.mrp)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
-        
-        active_batch = db.session.query(InventoryBatch.mrp).filter(
-            InventoryBatch.product_id == item.id,
-            InventoryBatch.quantity > 0
-        ).order_by(InventoryBatch.expiry_date.asc()).first()
-        current_mrp = float(active_batch[0]) if active_batch and active_batch[0] else float(max_mrp)
+        stats = stats_map.get(item.id, empty_stats)
+        total_qty       = stats['total_qty']
+        max_mrp         = stats['max_mrp']
+        min_mrp         = stats['min_mrp']
+        total_value     = stats['total_value']
+        earliest_expiry = stats['earliest_expiry']
+        current_mrp     = current_mrp_map.get(item.id, max_mrp)
+        vendor_list     = vendors_map.get(item.id, [])
 
-        total_value = db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity)).filter(
-            InventoryBatch.product_id == item.id
-        ).scalar() or 0.0
-        
-        earliest_expiry = db.session.query(func.min(InventoryBatch.expiry_date)).filter(
-            InventoryBatch.product_id == item.id, 
-            InventoryBatch.quantity > 0
-        ).scalar()
-
-        # Status Tags
         status_tags = []
         if total_qty <= 0:
             status_tags.append('OUT OF STOCK')
         elif total_qty < item.min_stock_level:
             status_tags.append('LOW STOCK')
-            
-        # Expiry Status
-        if earliest_expiry:
-             is_expired = (today.year > earliest_expiry.year) or \
-                          (today.year == earliest_expiry.year and today.month > earliest_expiry.month)
 
-             if is_expired:
-                 status_tags.append('EXPIRED')
-             else:
-                 days_until_expiry = (earliest_expiry - today).days
-                 if days_until_expiry <= expiry_months * 30:
-                     status_tags.append('EXPIRES SOON')
-        
+        if earliest_expiry:
+            is_expired = (today.year > earliest_expiry.year) or (
+                today.year == earliest_expiry.year and today.month > earliest_expiry.month
+            )
+            if is_expired:
+                status_tags.append('EXPIRED')
+            else:
+                days_until_expiry = (earliest_expiry - today).days
+                if days_until_expiry <= expiry_months * 30:
+                    status_tags.append('EXPIRES SOON')
+
         if not status_tags:
             status_tags.append('OK')
-
-        # Get list of vendors for active stock
-        vendors = db.session.query(PurchaseInvoice.vendor_name)\
-            .join(InventoryBatch, InventoryBatch.purchase_invoice_number == PurchaseInvoice.invoice_number)\
-            .filter(InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0)\
-            .distinct().all()
-        vendor_list = [v[0] for v in vendors if v[0]]
 
         results.append({
             'id': item.id,
@@ -475,9 +531,9 @@ def get_inventory():
             'manufacturer': item.manufacturer,
             'vendors': vendor_list,
             'price': current_mrp,
-            'min_price': float(min_mrp),
-            'max_price': float(max_mrp),
-            'total_value': float(total_value),
+            'min_price': min_mrp,
+            'max_price': max_mrp,
+            'total_value': total_value,
             'expiry_date': earliest_expiry.strftime('%m/%y') if earliest_expiry else None,
             'status': status_tags,
             'pack_size': item.pack_size,
@@ -485,6 +541,7 @@ def get_inventory():
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0.0,
             'formula': item.formula,
         })
+
     return jsonify(results), 200
 
 @inventory.route('/inventory_analytics', methods=['GET'])
