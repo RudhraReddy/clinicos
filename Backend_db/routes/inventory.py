@@ -1115,33 +1115,40 @@ def search_inventory():
 @require_auth
 def export_inventory():
     items = ProductMaster.query.all()
-    
+
     output = io.StringIO()
     writer = csv.writer(output)
-    
-    writer.writerow(['ID', 'Item Name', 'Dosage', 'Pack Size', 'Category', 'Min Stock', 'Total Quantity', 'Avg Purchase Rate', 'Max MRP', 'Earliest Expiry'])
-    
+
+    writer.writerow(['ID', 'Item Name', 'Pack Size', 'Category', 'Min Stock', 'Quantity', 'MRP', 'Expiry Date'])
+
     for item in items:
-        total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0
-        max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
-        earliest_expiry = db.session.query(func.min(InventoryBatch.expiry_date)).filter(InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0).scalar()
-        
-        avg_rate = db.session.query(func.avg(InventoryBatch.purchase_rate)).filter(InventoryBatch.product_id == item.id).scalar() or 0.0
-        
+        total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(
+            InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0
+        ).scalar() or 0
+
+        # Highest MRP across all batches (use for pricing)
+        max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(
+            InventoryBatch.product_id == item.id
+        ).scalar() or 0.0
+
+        # Earliest active-stock expiry
+        earliest_expiry = db.session.query(func.min(InventoryBatch.expiry_date)).filter(
+            InventoryBatch.product_id == item.id, InventoryBatch.quantity > 0
+        ).scalar()
+
         writer.writerow([
             item.id,
             item.item_name,
             item.pack_size or '',
             item.category or '',
             item.min_stock_level,
-            total_qty,
-            f"{float(avg_rate):.2f}",
+            int(total_qty),
             f"{float(max_mrp):.2f}",
-            earliest_expiry.isoformat() if earliest_expiry else ''
+            earliest_expiry.strftime('%m/%y') if earliest_expiry else '',
         ])
-        
+
     output.seek(0)
-    
+
     return send_file(
         io.BytesIO(output.getvalue().encode('utf-8')),
         mimetype='text/csv',
@@ -1227,17 +1234,19 @@ def import_inventory():
                         if k.lower() in exist_k.lower(): return row[exist_k]
                 return None
 
-            name = get_val(['Item Name', 'name', 'item'])
-            if not name: continue
-            
-            pack_size = get_val(['Pack Size', 'pack', 'packs']) or ''
-            
+            # ── Field extraction (supports both old and new header names) ──
+            name = get_val(['Item Name', 'name', 'item', 'Item'])
+            if not name:
+                continue
+
+            pack_size = get_val(['Pack Size', 'pack', 'packs', 'Pack']) or ''
+
             query = ProductMaster.query.filter(func.lower(ProductMaster.item_name) == name.strip().lower())
             if pack_size:
                 query = query.filter(ProductMaster.pack_size == pack_size.strip())
-                
+
             item = query.first()
-            
+
             if not item:
                 item = ProductMaster(
                     id=ProductMaster.generate_item_id(),
@@ -1255,26 +1264,36 @@ def import_inventory():
                 if min_s: item.min_stock_level = int(min_s)
 
             qty_str = get_val(['Quantity', 'qty', 'Total Quantity']) or '0'
-            try: qty = int(float(qty_str))
-            except: qty = 0
-            
-            if qty <= 0 and mode == 'update': continue 
-            
-            mrp_str = get_val(['MRP', 'Max MRP', 'price']) or '0'
-            try: mrp = float(mrp_str)
-            except: mrp = 0.0
-            
-            rate_str = get_val(['Purchase Rate', 'rate', 'Avg Purchase Rate']) or '0'
-            try: rate = float(rate_str)
-            except: rate = 0.0
-            
-            gst_str = get_val(['GST', 'tax']) or '0'
-            try: gst_rate = float(gst_str.replace('%', ''))
-            except: gst_rate = 0.0
-            
-            batch_num = get_val(['Batch', 'batch no', 'Batch Number']) or ''
+            try:
+                qty = int(float(qty_str))
+            except (ValueError, TypeError):
+                qty = 0
 
-            exp_str = get_val(['Expiry', 'exp', 'Earliest Expiry'])
+            if qty <= 0 and mode == 'update':
+                continue
+
+            mrp_str = get_val(['MRP', 'price', 'Max MRP']) or '0'
+            try:
+                mrp = float(mrp_str)
+            except (ValueError, TypeError):
+                mrp = 0.0
+
+            # Purchase rate: not in new export but keep reading if present in old CSVs
+            rate_str = get_val(['Purchase Rate', 'rate', 'Avg Purchase Rate']) or '0'
+            try:
+                rate = float(rate_str)
+            except (ValueError, TypeError):
+                rate = 0.0
+
+            gst_str = get_val(['GST', 'tax', 'GST Rate']) or '0'
+            try:
+                gst_rate = float(str(gst_str).replace('%', ''))
+            except (ValueError, TypeError):
+                gst_rate = 0.0
+
+            batch_num = get_val(['Batch', 'batch no', 'Batch Number', 'Batch No']) or ''
+
+            exp_str = get_val(['Expiry Date', 'Expiry', 'exp', 'Earliest Expiry'])
             expiry_date = parse_expiry_date(exp_str)
             
             if mode == 'overwrite':
