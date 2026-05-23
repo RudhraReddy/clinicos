@@ -407,7 +407,10 @@ def get_inventory():
     """
     Returns Master ProductMaster Items + Aggregated Stock
     """
-    expiry_months = int(request.args.get('expiry_months', 6))
+    try:
+        expiry_months = max(1, min(int(request.args.get('expiry_months', 6)), 24))
+    except (ValueError, TypeError):
+        expiry_months = 6
     today = get_ist_now().date()
     items = ProductMaster.query.order_by(ProductMaster.item_name.asc()).all()
     results = []
@@ -449,8 +452,8 @@ def get_inventory():
              if is_expired:
                  status_tags.append('EXPIRED')
              else:
-                 months_diff = (earliest_expiry.year - today.year) * 12 + (earliest_expiry.month - today.month)
-                 if months_diff <= expiry_months:
+                 days_until_expiry = (earliest_expiry - today).days
+                 if days_until_expiry <= expiry_months * 30:
                      status_tags.append('EXPIRES SOON')
         
         if not status_tags:
@@ -644,7 +647,10 @@ def get_inventory_analytics():
     low_stock = [s for s in raw_stock_list if s['qty'] > 0]
 
     # 3. Expiring (Configurable horizon) - Partitioned into Expired vs Expiring Soon
-    expiry_months = int(request.args.get('expiry_months', 6))
+    try:
+        expiry_months = max(1, min(int(request.args.get('expiry_months', 6)), 24))
+    except (ValueError, TypeError):
+        expiry_months = 6
     expiry_horizon = today + timedelta(days=expiry_months * 30)
     expiring_q = db.session.query(
         ProductMaster.item_name,
