@@ -1277,31 +1277,59 @@ def import_inventory():
             expiry_date = parse_expiry_date(exp_str)
             
             if mode == 'overwrite':
-                current_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0
+                current_qty = float(db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0)
                 diff = qty - current_qty
-                
-                if diff != 0:
-                     batch = InventoryBatch(
+
+                if abs(diff) < 0.01:
+                    pass  # no change needed
+                elif diff > 0:
+                    # Add stock
+                    batch = InventoryBatch(
                         product_id=item.id,
-                        quantity=diff, 
+                        quantity=diff,
                         mrp=mrp,
                         purchase_rate=rate,
                         gst_rate=gst_rate,
                         expiry_date=expiry_date,
                         purchase_invoice_number=import_id,
                         batch_number=batch_num or 'ADJUST'
-                     )
-                     db.session.add(batch)
-                     
-                     hist = InventoryHistory(
+                    )
+                    db.session.add(batch)
+                    db.session.flush()
+
+                    hist = InventoryHistory(
                         product_id=item.id,
-                        batch_id=batch.id, # will be None until flush? no, we need flush
+                        batch_id=batch.id,
                         change_amount=diff,
                         type='ADJUSTMENT',
-                        notes='CSV Import Overwrite',
+                        notes='CSV Import Overwrite — stock increase',
                         purchase_invoice_number=import_id
-                     )
-                     db.session.add(hist)
+                    )
+                    db.session.add(hist)
+                else:
+                    # Reduce stock FIFO — never create negative batches
+                    to_reduce = abs(diff)
+                    fifo_batches = InventoryBatch.query.filter(
+                        InventoryBatch.product_id == item.id,
+                        InventoryBatch.quantity > 0
+                    ).order_by(InventoryBatch.expiry_date.asc()).all()
+
+                    for fb in fifo_batches:
+                        if to_reduce <= 0:
+                            break
+                        take = min(float(fb.quantity), to_reduce)
+                        fb.quantity = float(fb.quantity) - take
+                        to_reduce -= take
+
+                    hist = InventoryHistory(
+                        product_id=item.id,
+                        batch_id=None,
+                        change_amount=diff,
+                        type='ADJUSTMENT',
+                        notes='CSV Import Overwrite — stock reduction (FIFO)',
+                        purchase_invoice_number=import_id
+                    )
+                    db.session.add(hist)
             
             elif mode == 'update':
                 batch = InventoryBatch(
