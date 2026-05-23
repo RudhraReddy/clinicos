@@ -267,7 +267,7 @@ function AllChangesPanel() {
 }
 
 export default function InventoryPage() {
-    const { appFontSize } = useSettings()
+    const { appFontSize, expiryReminderMonths } = useSettings()
     const { role } = useAuth()
     const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -332,7 +332,7 @@ export default function InventoryPage() {
         setLoading(true)
         setError(null)
         try {
-            const data = await api.getInventory()
+            const data = await api.getInventory(expiryReminderMonths)
             setInventory(data)
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load inventory")
@@ -517,12 +517,10 @@ export default function InventoryPage() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="space-y-4">
-                {role === 'doctor' && (
-                    <TabsList>
-                        <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                        <TabsTrigger value="all-changes">All Changes</TabsTrigger>
-                    </TabsList>
-                )}
+                <TabsList>
+                    <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                    <TabsTrigger value="all-changes">All Changes</TabsTrigger>
+                </TabsList>
 
                 <TabsContent value="all-changes">
                     <AllChangesPanel />
@@ -827,13 +825,13 @@ export default function InventoryPage() {
                                                     {getDisplayQuantity(item.quantity, item.pack_size).toLocaleString()}
                                                 </TableCell>}
                                                 {visibleColumns.has('price') && <TableCell>
-                                                    {`$${item.price}`}
+                                                    {`₹${item.price}`}
                                                 </TableCell>}
                                                 {visibleColumns.has('gst_rate') && <TableCell>
                                                     {item.gst_rate ? `${item.gst_rate}%` : '-'}
                                                 </TableCell>}
                                                 {visibleColumns.has('total_value') && <TableCell>
-                                                    {item.total_value ? `$${item.total_value.toLocaleString()}` : '-'}
+                                                    {item.total_value ? `₹${item.total_value.toLocaleString()}` : '-'}
                                                 </TableCell>}
                                                 {visibleColumns.has('category') && <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>}
                                                 {visibleColumns.has('hsn_code') && <TableCell className="text-muted-foreground text-xs">{item.hsn_code || '-'}</TableCell>}
