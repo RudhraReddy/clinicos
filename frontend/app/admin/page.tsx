@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth_context"
+import { useSettings } from "@/lib/settings_context"
 import { useRouter } from "next/navigation"
 import {
   getAdminStats, getAdminUsers, updateAdminUser, getActivityLog, getSystemDiagnostics,
@@ -732,6 +733,50 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
   )
 }
 
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
+
+function SettingsTab() {
+    const { expiryReminderMonths, setSettings } = useSettings()
+    const [localMonths, setLocalMonths] = useState(expiryReminderMonths)
+
+    const handleSave = () => {
+        const val = Math.max(1, Math.min(24, localMonths))
+        setSettings({ expiryReminderMonths: val })
+        toast.success(`Expiry reminder set to ${val} months`)
+    }
+
+    return (
+        <div className="space-y-6 max-w-lg">
+            <div>
+                <h2 className="text-lg font-semibold mb-1">Inventory Settings</h2>
+                <p className="text-sm text-muted-foreground">
+                    These settings apply across all inventory tables and dashboards.
+                </p>
+            </div>
+            <div className="rounded-lg border p-4 space-y-4">
+                <div className="space-y-1">
+                    <label className="text-sm font-medium">Expiry Reminder (months)</label>
+                    <p className="text-xs text-muted-foreground">
+                        Items expiring within this many months will be flagged as &quot;Expires Soon&quot;.
+                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                        <input
+                            type="number"
+                            min={1}
+                            max={24}
+                            value={localMonths}
+                            onChange={e => setLocalMonths(parseInt(e.target.value, 10) || 1)}
+                            className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <span className="text-sm text-muted-foreground">months (1–24)</span>
+                    </div>
+                </div>
+                <Button size="sm" onClick={handleSave}>Save Settings</Button>
+            </div>
+        </div>
+    )
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -772,6 +817,7 @@ export default function AdminPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -784,6 +830,10 @@ export default function AdminPage() {
 
         <TabsContent value="activity" className="mt-4">
           <ActivityLogTab allUsers={allUsers} />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-4">
+          <SettingsTab />
         </TabsContent>
       </Tabs>
     </div>
