@@ -1210,7 +1210,8 @@ def import_inventory():
         db.session.flush()
 
         total_import_value = 0
-        
+        warnings_list = []
+
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         csv_input = csv.DictReader(stream)
         
@@ -1277,6 +1278,9 @@ def import_inventory():
             expiry_date = parse_expiry_date(exp_str)
             
             if mode == 'overwrite':
+                # Fix 4: flush pending session mutations before the aggregate query
+                # so that a product appearing twice in the CSV sees the updated qty.
+                db.session.flush()
                 current_qty = float(db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0)
                 diff = qty - current_qty
 
@@ -1287,6 +1291,7 @@ def import_inventory():
                     batch = InventoryBatch(
                         product_id=item.id,
                         quantity=diff,
+                        initial_quantity=diff,  # Fix 2: snapshot initial qty
                         mrp=mrp,
                         purchase_rate=rate,
                         gst_rate=gst_rate,
@@ -1303,9 +1308,12 @@ def import_inventory():
                         change_amount=diff,
                         type='ADJUSTMENT',
                         notes='CSV Import Overwrite — stock increase',
-                        purchase_invoice_number=import_id
+                        purchase_invoice_number=import_id,
+                        user_id=g.current_user.get('user_id'),   # Fix 5
+                        username=g.current_user.get('username'),  # Fix 5
                     )
                     db.session.add(hist)
+                    total_import_value += diff * mrp  # Fix 3: accumulate overwrite increases
                 else:
                     # Reduce stock FIFO — never create negative batches
                     to_reduce = abs(diff)
@@ -1321,13 +1329,22 @@ def import_inventory():
                         fb.quantity = float(fb.quantity) - take
                         to_reduce -= take
 
+                    # Fix 1: warn if FIFO couldn't satisfy the full reduction
+                    if to_reduce > 0.01:
+                        warnings_list.append(
+                            f"{name}: insufficient stock — could only reduce by "
+                            f"{abs(diff) - to_reduce:.0f} of {abs(diff):.0f} requested"
+                        )
+
                     hist = InventoryHistory(
                         product_id=item.id,
                         batch_id=None,
                         change_amount=diff,
                         type='ADJUSTMENT',
                         notes='CSV Import Overwrite — stock reduction (FIFO)',
-                        purchase_invoice_number=import_id
+                        purchase_invoice_number=import_id,
+                        user_id=g.current_user.get('user_id'),   # Fix 5
+                        username=g.current_user.get('username'),  # Fix 5
                     )
                     db.session.add(hist)
             
@@ -1366,8 +1383,11 @@ def import_inventory():
         sys_invoice.total_amount = total_import_value
             
         db.session.commit()
-        return jsonify({'message': f'Processed {processed_count} items'}), 200
-        
+        return jsonify({
+            'message': f'Processed {processed_count} items',
+            'warnings': warnings_list,
+        }), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
