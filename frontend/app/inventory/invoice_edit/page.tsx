@@ -276,7 +276,7 @@ export default function InvoiceEditPage() {
                                     const res = await api.uploadInventoryReport(e.target.files[0])
                                     setImagePath(res.path)
                                 } catch (err) {
-                                    alert("Upload failed")
+                                    toast.error("Upload failed")
                                 }
                             }
                         }}
