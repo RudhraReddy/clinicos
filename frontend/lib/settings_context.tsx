@@ -52,7 +52,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         document.documentElement.style.fontSize = `${currentFontSize}px`
     }, [currentFontSize])
 
-    const setSettings = (settings: Partial<Omit<SettingsContextType, 'setSettings'>>) => {
+    const setSettings = (settings: Partial<Omit<SettingsContextType, 'setSettings' | 'setPreviewFontSize'>>) => {
         if (settings.clinicName !== undefined) {
             setClinicName(settings.clinicName)
             localStorage.setItem("clinic_name", settings.clinicName)
