@@ -180,14 +180,17 @@ export default function InvoiceEditPage() {
                 image_path: imagePath,
                 product_details: rows
             }
-            await api.saveInvoice(payload)
+            const result = await api.saveInvoice(payload)
 
-            // Clean up
+            if (result.warnings && result.warnings.length > 0) {
+                result.warnings.forEach(w => toast.warning(w))
+            }
+
             sessionStorage.removeItem("currentInvoice")
-            alert("Saved successfully!")
-            window.location.href = "/inventory"
+            toast.success(result.message || "Saved successfully!")
+            setTimeout(() => { window.location.href = "/inventory" }, 800)
         } catch (e) {
-            alert("Failed to save: " + e)
+            toast.error("Failed to save: " + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSaving(false)
         }
