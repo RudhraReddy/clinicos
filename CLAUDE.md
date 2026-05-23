@@ -293,6 +293,18 @@ These three strings are passed as props at two call sites and are currently hard
 
 ## Recent Changes / Notes
 
+- **Inventory System Overhaul (2026-05-23):** Comprehensive fixes across backend and frontend:
+  - **OCR vendor name** — `_transform_ocr_result` now passes the extracted `vendor_name` through instead of hardcoding `''`.
+  - **Expiry logic** — off-by-one fixed (`>` not `>=` month comparison); "Expires Soon" threshold changed from 3 → 6 months; configurable via `?expiry_months=N` query param on `GET /api/inventory` and `GET /api/inventory/analytics`. Frontend setting `expiryReminderMonths` (stored in localStorage, key `expiry_reminder_months`, default 6) is forwarded automatically.
+  - **N+1 query fix** — `get_inventory` replaced with 4 aggregate queries (was 7× per product); `export_inventory` uses a single pre-loop GROUP BY instead of 3 scalar queries per item.
+  - **Duplicate invoice detection** — `save_invoice` compares re-submitted invoices against existing batches: identical rows get an ADJUSTMENT history entry and a warning; qty-diff rows get an adjustment batch; new product rows are added normally. Always returns `warnings[]`. `invoice_date` is set to upload date on new invoices (never from form input).
+  - **Negative batch prevention** — duplicate path and CSV overwrite mode both use FIFO stock reduction instead of creating negative-quantity batches.
+  - **CSV export/import** — 8-column format: ID, Item Name, Pack Size, Category, Min Stock, Quantity, MRP, Expiry Date. No Dosage column; MRP = highest batch MRP; Expiry = earliest active-batch expiry. Import recognises both new and old header names.
+  - **Currency** — `$` → `₹` throughout the inventory table.
+  - **AllChanges tab** — visible to all roles (was doctor-only).
+  - **`alert()` → `toast()`** — all `alert()` calls in `invoice_edit/page.tsx` replaced with `toast.success/warning/error`; duplicate warnings surfaced to the user.
+  - **Admin Settings tab** — new Settings tab in `/admin` with an expiry reminder months control (1–24).
+
 - **Date Filtering:** Replaced two-input date filters with `DatePickerWithRange` (`components/ui/date-range-picker.tsx`) using `react-day-picker`. This single calendar can be used to select both a single date or a range of dates. Used in Inventory "All Changes" and Invoice History tabs.
 - **Invoice History:** Added client-side search (invoice number/vendor) and date range filtering to the `/inventory/history` tab. Additionally, implemented table-column dropdown filters for `Vendor` and `Source`, and a range filter for `Total Amount`. Updated the "Back to Inventory" button with an arrow icon.
 - **Admin Accounts & TOTP Security Overhaul:** Integrated 10-minute JWT grant tokens (`grant_token`) after Step 1 TOTP verification to eliminate 30-second expiry failures. Created hardcoded admin accounts (`saivelapati`, `tejavelapati`) which dynamically authenticate using active 6-digit TOTP codes and auto-provision in the database on-the-fly. Completely removed `email` fields from login/signup forms, generating a mock internal email address under the hood to bypass database uniqueness constraints. Integrated `window.location.href` redirect on successful login for instant state refresh.
@@ -303,4 +315,4 @@ These three strings are passed as props at two call sites and are currently hard
 - **On-Demand Infrastructure Telemetry:** Engineered an asynchronous system probe via `/api/admin/diagnostics` allowing admins to execute disk checks, confirm OCR activation state, recursively scan user media volume consumption, and view live PostgreSQL footprint reports safely on-demand without login lag.
 - **CSV Loader Persistence Fix:** Hotpatched iterative batch flushing logic to instantiate and Stage the parent Invoice entity prior to child record addition, preventing database constraint aborts on active inventory syncs.
 - **Admin Master Deletion System:** Introduced secure `@require_admin` backends handling hard-cascading physical purges of Inventory products, written to intelligently safeguard historic `BillItem` integrity rather than corrupting accounts.
-- **Patient Batch Pipelines:** Duplicated ultra-streamlined import/export engines to Patients module, complete with robust auto-deduplicating ingestion logics (collating on matching Name+Phone strings) and explicit browser triggers.
+- **Patient Batch Pipelines:** Duplicated ultra-streamlined import/export engines to Patients module, complete with robust auto-deduplicating ingestion logics (collating on matching Name+Phone strings) and explicit browser triggers. Field-length validation added (name ≤100, phone ≤20, sex ≤10, reference ≤100) to prevent DB constraint crashes on bad CSV data.
