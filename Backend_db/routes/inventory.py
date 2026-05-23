@@ -345,7 +345,7 @@ def _transform_ocr_result(ocr_result: dict) -> dict:
 
     OCR service returns:
         {
-            "metadata": {"invoice_no": ..., "date": ..., "gst_no": ...},
+            "metadata": {"invoice_no": ..., "date": ..., "gst_no": ..., "vendor_name": ...},
             "line_items": [{"product_name", "batch", "exp", "qty", "mrp",
                             "rate", "free", "mfg", "pack", "hsn", "gst",
                             "amount"}, ...],
@@ -360,7 +360,7 @@ def _transform_ocr_result(ocr_result: dict) -> dict:
             "invoice_number": str,
             "gst_number":     str,
             "total_amount":   str,
-            "vendor_name":    str   (OCR cannot extract this)
+            "vendor_name":    str   (best-effort: first header line before invoice keyword)
         }
 
     Error dicts ({"error": "..."}) are passed through unchanged so the
