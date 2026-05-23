@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
 from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem
-from sqlalchemy import func
+from sqlalchemy import func, case
 import io
 import csv
 import os
@@ -407,6 +407,8 @@ def get_inventory():
     """
     Returns Master ProductMaster Items + Aggregated Stock
     """
+    expiry_months = int(request.args.get('expiry_months', 6))
+    today = get_ist_now().date()
     items = ProductMaster.query.order_by(ProductMaster.item_name.asc()).all()
     results = []
     for item in items:
@@ -441,15 +443,14 @@ def get_inventory():
             
         # Expiry Status
         if earliest_expiry:
-             today = get_ist_now().date()
              is_expired = (today.year > earliest_expiry.year) or \
-                          (today.year == earliest_expiry.year and today.month >= earliest_expiry.month)
-             
+                          (today.year == earliest_expiry.year and today.month > earliest_expiry.month)
+
              if is_expired:
                  status_tags.append('EXPIRED')
              else:
                  months_diff = (earliest_expiry.year - today.year) * 12 + (earliest_expiry.month - today.month)
-                 if months_diff <= 3:
+                 if months_diff <= expiry_months:
                      status_tags.append('EXPIRES SOON')
         
         if not status_tags:
@@ -642,8 +643,9 @@ def get_inventory_analytics():
     out_of_stock = [s for s in raw_stock_list if s['qty'] <= 0]
     low_stock = [s for s in raw_stock_list if s['qty'] > 0]
 
-    # 3. Expiring (Next 120 Days) - Partitioned into Expired vs Expiring Soon
-    expiry_horizon = today + timedelta(days=120)
+    # 3. Expiring (Configurable horizon) - Partitioned into Expired vs Expiring Soon
+    expiry_months = int(request.args.get('expiry_months', 6))
+    expiry_horizon = today + timedelta(days=expiry_months * 30)
     expiring_q = db.session.query(
         ProductMaster.item_name,
         InventoryBatch.expiry_date,
