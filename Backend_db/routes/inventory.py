@@ -1451,6 +1451,10 @@ def save_invoice():
     is_duplicate_invoice = existing is not None
 
     if not existing:
+        products_early = data.get('product_details', [])
+        if not products_early:
+            return jsonify({'error': 'No product details provided'}), 400
+
         source_type = 'MANUAL'
         if image_path:
             source_type = 'OCR'
@@ -1477,7 +1481,7 @@ def save_invoice():
 
             p_mfg    = p.get('mfg', '').strip()
             p_pack   = p.get('packs') or p.get('pack') or ''
-            p_batch  = p.get('batch') or p.get('batch_number') or ''
+            p_batch  = (p.get('batch') or p.get('batch_number') or '').strip() or None
             p_hsn    = p.get('hsn') or p.get('hsn_code') or ''
             p_formula = (p.get('formula') or '').strip()
 
@@ -1485,7 +1489,7 @@ def save_invoice():
                 p_gst = float(str(p.get('gst', 0) or 0))
                 if p_gst >= 100:
                     p_gst = 0.0
-            except:
+            except (ValueError, TypeError):
                 p_gst = 0.0
 
             matched_id = p.get('matched_id')
@@ -1521,30 +1525,35 @@ def save_invoice():
 
             qty = 0
             try: qty = int(float(str(p.get('qty', 0))))
-            except: qty = 0
+            except (ValueError, TypeError): qty = 0
 
             free_qty = 0
             try: free_qty = int(float(str(p.get('free', 0))))
-            except: free_qty = 0
+            except (ValueError, TypeError): free_qty = 0
 
             total_stock_qty = qty + free_qty
 
             mrp = 0.0
             try: mrp = float(str(p.get('mrp', 0)))
-            except: mrp = 0.0
+            except (ValueError, TypeError): mrp = 0.0
 
             rate = 0.0
             try: rate = float(str(p.get('rate', 0)))
-            except: rate = 0.0
+            except (ValueError, TypeError): rate = 0.0
 
             expiry = parse_expiry_date(p.get('expiry'))
 
             if is_duplicate_invoice:
                 # Find existing batch for this product+batch_number under the same invoice
-                existing_batch = InventoryBatch.query.filter_by(
-                    purchase_invoice_number=invoice_no,
-                    product_id=item.id,
-                    batch_number=p_batch,
+                _batch_filter = (
+                    InventoryBatch.batch_number == p_batch
+                    if p_batch is not None
+                    else InventoryBatch.batch_number.is_(None)
+                )
+                existing_batch = InventoryBatch.query.filter(
+                    InventoryBatch.purchase_invoice_number == invoice_no,
+                    InventoryBatch.product_id == item.id,
+                    _batch_filter,
                 ).first()
 
                 if existing_batch:
@@ -1566,12 +1575,32 @@ def save_invoice():
                         )
                         db.session.add(history)
                         warnings.append(f'{p_name}: duplicate entry — skipped (identical)')
+                    elif qty_diff < 0:
+                        # Stock reduction: deduct from existing batch, floor at zero
+                        reduce_by = abs(qty_diff)
+                        existing_batch.quantity = max(0, float(existing_batch.quantity) - reduce_by)
+                        db.session.flush()
+                        history = InventoryHistory(
+                            product_id=item.id,
+                            batch_id=existing_batch.id,
+                            purchase_invoice_number=invoice_no,
+                            change_amount=qty_diff,
+                            type='ADJUSTMENT',
+                            notes=f'Duplicate invoice — qty reduced: {existing_qty:.0f} → {total_stock_qty:.0f}',
+                            user_id=g.current_user.get('user_id'),
+                            username=g.current_user.get('username'),
+                        )
+                        db.session.add(history)
+                        warnings.append(f'{p_name}: qty reduced by {qty_diff:+.0f}')
                     else:
-                        # Difference found — add adjustment batch
+                        # qty_diff > 0: add adjustment batch (positive quantity only)
+                        adj_batch_number = (
+                            f'{p_batch}-ADJ' if p_batch is not None else 'ADJ'
+                        )
                         adj_batch = InventoryBatch(
                             product_id=item.id,
                             purchase_invoice_number=invoice_no,
-                            batch_number=p_batch,
+                            batch_number=adj_batch_number,
                             quantity=qty_diff,
                             initial_quantity=qty_diff,
                             free_quantity=0,
