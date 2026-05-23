@@ -739,6 +739,10 @@ function SettingsTab() {
     const { expiryReminderMonths, setSettings } = useSettings()
     const [localMonths, setLocalMonths] = useState(expiryReminderMonths)
 
+    useEffect(() => {
+        setLocalMonths(expiryReminderMonths)
+    }, [expiryReminderMonths])
+
     const handleSave = () => {
         const val = Math.max(1, Math.min(24, localMonths))
         setSettings({ expiryReminderMonths: val })
@@ -765,7 +769,10 @@ function SettingsTab() {
                             min={1}
                             max={24}
                             value={localMonths}
-                            onChange={e => setLocalMonths(parseInt(e.target.value, 10) || 1)}
+                            onChange={e => {
+                                const n = parseInt(e.target.value, 10)
+                                if (!isNaN(n)) setLocalMonths(n)
+                            }}
                             className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                         <span className="text-sm text-muted-foreground">months (1–24)</span>
