@@ -911,7 +911,10 @@ def update_inventory_item(id):
             changed_fields.append('category')
         item.category = data['category']
     if 'min_stock_level' in data:
-        new_val = int(data['min_stock_level'])
+        try:
+            new_val = int(float(data['min_stock_level']))
+        except (ValueError, TypeError):
+            new_val = item.min_stock_level
         if item.min_stock_level != new_val:
             changed_fields.append('min_stock_level')
         item.min_stock_level = new_val
@@ -1252,12 +1255,16 @@ def import_inventory():
             item = query.first()
 
             if not item:
+                try:
+                    min_stock_val = int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
+                except (ValueError, TypeError):
+                    min_stock_val = 10
                 item = ProductMaster(
                     id=ProductMaster.generate_item_id(),
                     item_name=name.strip(),
                     pack_size=pack_size.strip(),
                     category=get_val(['Category', 'cat']) or '',
-                    min_stock_level=int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
+                    min_stock_level=min_stock_val
                 )
                 db.session.add(item)
                 db.session.flush()
