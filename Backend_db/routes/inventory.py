@@ -1117,42 +1117,47 @@ def search_inventory():
 @inventory.route('/inventory/export', methods=['GET'])
 @require_auth
 def export_inventory():
-    items = ProductMaster.query.all()
-
     output = io.StringIO()
     writer = csv.writer(output)
 
-    writer.writerow(['ID', 'Item Name', 'Pack Size', 'Category', 'Min Stock', 'Quantity', 'MRP', 'Expiry Date'])
+    writer.writerow([
+        'Product ID', 'Item Name', 'Pack Size', 'Category', 'HSN Code',
+        'Min Stock', 'Manufacturer', 'Product GST Rate', 'Generic Tags', 'Formula',
+        'Batch Number', 'Expiry Date', 'MRP', 'Purchase Rate',
+        'Batch GST Rate', 'GST Amount', 'Quantity', 'Initial Quantity', 'Free Quantity',
+    ])
 
-    batch_agg_rows = db.session.query(
-        InventoryBatch.product_id,
-        func.sum(
-            case((InventoryBatch.quantity > 0, InventoryBatch.quantity), else_=0)
-        ).label('total_qty'),
-        func.max(InventoryBatch.mrp).label('max_mrp'),
-        func.min(
-            case((InventoryBatch.quantity > 0, InventoryBatch.expiry_date), else_=None)
-        ).label('earliest_expiry'),
-    ).group_by(InventoryBatch.product_id).all()
+    products = ProductMaster.query.order_by(ProductMaster.item_name).all()
 
-    batch_agg = {row.product_id: row for row in batch_agg_rows}
-
-    for item in items:
-        agg = batch_agg.get(item.id)
-        total_qty = float(agg.total_qty or 0) if agg else 0
-        max_mrp = float(agg.max_mrp or 0.0) if agg else 0.0
-        earliest_expiry = agg.earliest_expiry if agg else None
-
-        writer.writerow([
-            item.id,
-            item.item_name,
-            item.pack_size or '',
-            item.category or '',
-            item.min_stock_level,
-            int(total_qty),
-            f"{float(max_mrp):.2f}",
-            earliest_expiry.strftime('%m/%y') if earliest_expiry else '',
-        ])
+    for product in products:
+        batches = InventoryBatch.query.filter_by(product_id=product.id).order_by(InventoryBatch.expiry_date.asc()).all()
+        product_row = [
+            product.id,
+            product.item_name,
+            product.pack_size or '',
+            product.category or '',
+            product.hsn_code or '',
+            product.min_stock_level,
+            product.manufacturer or '',
+            f"{float(product.gst_rate or 0):.2f}",
+            product.generic_tags or '',
+            product.formula or '',
+        ]
+        if batches:
+            for batch in batches:
+                writer.writerow(product_row + [
+                    batch.batch_number or '',
+                    batch.expiry_date.strftime('%m/%y') if batch.expiry_date else '',
+                    f"{float(batch.mrp or 0):.2f}",
+                    f"{float(batch.purchase_rate or 0):.2f}",
+                    f"{float(batch.gst_rate or 0):.2f}",
+                    f"{float(batch.gst_amount or 0):.2f}",
+                    int(batch.quantity or 0),
+                    int(batch.initial_quantity or 0),
+                    int(batch.free_quantity or 0),
+                ])
+        else:
+            writer.writerow(product_row + ['', '', '', '', '', '', '', '', ''])
 
     output.seek(0)
 
@@ -1247,34 +1252,58 @@ def import_inventory():
                 continue
 
             pack_size = get_val(['Pack Size', 'pack', 'packs', 'Pack']) or ''
+            product_id_csv = (get_val(['Product ID']) or '').strip()
 
-            query = ProductMaster.query.filter(func.lower(ProductMaster.item_name) == name.strip().lower())
-            if pack_size:
-                query = query.filter(ProductMaster.pack_size == pack_size.strip())
+            # Product lookup: by ID first (if provided), then by name+pack
+            if product_id_csv:
+                item = ProductMaster.query.get(product_id_csv)
+            else:
+                name_q = ProductMaster.query.filter(func.lower(ProductMaster.item_name) == name.strip().lower())
+                if pack_size:
+                    name_q = name_q.filter(ProductMaster.pack_size == pack_size.strip())
+                item = name_q.first()
 
-            item = query.first()
+            try:
+                min_stock_val = int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
+            except (ValueError, TypeError):
+                min_stock_val = 10
 
             if not item:
-                try:
-                    min_stock_val = int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
-                except (ValueError, TypeError):
-                    min_stock_val = 10
+                new_id = product_id_csv if product_id_csv else ProductMaster.generate_item_id()
                 item = ProductMaster(
-                    id=ProductMaster.generate_item_id(),
+                    id=new_id,
                     item_name=name.strip(),
                     pack_size=pack_size.strip(),
                     category=get_val(['Category', 'cat']) or '',
-                    min_stock_level=min_stock_val
+                    min_stock_level=min_stock_val,
+                    manufacturer=get_val(['Manufacturer', 'mfg', 'manufacturer']) or '',
+                    hsn_code=get_val(['HSN Code', 'hsn']) or '',
+                    generic_tags=get_val(['Generic Tags', 'tags']) or '',
+                    formula=get_val(['Formula', 'formula']) or '',
                 )
+                try:
+                    item.gst_rate = float(str(get_val(['Product GST Rate', 'Product GST', 'gst_rate']) or '0').replace('%', ''))
+                except (ValueError, TypeError):
+                    pass
                 db.session.add(item)
                 db.session.flush()
             else:
+                # Update product master fields if provided in CSV
                 cat = get_val(['Category', 'cat'])
                 if cat: item.category = cat
-                min_s = get_val(['Min Stock', 'min'])
-                if min_s:
+                if min_stock_val: item.min_stock_level = min_stock_val
+                mfg = get_val(['Manufacturer', 'mfg', 'manufacturer'])
+                if mfg: item.manufacturer = mfg
+                hsn = get_val(['HSN Code', 'hsn'])
+                if hsn: item.hsn_code = hsn
+                tags = get_val(['Generic Tags', 'tags'])
+                if tags: item.generic_tags = tags
+                formula = get_val(['Formula', 'formula'])
+                if formula: item.formula = formula
+                pgst = get_val(['Product GST Rate', 'Product GST', 'gst_rate'])
+                if pgst:
                     try:
-                        item.min_stock_level = int(float(min_s))
+                        item.gst_rate = float(str(pgst).replace('%', ''))
                     except (ValueError, TypeError):
                         pass
 
@@ -1293,27 +1322,73 @@ def import_inventory():
             except (ValueError, TypeError):
                 mrp = 0.0
 
-            # Purchase rate: not in new export but keep reading if present in old CSVs
             rate_str = get_val(['Purchase Rate', 'rate', 'Avg Purchase Rate']) or '0'
             try:
                 rate = float(rate_str)
             except (ValueError, TypeError):
                 rate = 0.0
 
-            gst_str = get_val(['GST', 'tax', 'GST Rate']) or '0'
+            gst_str = get_val(['Batch GST Rate', 'GST', 'tax', 'GST Rate']) or '0'
             try:
                 gst_rate = float(str(gst_str).replace('%', ''))
             except (ValueError, TypeError):
                 gst_rate = 0.0
 
-            batch_num = get_val(['Batch', 'batch no', 'Batch Number', 'Batch No']) or ''
+            batch_num = get_val(['Batch Number', 'Batch', 'batch no', 'Batch No']) or ''
 
             exp_str = get_val(['Expiry Date', 'Expiry', 'exp', 'Earliest Expiry'])
             expiry_date = parse_expiry_date(exp_str)
+
+            try:
+                initial_qty = int(float(get_val(['Initial Quantity', 'initial_qty']) or qty))
+            except (ValueError, TypeError):
+                initial_qty = qty
+
+            try:
+                free_qty = int(float(get_val(['Free Quantity', 'free_qty']) or 0))
+            except (ValueError, TypeError):
+                free_qty = 0
             
-            if mode == 'overwrite':
-                # Fix 4: flush pending session mutations before the aggregate query
-                # so that a product appearing twice in the CSV sees the updated qty.
+            # Try to find an existing batch to update in place (match by batch_number + expiry_date)
+            existing_batch = None
+            if batch_num and expiry_date:
+                existing_batch = InventoryBatch.query.filter_by(
+                    product_id=item.id,
+                    batch_number=batch_num,
+                    expiry_date=expiry_date,
+                ).first()
+            elif batch_num:
+                existing_batch = InventoryBatch.query.filter_by(
+                    product_id=item.id,
+                    batch_number=batch_num,
+                ).first()
+
+            if existing_batch:
+                # Update batch-level fields in place
+                existing_batch.mrp = mrp
+                existing_batch.purchase_rate = rate
+                existing_batch.gst_rate = gst_rate
+                if expiry_date:
+                    existing_batch.expiry_date = expiry_date
+
+                diff = qty - float(existing_batch.quantity)
+                if abs(diff) >= 0.01:
+                    existing_batch.quantity = qty
+                    hist = InventoryHistory(
+                        product_id=item.id,
+                        batch_id=existing_batch.id,
+                        change_amount=diff,
+                        type='ADJUSTMENT',
+                        notes=f'CSV Import {mode.capitalize()} — batch update',
+                        purchase_invoice_number=import_id,
+                        user_id=g.current_user.get('user_id'),
+                        username=g.current_user.get('username'),
+                    )
+                    db.session.add(hist)
+                    total_import_value += abs(diff) * mrp
+
+            elif mode == 'overwrite':
+                # No matching batch found — diff against total product qty
                 db.session.flush()
                 current_qty = float(db.session.query(func.sum(InventoryBatch.quantity)).filter(InventoryBatch.product_id == item.id).scalar() or 0)
                 diff = qty - current_qty
@@ -1321,11 +1396,10 @@ def import_inventory():
                 if abs(diff) < 0.01:
                     pass  # no change needed
                 elif diff > 0:
-                    # Add stock
                     batch = InventoryBatch(
                         product_id=item.id,
                         quantity=diff,
-                        initial_quantity=diff,  # Fix 2: snapshot initial qty
+                        initial_quantity=diff,
                         mrp=mrp,
                         purchase_rate=rate,
                         gst_rate=gst_rate,
@@ -1335,7 +1409,6 @@ def import_inventory():
                     )
                     db.session.add(batch)
                     db.session.flush()
-
                     hist = InventoryHistory(
                         product_id=item.id,
                         batch_id=batch.id,
@@ -1343,13 +1416,12 @@ def import_inventory():
                         type='ADJUSTMENT',
                         notes='CSV Import Overwrite — stock increase',
                         purchase_invoice_number=import_id,
-                        user_id=g.current_user.get('user_id'),   # Fix 5
-                        username=g.current_user.get('username'),  # Fix 5
+                        user_id=g.current_user.get('user_id'),
+                        username=g.current_user.get('username'),
                     )
                     db.session.add(hist)
-                    total_import_value += diff * mrp  # Fix 3: accumulate overwrite increases
+                    total_import_value += diff * mrp
                 else:
-                    # Reduce stock FIFO — never create negative batches
                     to_reduce = abs(diff)
                     fifo_batches = InventoryBatch.query.filter(
                         InventoryBatch.product_id == item.id,
@@ -1363,7 +1435,6 @@ def import_inventory():
                         fb.quantity = float(fb.quantity) - take
                         to_reduce -= take
 
-                    # Fix 1: warn if FIFO couldn't satisfy the full reduction
                     if to_reduce > 0.01:
                         warnings_list.append(
                             f"{name}: insufficient stock — could only reduce by "
@@ -1377,17 +1448,18 @@ def import_inventory():
                         type='ADJUSTMENT',
                         notes='CSV Import Overwrite — stock reduction (FIFO)',
                         purchase_invoice_number=import_id,
-                        user_id=g.current_user.get('user_id'),   # Fix 5
-                        username=g.current_user.get('username'),  # Fix 5
+                        user_id=g.current_user.get('user_id'),
+                        username=g.current_user.get('username'),
                     )
                     db.session.add(hist)
-            
+
             elif mode == 'update':
+                # No matching batch — create a new one
                 batch = InventoryBatch(
                     product_id=item.id,
                     quantity=qty,
-                    initial_quantity=qty,
-                    free_quantity=0,
+                    initial_quantity=initial_qty,
+                    free_quantity=free_qty,
                     mrp=mrp,
                     purchase_rate=rate,
                     gst_rate=gst_rate,
@@ -1396,11 +1468,8 @@ def import_inventory():
                     batch_number=batch_num
                 )
                 db.session.add(batch)
-                
                 total_import_value += (qty * mrp)
-                
                 db.session.flush()
-                
                 hist = InventoryHistory(
                     product_id=item.id,
                     batch_id=batch.id,
