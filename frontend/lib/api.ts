@@ -56,6 +56,7 @@ export interface InventoryItem {
     min_price?: number;
     max_price?: number;
     min_stock_level: number;
+    min_stock_override: boolean;
     total_value: number;
     manufacturer?: string;
     vendors?: string[];
@@ -248,6 +249,13 @@ export const api = {
         });
     },
 
+    async applyDefaultMinStock(value: number): Promise<{ updated: number }> {
+        return fetchApi('/api/inventory/products/apply_default_min_stock', {
+            method: 'PATCH',
+            body: JSON.stringify({ default_min_stock: value }),
+        });
+    },
+
     async wipeInventory(totpCode: string): Promise<{ message: string }> {
         return fetchApi('/api/admin/inventory/wipe', {
             method: 'DELETE',
@@ -307,6 +315,7 @@ export const api = {
         mode: 'update' | 'overwrite',
         fieldMapping?: Record<string, string>,
         clinicMapping?: Record<string, number>,
+        defaultMinStock?: number,
     ) {
         const formData = new FormData()
         formData.append('file', file)
@@ -317,7 +326,8 @@ export const api = {
         if (clinicMapping && Object.keys(clinicMapping).length > 0) {
             formData.append('clinic_mapping', JSON.stringify(clinicMapping))
         }
-        const res = await fetch(`${API_BASE_URL}/api/inventory/import`, {
+        const qs = defaultMinStock ? `?default_min_stock=${defaultMinStock}` : ''
+        const res = await fetch(`${API_BASE_URL}/api/inventory/import${qs}`, {
             method: 'POST',
             body: formData,
             credentials: 'include',

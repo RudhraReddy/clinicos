@@ -31,6 +31,7 @@ interface SettingsContextType {
     referenceDoctor: string
     appFontSize: number
     expiryReminderMonths: number
+    defaultMinStock: number
     defaultInventoryColumns: string[]
     setSettings: (settings: Partial<Omit<SettingsContextType, 'setSettings' | 'setPreviewFontSize'>>) => void
     setPreviewFontSize: (size: number | null) => void
@@ -45,6 +46,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [referenceDoctor, setReferenceDoctor] = useState("")
     const [appFontSize, setAppFontSize] = useState(16)
     const [expiryReminderMonths, setExpiryReminderMonths] = useState(6)
+    const [defaultMinStock, setDefaultMinStock] = useState(10)
     const [defaultInventoryColumns, setDefaultInventoryColumns] = useState<string[]>(DEFAULT_INVENTORY_COLUMNS)
     const [previewFontSize, setPreviewFontSize] = useState<number | null>(null)
 
@@ -57,6 +59,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const storedRefDoc     = localStorage.getItem("clinic_ref_doc")
         const storedFontSize   = localStorage.getItem("clinic_font_size")
         const storedExpiry     = localStorage.getItem("expiry_reminder_months")
+        const storedDefaultMinStock = localStorage.getItem("inventory_default_min_stock")
         const storedCols       = localStorage.getItem("inventory_default_columns")
 
         if (storedName)    setClinicName(storedName)
@@ -70,6 +73,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (storedExpiry) {
             const parsed = parseInt(storedExpiry, 10)
             if (!isNaN(parsed) && parsed >= 1 && parsed <= 24) setExpiryReminderMonths(parsed)
+        }
+        if (storedDefaultMinStock) {
+            const parsed = parseInt(storedDefaultMinStock, 10)
+            if (!isNaN(parsed) && parsed >= 1) setDefaultMinStock(parsed)
         }
         if (storedCols) {
             try {
@@ -108,6 +115,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             setExpiryReminderMonths(settings.expiryReminderMonths)
             localStorage.setItem("expiry_reminder_months", settings.expiryReminderMonths.toString())
         }
+        if (settings.defaultMinStock !== undefined) {
+            setDefaultMinStock(settings.defaultMinStock)
+            localStorage.setItem("inventory_default_min_stock", settings.defaultMinStock.toString())
+        }
         if (settings.defaultInventoryColumns !== undefined) {
             const cols = ['item_name', ...settings.defaultInventoryColumns.filter(c => c !== 'item_name')]
             setDefaultInventoryColumns(cols)
@@ -123,6 +134,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             referenceDoctor,
             appFontSize: currentFontSize,
             expiryReminderMonths,
+            defaultMinStock,
             defaultInventoryColumns,
             setSettings,
             setPreviewFontSize
