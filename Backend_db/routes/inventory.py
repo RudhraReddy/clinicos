@@ -1631,7 +1631,11 @@ def import_inventory():
             except (ValueError, TypeError):
                 qty = 0
 
-            if qty <= 0 and mode == 'update':
+            # Skip zero-qty rows in update mode ONLY if the CSV actually has a Quantity column.
+            # If there is no Quantity column (e.g. Edit Inventory format without clinic cols),
+            # still process the row so MRP/Expiry can be written to existing batches.
+            has_qty_col = any('quantity' in (k or '').lower() for k in (csv_input.fieldnames or []))
+            if qty <= 0 and mode == 'update' and has_qty_col:
                 continue
 
             mrp_str = get_val(['MRP', 'price', 'Max MRP']) or '0'

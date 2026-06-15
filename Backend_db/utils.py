@@ -24,14 +24,13 @@ def generate_visit_id(patient_id):
 
 def parse_expiry_date(date_str):
     if not date_str: return None
-    date_str = date_str.strip().replace('.', '/').replace('-', '/')
+    date_str = date_str.strip().replace(' ', '').replace('.', '/').replace('-', '/')
     
-    # Try Month/Year formats first (default to 10th)
+    # MM/YY or MM/YYYY — default to 1st of the month
     for fmt in ['%m/%y', '%m/%Y']:
         try:
             dt = datetime.strptime(date_str, fmt)
-            # User request: Default to 10th of the month
-            return dt.replace(day=10).date()
+            return dt.replace(day=1).date()
         except ValueError:
             continue
 
