@@ -23,13 +23,21 @@ class Patient(db.Model):
 
 # --- New Inventory System ---
 
+class Location(db.Model):
+    __tablename__ = 'locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+
 class PurchaseInvoice(db.Model):
     """
     Tracks the source of inventory.
     Unique constraint on invoice_number.
     """
     __tablename__ = 'purchase_invoices'
-    
+
     invoice_number = db.Column(db.String(50), primary_key=True) # User/OCR provided unique ID
     gst_number = db.Column(db.String(50))
     total_amount = db.Column(db.Numeric(10, 2))
@@ -41,14 +49,6 @@ class PurchaseInvoice(db.Model):
     location = db.Column(db.String(50), nullable=True, default='Main') # For Dimensionality
     created_by_user_id = db.Column(db.String(36), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
-
-class Location(db.Model):
-    __tablename__ = 'locations'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=get_ist_now)
 
 class ProductMaster(db.Model):
     """
