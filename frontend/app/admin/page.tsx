@@ -756,17 +756,34 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
-    const { expiryReminderMonths, defaultInventoryColumns, setSettings } = useSettings()
+    const { expiryReminderMonths, defaultInventoryColumns, defaultMinStock, setSettings } = useSettings()
     const [localMonths, setLocalMonths] = useState(expiryReminderMonths)
 
     useEffect(() => {
         setLocalMonths(expiryReminderMonths)
     }, [expiryReminderMonths])
 
+    const [localDefaultMinStock, setLocalDefaultMinStock] = useState(defaultMinStock)
+
+    useEffect(() => {
+        setLocalDefaultMinStock(defaultMinStock)
+    }, [defaultMinStock])
+
     const handleSave = () => {
         const val = Math.max(1, Math.min(24, localMonths))
         setSettings({ expiryReminderMonths: val })
         toast.success(`Expiry reminder set to ${val} months`)
+    }
+
+    const handleSaveDefaultMinStock = async () => {
+        const val = Math.max(1, Math.min(9999, localDefaultMinStock))
+        setSettings({ defaultMinStock: val })
+        try {
+            const result = await api.applyDefaultMinStock(val)
+            toast.success(`Default updated — ${result.updated} product${result.updated !== 1 ? 's' : ''} synced`)
+        } catch {
+            toast.error('Failed to sync products')
+        }
     }
 
     // ── Default columns state ──
@@ -896,6 +913,31 @@ function SettingsTab() {
                     </div>
                 </div>
                 <Button size="sm" onClick={handleSave}>Save Settings</Button>
+            </div>
+
+            {/* ── Default Min Stock ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+                <div className="space-y-1">
+                    <label className="text-sm font-medium">Default Min Stock Level</label>
+                    <p className="text-xs text-muted-foreground">
+                        Products without a custom min stock will use this value. Saving updates all such products automatically.
+                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                        <input
+                            type="number"
+                            min={1}
+                            max={9999}
+                            value={localDefaultMinStock}
+                            onChange={e => {
+                                const n = parseInt(e.target.value, 10)
+                                if (!isNaN(n)) setLocalDefaultMinStock(n)
+                            }}
+                            className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <span className="text-sm text-muted-foreground">units (1–9999)</span>
+                    </div>
+                </div>
+                <Button size="sm" onClick={handleSaveDefaultMinStock}>Save</Button>
             </div>
 
             {/* ── Inventory Default Columns ── */}
