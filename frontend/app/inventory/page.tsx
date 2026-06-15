@@ -13,7 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react"
+import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
@@ -309,6 +309,27 @@ export default function InventoryPage() {
     const [activeLocationId, setActiveLocationId] = useState<number | 'all'>('all')
     const [exportDialogOpen, setExportDialogOpen] = useState(false)
     const [exportScope, setExportScope] = useState<string>('all')
+    const [wipeDialogOpen, setWipeDialogOpen] = useState(false)
+    const [wipeCode, setWipeCode] = useState('')
+    const [wipeLoading, setWipeLoading] = useState(false)
+    const [wipeError, setWipeError] = useState<string | null>(null)
+
+    const handleWipeInventory = async () => {
+        if (!wipeCode.trim()) return
+        setWipeLoading(true)
+        setWipeError(null)
+        try {
+            const res = await api.wipeInventory(wipeCode.trim())
+            setWipeDialogOpen(false)
+            setWipeCode('')
+            toast.success(res.message)
+            loadData()
+        } catch (err: unknown) {
+            setWipeError(err instanceof Error ? err.message : 'Failed to wipe inventory')
+        } finally {
+            setWipeLoading(false)
+        }
+    }
 
     const openHistory = async (item: InventoryItem) => {
         setHistoryItem(item)
@@ -522,6 +543,17 @@ export default function InventoryPage() {
                             <Upload className="h-4 w-4" />
                         </Button>
                     } onSuccess={loadData} />
+                    {role === 'admin' && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Wipe Inventory"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                            onClick={() => { setWipeDialogOpen(true); setWipeCode(''); setWipeError(null) }}
+                        >
+                            <ShieldAlert className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -1076,6 +1108,68 @@ export default function InventoryPage() {
                                 </Button>
                             </div>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Wipe Inventory Dialog */}
+            <Dialog open={wipeDialogOpen} onOpenChange={(v) => { setWipeDialogOpen(v); if (!v) { setWipeCode(''); setWipeError(null) } }}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-rose-600">
+                            <ShieldAlert className="h-5 w-5" />
+                            Wipe Entire Inventory
+                        </DialogTitle>
+                        <DialogDescription>
+                            This permanently deletes <strong>all stock batches and movement history</strong>.
+                            Product names and billing records are preserved.
+                            This cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 p-3 text-sm text-rose-700 dark:text-rose-400 space-y-1">
+                            <p className="font-semibold">What will be deleted:</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-xs">
+                                <li>All inventory batches (all stock quantities reset to zero)</li>
+                                <li>All inventory movement history</li>
+                            </ul>
+                            <p className="font-semibold mt-2">What is kept:</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-xs">
+                                <li>Product master catalog (names, categories, etc.)</li>
+                                <li>Purchase invoices and billing records</li>
+                            </ul>
+                        </div>
+                        {wipeError && (
+                            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {wipeError}
+                            </div>
+                        )}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Enter your 6-digit admin auth code to confirm</label>
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                placeholder="000000"
+                                value={wipeCode}
+                                onChange={e => setWipeCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                onKeyDown={e => { if (e.key === 'Enter' && wipeCode.length === 6) handleWipeInventory() }}
+                                className="text-center text-2xl tracking-widest font-mono h-12"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setWipeDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleWipeInventory}
+                            disabled={wipeCode.length !== 6 || wipeLoading}
+                        >
+                            {wipeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Wipe Inventory
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

@@ -6,8 +6,8 @@ from flask import Blueprint, g, jsonify, request
 from sqlalchemy import func, text
 
 from extensions import db, get_ist_now
-from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient, Location
-from routes.auth import require_admin, require_auth
+from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient, Location, InventoryBatch, InventoryHistory
+from routes.auth import require_admin, require_auth, _verify_totp
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -289,3 +289,45 @@ def admin_diagnostics():
         },
         'timestamp': get_ist_now().isoformat()
     }), 200
+
+
+@admin_bp.route('/admin/inventory/wipe', methods=['DELETE'])
+@require_auth
+@require_admin
+def wipe_inventory():
+    data = request.get_json(silent=True) or {}
+    totp_code = (data.get('totp_code') or '').strip()
+
+    if not totp_code:
+        return jsonify({'error': 'Auth code is required'}), 400
+
+    if not _verify_totp(totp_code):
+        return jsonify({'error': 'Invalid or expired auth code'}), 401
+
+    try:
+        history_count = InventoryHistory.query.count()
+        batch_count = InventoryBatch.query.count()
+
+        InventoryHistory.query.delete(synchronize_session=False)
+        InventoryBatch.query.delete(synchronize_session=False)
+        db.session.commit()
+
+        from routes.auth import log_activity
+        log_activity(
+            action='DELETE',
+            resource_type='inventory',
+            resource_id='ALL',
+            resource_label='FULL INVENTORY WIPE',
+            details=f'Wiped {batch_count} batches and {history_count} history entries',
+            user_id=g.current_user.get('user_id'),
+            username=g.current_user.get('username'),
+            ip_address=request.remote_addr,
+        )
+
+        return jsonify({
+            'message': f'Inventory wiped — {batch_count} batches and {history_count} history records deleted.',
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

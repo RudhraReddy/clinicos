@@ -248,6 +248,14 @@ export const api = {
         });
     },
 
+    async wipeInventory(totpCode: string): Promise<{ message: string }> {
+        return fetchApi('/api/admin/inventory/wipe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ totp_code: totpCode }),
+        });
+    },
+
     async updateInventoryBatch(id: number, data: { expiry_date?: string, quantity?: number, mrp?: number, purchase_rate?: number }): Promise<void> {
         return fetchApi(`/api/inventory/batch/${id}`, {
             method: 'PUT',
