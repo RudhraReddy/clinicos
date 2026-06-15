@@ -959,6 +959,7 @@ def update_inventory_item(id):
             item.min_stock_override = False
         else:
             item.min_stock_override = True
+            changed_fields.append('min_stock_override')
     elif 'min_stock_override' in data and data['min_stock_override'] is False:
         # Allow resetting to default without changing the value
         item.min_stock_override = False
@@ -1030,6 +1031,15 @@ def apply_default_min_stock():
         synchronize_session=False,
     )
     db.session.commit()
+    log_activity(
+        action='UPDATE',
+        resource_type='inventory_product',
+        resource_id='BULK',
+        resource_label=f'Default min stock set to {default_val} ({updated} products)',
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
     return jsonify({'updated': updated}), 200
 
 @inventory.route('/inventory/<string:id>', methods=['DELETE'])
