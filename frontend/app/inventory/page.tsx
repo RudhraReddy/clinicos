@@ -33,7 +33,7 @@ import Link from 'next/link'
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
-import { useSettings } from "@/lib/settings_context"
+import { useSettings, ALL_INVENTORY_COLUMNS } from "@/lib/settings_context"
 import { toast } from "sonner"
 
 const getDisplayQuantity = (quantity: number, pack_size?: string) => {
@@ -268,7 +268,7 @@ function AllChangesPanel() {
 }
 
 export default function InventoryPage() {
-    const { appFontSize, expiryReminderMonths } = useSettings()
+    const { appFontSize, expiryReminderMonths, defaultInventoryColumns } = useSettings()
     const { role } = useAuth()
     const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -476,51 +476,30 @@ export default function InventoryPage() {
             matchesPack && matchesGST && matchesHSN && matchesFormula && matchesMinStock
     })
 
-    // Column Visibility State
-    const defaultColumns = ['item_name', 'manufacturer', 'vendor', 'pack_size', 'quantity', 'price', 'formula', 'expiry_date', 'status']
-    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(defaultColumns))
+    // Column Visibility — starts from admin-configured defaults, adjusts for large font
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(defaultInventoryColumns))
 
     useEffect(() => {
         if (appFontSize > 16) {
             setVisibleColumns(prev => {
                 const next = new Set(prev)
-                const toRemove = ['id', 'manufacturer', 'vendor', 'pack_size', 'price', 'expiry_date', 'category', 'hsn_code', 'gst_rate', 'formula', 'min_stock_level', 'total_value']
+                const toRemove = ['id', 'manufacturer', 'vendor', 'pack_size', 'price', 'expiry_date', 'category', 'hsn_code', 'gst_rate', 'min_stock_level', 'total_value']
                 toRemove.forEach(c => next.delete(c))
                 return next
             })
         } else {
-            setVisibleColumns(new Set(defaultColumns))
+            setVisibleColumns(new Set(defaultInventoryColumns))
         }
-    }, [appFontSize])
+    }, [appFontSize, defaultInventoryColumns])
 
     const toggleColumn = (col: string) => {
         const newSet = new Set(visibleColumns)
-        if (newSet.has(col)) {
-            newSet.delete(col)
-        } else {
-            newSet.add(col)
-        }
+        newSet.has(col) ? newSet.delete(col) : newSet.add(col)
         setVisibleColumns(newSet)
     }
 
-    // Column Definitions for Toggle
-    const allColumns = [
-        { id: 'id', label: 'ID' },
-        { id: 'item_name', label: 'Item Name' },
-        { id: 'manufacturer', label: 'MFG' },
-        { id: 'vendor', label: 'Vendor' },
-        { id: 'pack_size', label: 'Pack' },
-        { id: 'quantity', label: 'Qty' },
-        { id: 'price', label: 'MRP' },
-        { id: 'expiry_date', label: 'Next Expiry' },
-        { id: 'status', label: 'Status' },
-        { id: 'category', label: 'Category' },
-        { id: 'hsn_code', label: 'HSN' },
-        { id: 'gst_rate', label: 'GST %' },
-        { id: 'formula', label: 'Formula' },
-        { id: 'min_stock_level', label: 'Min Stock' },
-        { id: 'total_value', label: 'Total Value' },
-    ]
+    // Column definitions come from settings_context so they stay in sync with admin config
+    const allColumns = ALL_INVENTORY_COLUMNS
 
     const lowCount = inventory.filter(i => i.status.includes("LOW STOCK")).length
     const outCount = inventory.filter(i => i.status.includes("OUT OF STOCK")).length
@@ -804,14 +783,6 @@ export default function InventoryPage() {
                                                 onChange={setFilterHSN}
                                             />
                                         </TableHead>}
-                                        {visibleColumns.has('formula') && <TableHead>
-                                            <DataTableColumnFilter
-                                                title="Formula"
-                                                options={optionsFormula}
-                                                selectedValues={filterFormula}
-                                                onChange={setFilterFormula}
-                                            />
-                                        </TableHead>}
                                         {visibleColumns.has('min_stock_level') && <TableHead>
                                             <DataTableRangeFilter
                                                 title="Min Stock"
@@ -887,7 +858,14 @@ export default function InventoryPage() {
                                                 {visibleColumns.has('id') && <TableCell className="font-medium font-mono text-xs text-muted-foreground">
                                                     {item.id}
                                                 </TableCell>}
-                                                {visibleColumns.has('item_name') && <TableCell className="font-semibold">{item.item_name}</TableCell>}
+                                                {visibleColumns.has('item_name') && (
+                                                    <TableCell>
+                                                        <div className="font-semibold">{item.item_name}</div>
+                                                        {item.formula && (
+                                                            <div className="text-xs text-muted-foreground mt-0.5 italic">{item.formula}</div>
+                                                        )}
+                                                    </TableCell>
+                                                )}
                                                 {visibleColumns.has('manufacturer') && <TableCell className="text-sm text-muted-foreground">{item.manufacturer || '-'}</TableCell>}
                                                 {visibleColumns.has('vendor') && <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate" title={item.vendors?.join(', ')}>
                                                     {item.vendors?.slice(0, 2).join(', ')}{item.vendors && item.vendors.length > 2 ? '...' : ''}
@@ -907,7 +885,6 @@ export default function InventoryPage() {
                                                 </TableCell>}
                                                 {visibleColumns.has('category') && <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>}
                                                 {visibleColumns.has('hsn_code') && <TableCell className="text-muted-foreground text-xs">{item.hsn_code || '-'}</TableCell>}
-                                                {visibleColumns.has('formula') && <TableCell className="text-muted-foreground text-xs">{item.formula || '-'}</TableCell>}
                                                 {visibleColumns.has('min_stock_level') && <TableCell className="text-muted-foreground text-xs">{item.min_stock_level}</TableCell>}
                                                 {visibleColumns.has('expiry_date') && <TableCell>{item.expiry_date}</TableCell>}
                                                 {visibleColumns.has('status') && <TableCell>

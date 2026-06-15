@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth_context"
-import { useSettings } from "@/lib/settings_context"
+import { useSettings, ALL_INVENTORY_COLUMNS, DEFAULT_INVENTORY_COLUMNS } from "@/lib/settings_context"
 import { useRouter } from "next/navigation"
 import {
   api, getAdminStats, getAdminUsers, updateAdminUser, getActivityLog, getSystemDiagnostics,
@@ -756,7 +756,7 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
-    const { expiryReminderMonths, setSettings } = useSettings()
+    const { expiryReminderMonths, defaultInventoryColumns, setSettings } = useSettings()
     const [localMonths, setLocalMonths] = useState(expiryReminderMonths)
 
     useEffect(() => {
@@ -767,6 +767,30 @@ function SettingsTab() {
         const val = Math.max(1, Math.min(24, localMonths))
         setSettings({ expiryReminderMonths: val })
         toast.success(`Expiry reminder set to ${val} months`)
+    }
+
+    // ── Default columns state ──
+    const [localCols, setLocalCols] = useState<Set<string>>(new Set(defaultInventoryColumns))
+    useEffect(() => { setLocalCols(new Set(defaultInventoryColumns)) }, [defaultInventoryColumns])
+
+    const toggleCol = (id: string) => {
+        if (id === 'item_name') return // always required
+        setLocalCols(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+        })
+    }
+
+    const handleSaveCols = () => {
+        setSettings({ defaultInventoryColumns: Array.from(localCols) })
+        toast.success('Default columns saved')
+    }
+
+    const handleResetCols = () => {
+        setLocalCols(new Set(DEFAULT_INVENTORY_COLUMNS))
+        setSettings({ defaultInventoryColumns: DEFAULT_INVENTORY_COLUMNS })
+        toast.success('Columns reset to defaults')
     }
 
     // ── Locations state ──
@@ -872,6 +896,38 @@ function SettingsTab() {
                     </div>
                 </div>
                 <Button size="sm" onClick={handleSave}>Save Settings</Button>
+            </div>
+
+            {/* ── Inventory Default Columns ── */}
+            <div>
+                <h2 className="text-lg font-semibold mb-1">Inventory Default Columns</h2>
+                <p className="text-sm text-muted-foreground">
+                    Choose which columns are shown by default in the inventory table. Users can still toggle columns per-session.
+                </p>
+            </div>
+            <div className="rounded-lg border p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                    {ALL_INVENTORY_COLUMNS.map(col => (
+                        <label
+                            key={col.id}
+                            className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={localCols.has(col.id)}
+                                onChange={() => toggleCol(col.id)}
+                                disabled={col.required}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="font-medium leading-none">{col.label}</span>
+                            {col.required && <span className="text-xs text-muted-foreground">(always on)</span>}
+                        </label>
+                    ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={handleSaveCols}>Save Defaults</Button>
+                    <Button size="sm" variant="ghost" onClick={handleResetCols}>Reset</Button>
+                </div>
             </div>
 
             {/* ── Locations ── */}
