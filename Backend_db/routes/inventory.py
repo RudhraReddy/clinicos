@@ -452,9 +452,13 @@ def get_inventory():
     }
 
     # ── Query 2: current MRP = first active batch FIFO per product ─────────
+    # Only considers batches that have an actual price (mrp > 0).
+    # Zero-MRP batches (old unpriced stock) are skipped so they don't shadow
+    # newer properly-priced batches. Falls back to max_mrp if nothing priced exists.
     batch_q2_filters = [
         InventoryBatch.product_id.in_(product_ids),
         InventoryBatch.quantity > 0,
+        InventoryBatch.mrp > 0,
     ]
     if filter_location_id is not None:
         batch_q2_filters.append(InventoryBatch.location_id == filter_location_id)
