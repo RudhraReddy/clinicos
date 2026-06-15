@@ -1302,7 +1302,7 @@ def export_inventory_edit():
             product.formula or '',
             product.category or '',
             product.manufacturer or '',
-            product.min_stock_level,
+            product.min_stock_level if product.min_stock_level is not None else '',
             mrp_str,
             expiry_str,
         ] + loc_qtys)
@@ -1495,7 +1495,11 @@ def import_inventory():
             if raw_min_stock is not None and str(raw_min_stock).strip() != '':
                 try:
                     min_stock_val = int(float(raw_min_stock))
-                    min_stock_is_custom = True
+                    if min_stock_val < 1:
+                        min_stock_val = default_min_stock
+                        min_stock_is_custom = False
+                    else:
+                        min_stock_is_custom = True
                 except (ValueError, TypeError):
                     min_stock_val = default_min_stock
                     min_stock_is_custom = False
