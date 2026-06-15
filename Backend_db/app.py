@@ -48,6 +48,10 @@ def _apply_migrations(db):
         "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id)",
         "ALTER TABLE expense_ledger ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id)",
         "ALTER TABLE inventory_batches ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id)",
+        # 2026-06-15: min_stock_override flag for default vs custom min stock tracking
+        "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS min_stock_override BOOLEAN DEFAULT FALSE",
+        "UPDATE product_master SET min_stock_override = TRUE WHERE min_stock_level != 10",
+        "UPDATE product_master SET min_stock_override = FALSE WHERE min_stock_level = 10",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
