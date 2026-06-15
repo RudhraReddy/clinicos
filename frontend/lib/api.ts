@@ -221,9 +221,12 @@ export const api = {
     },
 
     // Inventory APIs
-    async getInventory(expiryMonths?: number): Promise<InventoryItem[]> {
-        const qs = expiryMonths ? `?expiry_months=${expiryMonths}` : '';
-        return fetchApi(`/api/inventory${qs}`);
+    async getInventory(expiryMonths?: number, locationId?: number): Promise<InventoryItem[]> {
+        const params = new URLSearchParams()
+        if (expiryMonths) params.set('expiry_months', expiryMonths.toString())
+        if (locationId) params.set('location_id', locationId.toString())
+        const qs = params.toString() ? `?${params}` : ''
+        return fetchApi(`/api/inventory${qs}`)
     },
 
     async getInventoryBatches(id: string): Promise<InventoryBatch[]> {
@@ -291,25 +294,57 @@ export const api = {
         return fetchApi(`/api/inventory_analytics${qs}`);
     },
 
-    async exportInventory() {
-        // Trigger download directly
+    exportInventory() {
         window.location.href = `${API_BASE_URL}/api/inventory/export`
     },
+    exportInventoryEdit(scope: string) {
+        window.location.href = `${API_BASE_URL}/api/inventory/export/edit?scope=${encodeURIComponent(scope)}`
+    },
 
-    async importInventory(file: File, mode: 'update' | 'overwrite') {
+    async parseImportHeaders(file: File): Promise<{
+        headers: string[];
+        known_fields: string[];
+        known_clinics: { header: string; location_name: string }[];
+        unknown: string[];
+        needs_mapping: boolean;
+    }> {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`${API_BASE_URL}/api/inventory/import/parse-headers`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error((err as any).error || 'Failed to parse headers')
+        }
+        return res.json()
+    },
+
+    async importInventory(
+        file: File,
+        mode: 'update' | 'overwrite',
+        fieldMapping?: Record<string, string>,
+        clinicMapping?: Record<string, number>,
+    ) {
         const formData = new FormData()
         formData.append('file', file)
         formData.append('mode', mode)
-
+        if (fieldMapping && Object.keys(fieldMapping).length > 0) {
+            formData.append('field_mapping', JSON.stringify(fieldMapping))
+        }
+        if (clinicMapping && Object.keys(clinicMapping).length > 0) {
+            formData.append('clinic_mapping', JSON.stringify(clinicMapping))
+        }
         const res = await fetch(`${API_BASE_URL}/api/inventory/import`, {
             method: 'POST',
             body: formData,
+            credentials: 'include',
         })
-        if (!res.ok) {
-            const err = await res.json()
-            throw new Error(err.error || 'Failed to import')
-        }
-        return res.json()
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error((data as any).error || 'Failed to import')
+        return data
     },
 
     async uploadInventoryReport(file: File): Promise<UploadInventoryResponse> {

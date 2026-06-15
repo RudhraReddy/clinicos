@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react"
-import { api, type InventoryItem, type InventoryHistoryEntry } from "@/lib/api"
+import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
 import { UploadInventoryReportDialog } from "@/components/UploadInventoryReportDialog"
@@ -25,6 +25,7 @@ import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -304,6 +305,11 @@ export default function InventoryPage() {
     const [historyEntries, setHistoryEntries] = useState<InventoryHistoryEntry[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
 
+    const [locations, setLocations] = useState<Location[]>([])
+    const [activeLocationId, setActiveLocationId] = useState<number | 'all'>('all')
+    const [exportDialogOpen, setExportDialogOpen] = useState(false)
+    const [exportScope, setExportScope] = useState<string>('all')
+
     const openHistory = async (item: InventoryItem) => {
         setHistoryItem(item)
         setHistoryEntries([])
@@ -328,11 +334,15 @@ export default function InventoryPage() {
         }
     }
 
+    useEffect(() => {
+        api.getLocations().then(locs => setLocations(locs.filter(l => l.is_active))).catch(() => {})
+    }, [])
+
     const loadData = async () => {
         setLoading(true)
         setError(null)
         try {
-            const data = await api.getInventory(expiryReminderMonths)
+            const data = await api.getInventory(expiryReminderMonths, activeLocationId === 'all' ? undefined : activeLocationId)
             setInventory(data)
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load inventory")
@@ -356,7 +366,7 @@ export default function InventoryPage() {
 
     useEffect(() => {
         loadData()
-    }, [])
+    }, [activeLocationId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Extract Unique Values for Filters
     const optionsName = Array.from(new Set(inventory.map(i => i.item_name))).filter(Boolean).sort()
@@ -504,7 +514,7 @@ export default function InventoryPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" title="Export CSV" onClick={() => api.exportInventory()}>
+                    <Button variant="ghost" size="icon" title="Export" onClick={() => setExportDialogOpen(true)}>
                         <Download className="h-4 w-4" />
                     </Button>
                     <ImportInventoryDialog trigger={
@@ -514,6 +524,36 @@ export default function InventoryPage() {
                     } onSuccess={loadData} />
                 </div>
             </div>
+
+            {locations.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                    <button
+                        onClick={() => setActiveLocationId('all')}
+                        className={cn(
+                            "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                            activeLocationId === 'all'
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        )}
+                    >
+                        All Locations
+                    </button>
+                    {locations.map(loc => (
+                        <button
+                            key={loc.id}
+                            onClick={() => setActiveLocationId(loc.id)}
+                            className={cn(
+                                "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                activeLocationId === loc.id
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            )}
+                        >
+                            {loc.name}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="space-y-4">
@@ -991,6 +1031,54 @@ export default function InventoryPage() {
             </Sheet>
                 </TabsContent>
             </Tabs>
+
+            {/* Export Dialog */}
+            <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Export Inventory</DialogTitle>
+                        <DialogDescription>Choose what to export.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <button
+                            className="w-full text-left rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                            onClick={() => { api.exportInventory(); setExportDialogOpen(false) }}
+                        >
+                            <p className="font-semibold text-sm">Total Inventory</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Full batch-level dump with all fields. Use for records or backup.
+                            </p>
+                        </button>
+                        <div className="rounded-lg border p-4 space-y-3">
+                            <div>
+                                <p className="font-semibold text-sm">Edit Inventory</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    One row per product with per-clinic quantities. Use to adjust stock and re-import.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Select value={exportScope} onValueChange={setExportScope}>
+                                    <SelectTrigger className="h-8 flex-1 text-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All clinics</SelectItem>
+                                        {locations.map(l => (
+                                            <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button size="sm" onClick={() => {
+                                    api.exportInventoryEdit(exportScope)
+                                    setExportDialogOpen(false)
+                                }}>
+                                    Download
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div >
     )
 }
