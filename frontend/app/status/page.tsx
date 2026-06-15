@@ -46,8 +46,8 @@ export default function StatusPage() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const analytics = await api.getInventoryAnalytics(loc)
-      const ledgerData = await api.getLedger(loc)
+      const analytics = await api.getInventoryAnalytics()
+      const ledgerData = await api.getLedger()
       setApiData(analytics)
       setLedger(ledgerData)
     } catch (error) {

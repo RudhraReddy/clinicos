@@ -33,9 +33,13 @@ def get_ledger():
     limit = int(request.args.get('limit', 20))
     
     q = ExpenseLedger.query.order_by(ExpenseLedger.created_at.desc())
-    
+
     if loc and loc != 'all':
         q = q.filter(ExpenseLedger.location == loc)
+
+    location_id_param = request.args.get('location_id')
+    if location_id_param and location_id_param.isdigit():
+        q = q.filter(ExpenseLedger.location_id == int(location_id_param))
         
     items = q.offset((page - 1) * limit).limit(limit).all()
     

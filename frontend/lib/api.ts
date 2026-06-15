@@ -255,42 +255,14 @@ export const api = {
         });
     },
 
-    async getInventoryAnalytics(location?: string): Promise<{
-        all: any;
-        year: any;
-        month: any;
-        today: any;
-        ledger_expense_pie: { label: string, value: number }[];
+    async getInventoryAnalytics(locationId?: number | 'all'): Promise<{
+        today: { income: number; outcome: number; net: number; pharmRev: number; consultRev: number; visits: number; pBills: number; paid: number; marginPct: number };
+        month: { income: number; outcome: number; net: number; pharmRev: number; consultRev: number; visits: number; pBills: number; paid: number; marginPct: number };
+        year: { income: number; outcome: number; net: number; pharmRev: number; consultRev: number; visits: number; pBills: number; paid: number; marginPct: number };
         sitting_inventory_value: number;
-        busy_day_matrix: { d: string, c: number }[];
-        today_by_payment: { type: string; value: number }[];
-        
-        // Compatibility keys to prevent breaking the old status page
-        total_purchase_cost: number;
-        medicine_revenue: number;
-        total_visits: number;
-        visit_fees_collected: number;
-        total_invoices_count: number;
-        total_sales_count: number;
-        total_current_value: number;
-        visit_fees_pending: number;
-        month_medicine: number;
-        month_visit_fees: number;
-        today_medicine: number;
-        today_visit_fees: number;
-        today_visit_fees_pending: number;
-        weekly_income: { week: string; medicine: number; visit_fees: number }[];
-        category_stock: { category: string; value: number }[];
-        category_sales: { category: string; value: number }[];
-        top_items: { name: string; revenue: number; qty_sold: number }[];
-        low_stock: { name: string; qty: number }[];
-        out_of_stock: { name: string; qty: number }[];
-        expired: { name: string; expiry: string; qty: number }[];
-        expiring_soon: { name: string; expiry: string; qty: number }[];
-        low_stock_count: number;
-        expiring_count: number;
+        [key: string]: any;
     }> {
-        const qs = location && location !== 'all' ? `?location=${encodeURIComponent(location)}` : '';
+        const qs = (locationId && locationId !== 'all') ? `?location_id=${locationId}` : '';
         return fetchApi(`/api/inventory_analytics${qs}`);
     },
 
@@ -579,12 +551,14 @@ export const api = {
     },
 
     // Ledger APIs
-    async getLedger(location?: string, page = 1, limit = 20): Promise<any[]> {
-        const params = new URLSearchParams();
-        if (location && location !== 'all') params.set('location', location);
-        params.set('page', String(page));
-        params.set('limit', String(limit));
-        return fetchApi(`/api/ledger?${params.toString()}`);
+    async getLedger(locationId?: number | 'all', page = 1, limit = 20): Promise<any[]> {
+        const params = new URLSearchParams()
+        if (locationId && locationId !== 'all') params.set('location_id', locationId.toString())
+        params.set('page', page.toString())
+        params.set('limit', limit.toString())
+        const res = await fetch(`${API_BASE_URL}/api/ledger?${params}`, { credentials: 'include' })
+        if (!res.ok) throw new Error('Failed to fetch ledger')
+        return res.json()
     },
 
     async createLedgerItem(data: { title: string, amount: number, category: string, frequency: string, location: string, notes?: string }): Promise<{ id: number }> {

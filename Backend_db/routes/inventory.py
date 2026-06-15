@@ -552,13 +552,22 @@ def get_inventory_analytics():
     from sqlalchemy import extract, desc
 
     loc = request.args.get('location')
+
+    location_id_param = request.args.get('location_id')
+    filter_location_id = None
+    if location_id_param and location_id_param.isdigit():
+        filter_location_id = int(location_id_param)
+
     today = get_ist_now().date()
     month_start = today.replace(day=1)
     year_start = today.replace(month=1, day=1)
 
     # Helper to inject location filter uniformly if provided
     def loc_f(q, model):
-        if loc and loc != 'all':
+        if filter_location_id is not None:
+            if hasattr(model, 'location_id'):
+                return q.filter(model.location_id == filter_location_id)
+        elif loc and loc != 'all':
             # Ensure model actually has location column attribute to be safe
             if hasattr(model, 'location'):
                 return q.filter(model.location == loc)
@@ -566,7 +575,9 @@ def get_inventory_analytics():
 
     # ── Ledger Aggregations (The NEW Pie & Expense Feed) ──────────────────
     ledger_base = ExpenseLedger.query
-    if loc and loc != 'all':
+    if filter_location_id is not None:
+        ledger_base = ledger_base.filter(ExpenseLedger.location_id == filter_location_id)
+    elif loc and loc != 'all':
         ledger_base = ledger_base.filter(ExpenseLedger.location == loc)
         
     total_ledger_cost = float(db.session.query(func.sum(ExpenseLedger.amount)).filter(ExpenseLedger.id.in_([x.id for x in ledger_base])).scalar() or 0)
@@ -659,8 +670,10 @@ def get_inventory_analytics():
     today_by_payment = [{'type': (t or 'Other').upper(), 'value': float(v)} for t, v in today_payment_q if v]
 
     # ── Stock Current Total Asset Value ──────────────────────────────────
-    # Asset value is global usually, but could be filtered if inventory batches held locations (omitted for simplicity now)
-    total_current_value = float(db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity)).filter(InventoryBatch.quantity > 0).scalar() or 0)
+    _inv_value_q = db.session.query(func.sum(InventoryBatch.mrp * InventoryBatch.quantity)).filter(InventoryBatch.quantity > 0)
+    if filter_location_id is not None:
+        _inv_value_q = _inv_value_q.filter(InventoryBatch.location_id == filter_location_id)
+    total_current_value = float(_inv_value_q.scalar() or 0)
 
     # ── Weekly and Daily distributions for "Busy Matrix" ────────────────
     # Query counts grouped by DOW (Day of Week) for overall traffic
@@ -694,7 +707,10 @@ def get_inventory_analytics():
         ProductMaster.item_name,
         func.sum(InventoryBatch.quantity).label('qty'),
         ProductMaster.min_stock_level
-    ).join(InventoryBatch, ProductMaster.id == InventoryBatch.product_id)\
+    ).join(InventoryBatch, ProductMaster.id == InventoryBatch.product_id)
+    if filter_location_id is not None:
+        low_stock_q = low_stock_q.filter(InventoryBatch.location_id == filter_location_id)
+    low_stock_q = low_stock_q\
     .group_by(ProductMaster.id, ProductMaster.item_name, ProductMaster.min_stock_level)\
     .having(func.sum(InventoryBatch.quantity) <= ProductMaster.min_stock_level)\
     .order_by('qty').all()
@@ -714,8 +730,10 @@ def get_inventory_analytics():
         InventoryBatch.expiry_date,
         InventoryBatch.quantity
     ).join(InventoryBatch, ProductMaster.id == InventoryBatch.product_id)\
-    .filter(InventoryBatch.quantity > 0, InventoryBatch.expiry_date <= expiry_horizon)\
-    .order_by(InventoryBatch.expiry_date).all()
+    .filter(InventoryBatch.quantity > 0, InventoryBatch.expiry_date <= expiry_horizon)
+    if filter_location_id is not None:
+        expiring_q = expiring_q.filter(InventoryBatch.location_id == filter_location_id)
+    expiring_q = expiring_q.order_by(InventoryBatch.expiry_date).all()
     
     raw_expiring = []
     for e in expiring_q:
