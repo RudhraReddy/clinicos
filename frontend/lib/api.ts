@@ -99,6 +99,12 @@ export interface InventoryHistoryEntry {
     timestamp: string;
 }
 
+export interface Location {
+    id: number;
+    name: string;
+    is_active: boolean;
+}
+
 export interface BillingHistoryEntry {
     invoice_id: string;
     date: string;
@@ -415,6 +421,27 @@ export const api = {
         return fetchApi(`/api/inventory/all-changes${qs ? `?${qs}` : ''}`)
     },
 
+    async getLocations(): Promise<Location[]> {
+        return fetchApi('/api/admin/locations');
+    },
+    async createLocation(name: string): Promise<Location> {
+        return fetchApi('/api/admin/locations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+    },
+    async updateLocation(id: number, data: { name?: string; is_active?: boolean }): Promise<Location> {
+        return fetchApi(`/api/admin/locations/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+    },
+    async deleteLocation(id: number): Promise<{ ok?: boolean; error?: string }> {
+        return fetchApi(`/api/admin/locations/${id}`, { method: 'DELETE' });
+    },
+
     // Billing Search
     async searchInventory(query: string): Promise<InventorySearchResult[]> {
         if (!query) return []
@@ -561,7 +588,7 @@ export async function logout() {
 export async function getMe() {
   const res = await fetch('/api/auth/me', { credentials: 'include' })
   if (!res.ok) return null
-  return res.json() as Promise<{ user_id: string; username: string; role: string; location_label?: string }>
+  return res.json() as Promise<{ user_id: string; username: string; role: string; location_label?: string; location_id?: number | null }>
 }
 
 export async function verifyTotp(totp_code: string) {
