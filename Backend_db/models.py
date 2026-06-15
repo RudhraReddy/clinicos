@@ -66,7 +66,7 @@ class ProductMaster(db.Model):
     hsn_code = db.Column(db.String(20))
     # min_stock_level kept for alert logic
     min_stock_level = db.Column(db.Integer, default=10)
-    min_stock_override = db.Column(db.Boolean, default=False)
+    min_stock_override = db.Column(db.Boolean, default=False, nullable=False)
     manufacturer = db.Column(db.String(100))
     
     # New Fields for Billing/Product Master
