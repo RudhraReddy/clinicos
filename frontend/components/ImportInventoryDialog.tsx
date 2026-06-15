@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
 import { api } from "@/lib/api"
+import { useSettings } from "@/lib/settings_context"
 
 const KNOWN_FIELD_OPTIONS = [
     'Product ID', 'Item Name', 'Pack Size', 'Formula', 'Category',
@@ -28,6 +29,7 @@ interface ImportInventoryDialogProps {
 type Step = 'pick' | 'mapping' | 'import' | 'done'
 
 export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDialogProps) {
+    const { defaultMinStock } = useSettings()
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState<Step>('pick')
     const [file, setFile] = useState<File | null>(null)
@@ -109,7 +111,7 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
         setSubmitting(true)
         setErrorMsg(null)
         try {
-            const data = await api.importInventory(file, mode, fieldMapping, clinicMapping)
+            const data = await api.importInventory(file, mode, fieldMapping, clinicMapping, defaultMinStock)
             setResult({ message: data.message || 'Imported successfully.' })
             setStep('done')
             onSuccess?.()
