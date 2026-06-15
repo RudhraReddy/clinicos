@@ -40,6 +40,7 @@ def _apply_migrations(db):
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
         "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
+        "ALTER TABLE expense_ledger ADD COLUMN IF NOT EXISTS location VARCHAR(50) DEFAULT 'Main'",
         # SP1: location_id FK columns on existing tables (locations table created by db.create_all())
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id)",
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id)",
