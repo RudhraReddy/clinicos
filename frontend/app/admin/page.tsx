@@ -496,9 +496,14 @@ function UsersTab() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No location</SelectItem>
-                    {locations.filter(l => l.is_active).map(l => (
-                      <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                    ))}
+                    {locations
+                      .filter(l => l.is_active || l.id === editLocationId)
+                      .map(l => (
+                        <SelectItem key={l.id} value={l.id.toString()}>
+                          {l.name}{!l.is_active ? ' (inactive)' : ''}
+                        </SelectItem>
+                      ))
+                    }
                   </SelectContent>
                 </Select>
               </div>

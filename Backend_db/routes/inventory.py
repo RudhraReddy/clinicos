@@ -411,6 +411,10 @@ def get_inventory():
         expiry_months = max(1, min(int(request.args.get('expiry_months', 6)), 24))
     except (ValueError, TypeError):
         expiry_months = 6
+    location_id_param = request.args.get('location_id')
+    filter_location_id = None
+    if location_id_param and location_id_param.isdigit():
+        filter_location_id = int(location_id_param)
     today = get_ist_now().date()
     items = ProductMaster.query.order_by(ProductMaster.item_name.asc()).all()
     if not items:
@@ -419,7 +423,7 @@ def get_inventory():
     product_ids = [item.id for item in items]
 
     # ── Query 1: batch aggregates (replaces 5 per-product queries) ─────────
-    batch_stats_rows = db.session.query(
+    batch_q1 = db.session.query(
         InventoryBatch.product_id,
         func.sum(InventoryBatch.quantity).label('total_qty'),
         func.max(InventoryBatch.mrp).label('max_mrp'),
@@ -431,8 +435,10 @@ def get_inventory():
                 else_=None
             )
         ).label('earliest_expiry'),
-    ).filter(InventoryBatch.product_id.in_(product_ids))\
-     .group_by(InventoryBatch.product_id).all()
+    ).filter(InventoryBatch.product_id.in_(product_ids))
+    if filter_location_id is not None:
+        batch_q1 = batch_q1.filter(InventoryBatch.location_id == filter_location_id)
+    batch_stats_rows = batch_q1.group_by(InventoryBatch.product_id).all()
 
     stats_map = {
         r.product_id: {
@@ -446,6 +452,12 @@ def get_inventory():
     }
 
     # ── Query 2: current MRP = first active batch FIFO per product ─────────
+    batch_q2_filters = [
+        InventoryBatch.product_id.in_(product_ids),
+        InventoryBatch.quantity > 0,
+    ]
+    if filter_location_id is not None:
+        batch_q2_filters.append(InventoryBatch.location_id == filter_location_id)
     ranked_sq = db.session.query(
         InventoryBatch.product_id,
         InventoryBatch.mrp,
@@ -453,10 +465,7 @@ def get_inventory():
             partition_by=InventoryBatch.product_id,
             order_by=InventoryBatch.expiry_date.asc()
         ).label('rn')
-    ).filter(
-        InventoryBatch.product_id.in_(product_ids),
-        InventoryBatch.quantity > 0
-    ).subquery()
+    ).filter(*batch_q2_filters).subquery()
 
     current_mrp_rows = db.session.query(
         ranked_sq.c.product_id,
@@ -466,17 +475,20 @@ def get_inventory():
     current_mrp_map = {r.product_id: float(r.mrp) for r in current_mrp_rows}
 
     # ── Query 3: vendor names for active stock ─────────────────────────────
+    batch_q3_filters = [
+        InventoryBatch.product_id.in_(product_ids),
+        InventoryBatch.quantity > 0,
+        PurchaseInvoice.vendor_name.isnot(None),
+    ]
+    if filter_location_id is not None:
+        batch_q3_filters.append(InventoryBatch.location_id == filter_location_id)
     vendor_rows = db.session.query(
         InventoryBatch.product_id,
         PurchaseInvoice.vendor_name
     ).join(
         PurchaseInvoice,
         InventoryBatch.purchase_invoice_number == PurchaseInvoice.invoice_number
-    ).filter(
-        InventoryBatch.product_id.in_(product_ids),
-        InventoryBatch.quantity > 0,
-        PurchaseInvoice.vendor_name.isnot(None)
-    ).distinct().all()
+    ).filter(*batch_q3_filters).distinct().all()
 
     vendors_map: dict = {}
     for pid, vname in vendor_rows:
