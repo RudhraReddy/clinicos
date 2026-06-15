@@ -76,7 +76,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
         if (storedDefaultMinStock) {
             const parsed = parseInt(storedDefaultMinStock, 10)
-            if (!isNaN(parsed) && parsed >= 1) setDefaultMinStock(parsed)
+            if (!isNaN(parsed) && parsed >= 1 && parsed <= 9999) setDefaultMinStock(parsed)
         }
         if (storedCols) {
             try {

@@ -14,6 +14,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { api, InventoryItem, InventoryBatch } from "@/lib/api"
+import { toast } from "sonner"
 import { useSettings } from "@/lib/settings_context"
 import { Pencil, Loader2, Save, Trash2, AlertCircle } from "lucide-react"
 
@@ -53,11 +54,11 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                 quantity: batch.quantity,
                 mrp: batch.mrp
             })
-            alert("Batch updated")
+            toast.success("Batch updated")
             onSuccess() // Refresh parent
         } catch (e) {
             console.error(e)
-            alert("Failed to save batch")
+            toast.error("Failed to save batch")
         }
     }
 
@@ -110,7 +111,7 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
             onSuccess()
         } catch (error) {
             console.error(error)
-            alert("Failed to update item")
+            toast.error("Failed to update item")
         } finally {
             setLoading(false)
         }

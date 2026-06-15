@@ -777,9 +777,9 @@ function SettingsTab() {
 
     const handleSaveDefaultMinStock = async () => {
         const val = Math.max(1, Math.min(9999, localDefaultMinStock))
-        setSettings({ defaultMinStock: val })
         try {
             const result = await api.applyDefaultMinStock(val)
+            setSettings({ defaultMinStock: val })
             toast.success(`Default updated — ${result.updated} product${result.updated !== 1 ? 's' : ''} synced`)
         } catch {
             toast.error('Failed to sync products')
