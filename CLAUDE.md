@@ -68,7 +68,7 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 ### Flask Backend
 
 - **App factory:** `Backend_db/app.py` → `create_app()` registers all blueprints with `/api` prefix.
-- **Blueprints:** One file per domain in `routes/` (patients, visits, billing, inventory, images, upload). All registered in `routes/__init__.py`.
+- **Blueprints:** One file per domain in `routes/` (patients, visits, billing, inventory, images, upload, locations). All registered in `routes/__init__.py`.
 - **ORM:** SQLAlchemy 2.0, all models in `models.py`. Extensions (db instance, `get_ist_now()`) in `extensions.py`.
 - **Timestamps:** All use IST (UTC+5:30) via `get_ist_now()` — never use `datetime.utcnow()`.
 - **ID generation:** `Backend_db/utils.py` — `generate_visit_id(patient_id)` → `{patient_id}-DDMMYY-XXX-XXX`, `generate_invoice_id()` → `DDMMYY-XXX-XXX`, `parse_expiry_date()` for flexible MM/YY input.
@@ -114,7 +114,7 @@ The `/` root page redirects `doctor` role to `/doctor` on load.
 
 ### Status / Analytics Page
 
-`app/status/page.tsx` is a doctor-only analytics dashboard. All metrics are computed client-side from `api.getVisits()` and `api.getBillingHistory()` — no dedicated backend endpoints. Sections: revenue KPI cards, weekly revenue bar chart, visits by day-of-week, busiest hours, payment type breakdown, new vs returning patients, recent patients list.
+`app/status/page.tsx` is a doctor-only analytics dashboard. Calls `api.getInventoryAnalytics(locationId?)` and `api.getLedger(locationId?)` — both accept a numeric `location_id` or `'all'`. The page has a **dynamic location dropdown** populated from `GET /api/admin/locations` (no hardcoded options). When a location is selected all KPI cards, charts, and inventory alerts scope to that clinic via `?location_id=N` on the backend. **Staff filter has been removed** — filtering is location-only. Sections: revenue KPI cards, inventory stock value, expense ledger breakdown, expiry/stock alerts.
 
 Placeholder empty directories exist for future auth: `app/login/`, `app/create-account/`.
 
@@ -122,7 +122,7 @@ Placeholder empty directories exist for future auth: `app/login/`, `app/create-a
 
 Two-layer inventory model:
 - `ProductMaster` — catalog only (name, category, GST rate, min stock level). No qty or price.
-- `InventoryBatch` — physical stock (qty, expiry, MRP, batch#, purchase source).
+- `InventoryBatch` — physical stock (qty, expiry, MRP, batch#, purchase source, **location_id**).
 
 Core relationship chain:
 ```
@@ -131,7 +131,9 @@ Patient → Visit → Bill → BillItem → ProductMaster
                                  InventoryBatch → PurchaseInvoice
 ```
 
-Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `PrescriptionItem` (linked to visits), `UploadSession` (QR mobile uploads).
+Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `PrescriptionItem` (linked to visits), `UploadSession` (QR mobile uploads), `Location` (clinic branches).
+
+**Multi-location model:** `Location` (id int PK, name string unique, is_active bool) — managed in Admin → Settings. A nullable `location_id` FK to `Location` exists on `User`, `Visit`, `Bill`, `PurchaseInvoice`, `ExpenseLedger`, and `InventoryBatch`. New records are auto-tagged with the creating user's `location_id`. Old rows keep their legacy `location` string column for backward compat.
 
 ### Key Business Logic
 
@@ -292,6 +294,11 @@ These three strings are passed as props at two call sites and are currently hard
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **Multi-Location Inventory System (2026-06-14):** Full per-clinic stock tracking across three sub-projects:
+  - **SP1 — Location Foundation:** New `Location` model (`id`, `name`, `is_active`). Nullable `location_id` FK added to `User`, `Visit`, `Bill`, `PurchaseInvoice`, `ExpenseLedger`, `InventoryBatch` (additive — no data loss). CRUD API at `GET/POST/PATCH/DELETE /api/admin/locations` (GET is `@require_auth`; mutations are `@require_admin`). `_apply_migrations()` in `app.py` handles the 6 new FK columns on existing tables. Admin Settings tab has a **Locations card** (create, rename inline, activate/deactivate, delete). Admin Users dialog location field is now a **Select dropdown** (not free text) that saves `location_id` and syncs `location_label` for backward compat.
+  - **SP2 — Per-Location Inventory:** `GET /api/inventory?location_id=N` filters stock to a single clinic. New `GET /api/inventory/export/edit?scope=all|<id>` exports one-row-per-product CSV with dynamic per-clinic qty columns. New `POST /api/inventory/import/parse-headers` classifies CSV headers as `known_fields`, `known_clinics`, or `unknown`. Import route accepts `field_mapping` and `clinic_mapping` JSON to handle renamed columns or renamed clinics. `ImportInventoryDialog` is now a 3-step flow: file pick → column mapping (if unknown headers) → mode select. Inventory page has a **location pill switcher** and the Download button opens a **two-option export dialog** (Total Inventory vs Edit Inventory with scope select).
+  - **SP3 — Location Analytics:** `GET /api/inventory_analytics?location_id=N` filters all KPIs via `location_id` FK. `GET /api/ledger?location_id=N` likewise. New visits, bills, purchase invoices, and inventory batches are auto-tagged with the creating user's `location_id`. Status page has dynamic location dropdown and no staff filter.
 
 - **Inventory System Overhaul (2026-05-23):** Comprehensive fixes across backend and frontend:
   - **OCR vendor name** — `_transform_ocr_result` now passes the extracted `vendor_name` through instead of hardcoding `''`.
