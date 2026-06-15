@@ -1266,7 +1266,7 @@ def export_inventory_edit():
     loc_headers = [l.name for l in active_locs]
     writer.writerow([
         'Product ID', 'Item Name', 'Pack Size', 'Formula',
-        'Category', 'Manufacturer', 'MRP', 'Expiry Date',
+        'Category', 'Manufacturer', 'Min Stock', 'MRP', 'Expiry Date',
     ] + loc_headers)
 
     products = ProductMaster.query.order_by(ProductMaster.item_name).all()
@@ -1302,6 +1302,7 @@ def export_inventory_edit():
             product.formula or '',
             product.category or '',
             product.manufacturer or '',
+            product.min_stock_level,
             mrp_str,
             expiry_str,
         ] + loc_qtys)
@@ -1404,6 +1405,13 @@ def import_inventory():
     file = request.files['file']
     mode = request.form.get('mode', 'update')
 
+    try:
+        default_min_stock = int(request.args.get('default_min_stock', 10))
+        if default_min_stock < 1:
+            default_min_stock = 10
+    except (ValueError, TypeError):
+        default_min_stock = 10
+
     import json as _json
     try:
         field_mapping = _json.loads(request.form.get('field_mapping', '{}') or '{}')
@@ -1483,10 +1491,17 @@ def import_inventory():
                     name_q = name_q.filter(ProductMaster.pack_size == pack_size.strip())
                 item = name_q.first()
 
-            try:
-                min_stock_val = int(float(get_val(['Min Stock', 'min', 'Min Stock Level']) or 10))
-            except (ValueError, TypeError):
-                min_stock_val = 10
+            raw_min_stock = get_val(['Min Stock', 'min', 'Min Stock Level'])
+            if raw_min_stock is not None and str(raw_min_stock).strip() != '':
+                try:
+                    min_stock_val = int(float(raw_min_stock))
+                    min_stock_is_custom = True
+                except (ValueError, TypeError):
+                    min_stock_val = default_min_stock
+                    min_stock_is_custom = False
+            else:
+                min_stock_val = default_min_stock
+                min_stock_is_custom = False
 
             if not item:
                 new_id = product_id_csv if product_id_csv else ProductMaster.generate_item_id()
@@ -1496,6 +1511,7 @@ def import_inventory():
                     pack_size=pack_size.strip(),
                     category=get_val(['Category', 'cat']) or '',
                     min_stock_level=min_stock_val,
+                    min_stock_override=min_stock_is_custom,
                     manufacturer=get_val(['Manufacturer', 'mfg', 'manufacturer']) or '',
                     hsn_code=get_val(['HSN Code', 'hsn']) or '',
                     generic_tags=get_val(['Generic Tags', 'tags']) or '',
@@ -1511,7 +1527,9 @@ def import_inventory():
                 # Update product master fields if provided in CSV
                 cat = get_val(['Category', 'cat'])
                 if cat: item.category = cat
-                if min_stock_val: item.min_stock_level = min_stock_val
+                if raw_min_stock is not None and str(raw_min_stock).strip() != '':
+                    item.min_stock_level = min_stock_val
+                    item.min_stock_override = min_stock_is_custom
                 mfg = get_val(['Manufacturer', 'mfg', 'manufacturer'])
                 if mfg: item.manufacturer = mfg
                 hsn = get_val(['HSN Code', 'hsn'])
