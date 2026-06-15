@@ -908,7 +908,7 @@ def add_inventory_item():
         id=ProductMaster.generate_item_id(),
         item_name=data['item_name'],
         min_stock_level=data.get('min_stock_level', 10),
-        min_stock_override=False,
+        min_stock_override='min_stock_level' in data,
         manufacturer=data.get('supplier', ''),
         category=data.get('category', ''),
         pack_size=data.get('pack_size', ''),
