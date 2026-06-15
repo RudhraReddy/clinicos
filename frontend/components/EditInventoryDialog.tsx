@@ -14,6 +14,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { api, InventoryItem, InventoryBatch } from "@/lib/api"
+import { useSettings } from "@/lib/settings_context"
 import { Pencil, Loader2, Save, Trash2, AlertCircle } from "lucide-react"
 
 interface EditInventoryDialogProps {
@@ -60,6 +61,12 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
         }
     }
 
+    const { defaultMinStock } = useSettings()
+
+    const [isCustomMinStock, setIsCustomMinStock] = useState<boolean>(
+        item.min_stock_override ?? true
+    )
+
     const [formData, setFormData] = useState({
         item_name: item.item_name,
         manufacturer: item.manufacturer || '',
@@ -85,6 +92,7 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                 pack_size: item.pack_size || '',
                 formula: item.formula || ''
             })
+            setIsCustomMinStock(item.min_stock_override ?? true)
         }
     }, [open, item])
 
@@ -94,7 +102,8 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
         try {
             const payload = {
                 ...formData,
-                vendors: formData.vendors.split(',').map(v => v.trim()).filter(Boolean)
+                vendors: formData.vendors.split(',').map(v => v.trim()).filter(Boolean),
+                min_stock_override: isCustomMinStock,
             }
             await api.updateInventoryItem(item.id, payload)
             setOpen(false)
@@ -194,15 +203,37 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                     className="col-span-3"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="min_stock" className="text-right">Min Stock</Label>
-                                <Input
-                                    id="min_stock"
-                                    type="number"
-                                    value={formData.min_stock_level}
-                                    onChange={(e) => setFormData({ ...formData, min_stock_level: parseInt(e.target.value) || 0 })}
-                                    className="col-span-3"
-                                />
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="min_stock" className="text-right pt-2">Min Stock</Label>
+                                <div className="col-span-3 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            id="min_stock"
+                                            type="number"
+                                            value={formData.min_stock_level}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, min_stock_level: parseInt(e.target.value) || 0 })
+                                                setIsCustomMinStock(true)
+                                            }}
+                                            className="w-24"
+                                        />
+                                        {!isCustomMinStock && (
+                                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">(default)</span>
+                                        )}
+                                        {isCustomMinStock && (
+                                            <button
+                                                type="button"
+                                                className="text-xs text-primary underline underline-offset-2"
+                                                onClick={() => {
+                                                    setFormData({ ...formData, min_stock_level: defaultMinStock })
+                                                    setIsCustomMinStock(false)
+                                                }}
+                                            >
+                                                ↺ Use default
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="pack_size" className="text-right">Pack Size</Label>
