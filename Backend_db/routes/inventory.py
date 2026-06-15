@@ -1168,6 +1168,77 @@ def export_inventory():
         download_name=f'inventory_export_{get_ist_now().strftime("%Y%m%d")}.csv'
     )
 
+@inventory.route('/inventory/export/edit', methods=['GET'])
+@require_auth
+def export_inventory_edit():
+    from models import Location
+    scope = request.args.get('scope', 'all')  # 'all' or a location_id integer string
+
+    if scope == 'all':
+        active_locs = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    else:
+        try:
+            loc = db.session.get(Location, int(scope))
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid scope'}), 400
+        if not loc:
+            return jsonify({'error': 'Location not found'}), 404
+        active_locs = [loc]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    loc_headers = [l.name for l in active_locs]
+    writer.writerow([
+        'Product ID', 'Item Name', 'Pack Size', 'Formula',
+        'Category', 'Manufacturer', 'MRP', 'Expiry Date',
+    ] + loc_headers)
+
+    products = ProductMaster.query.order_by(ProductMaster.item_name).all()
+
+    for product in products:
+        overall_mrp = 0.0
+        earliest_expiry = None
+        loc_qtys = []
+
+        for loc in active_locs:
+            batches = InventoryBatch.query.filter_by(
+                product_id=product.id,
+                location_id=loc.id,
+            ).filter(InventoryBatch.quantity > 0).all()
+
+            loc_qty = sum(float(b.quantity or 0) for b in batches)
+            loc_qtys.append(int(loc_qty))
+
+            for b in batches:
+                if b.mrp and float(b.mrp) > overall_mrp:
+                    overall_mrp = float(b.mrp)
+                if b.expiry_date:
+                    if earliest_expiry is None or b.expiry_date < earliest_expiry:
+                        earliest_expiry = b.expiry_date
+
+        expiry_str = earliest_expiry.strftime('%m/%y') if earliest_expiry else ''
+        mrp_str = f"{overall_mrp:.2f}" if overall_mrp else ''
+
+        writer.writerow([
+            product.id,
+            product.item_name,
+            product.pack_size or '',
+            product.formula or '',
+            product.category or '',
+            product.manufacturer or '',
+            mrp_str,
+            expiry_str,
+        ] + loc_qtys)
+
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'inventory_edit_{get_ist_now().strftime("%Y%m%d")}.csv'
+    )
+
 @inventory.route('/inventory/invoices/<invoice_number>/export', methods=['GET'])
 @require_auth
 def export_invoice(invoice_number):
