@@ -3,7 +3,7 @@ import math
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory
+from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory, User
 from sqlalchemy import func
 from utils import generate_invoice_id
 from .auth import require_auth, log_activity
@@ -42,6 +42,9 @@ def create_bill():
         total_amount=0,
         created_by_user_id=g.current_user.get('user_id')
     )
+    creator = db.session.get(User, g.current_user.get('user_id'))
+    if creator and creator.location_id:
+        new_bill.location_id = creator.location_id
     db.session.add(new_bill)
     db.session.flush()
 

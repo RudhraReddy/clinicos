@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
-from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem
+from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem, User
 from sqlalchemy import func, case
 import io
 import csv
@@ -1907,6 +1907,8 @@ def save_invoice():
     existing = PurchaseInvoice.query.get(invoice_no)
     is_duplicate_invoice = existing is not None
 
+    creator = db.session.get(User, g.current_user.get('user_id'))
+
     if not existing:
         products_early = data.get('product_details', [])
         if not products_early:
@@ -1927,8 +1929,10 @@ def save_invoice():
             upload_date=get_ist_now(),
             created_by_user_id=g.current_user.get('user_id'),
         )
+        if creator and creator.location_id:
+            new_inv.location_id = creator.location_id
         db.session.add(new_inv)
-    
+
     products = data.get('product_details', [])
     
     try:
@@ -2067,6 +2071,8 @@ def save_invoice():
                             expiry_date=expiry,
                             created_by_user_id=g.current_user.get('user_id'),
                         )
+                        if creator and creator.location_id:
+                            adj_batch.location_id = creator.location_id
                         db.session.add(adj_batch)
                         db.session.flush()
                         history = InventoryHistory(
@@ -2096,6 +2102,8 @@ def save_invoice():
                         expiry_date=expiry,
                         created_by_user_id=g.current_user.get('user_id'),
                     )
+                    if creator and creator.location_id:
+                        new_batch.location_id = creator.location_id
                     db.session.add(new_batch)
                     db.session.flush()
                     history = InventoryHistory(
@@ -2125,6 +2133,8 @@ def save_invoice():
                     expiry_date=expiry,
                     created_by_user_id=g.current_user.get('user_id'),
                 )
+                if creator and creator.location_id:
+                    new_batch.location_id = creator.location_id
                 db.session.add(new_batch)
                 db.session.flush()
 

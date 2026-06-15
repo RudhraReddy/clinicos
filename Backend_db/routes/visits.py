@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Visit, Patient, ProductMaster
+from models import Visit, Patient, ProductMaster, User
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
@@ -29,6 +29,9 @@ def create_visit():
         payment_status=data.get('payment_status', 'unpaid'),
         created_by_user_id=g.current_user.get('user_id')
     )
+    creator = db.session.get(User, g.current_user.get('user_id'))
+    if creator and creator.location_id:
+        new_visit.location_id = creator.location_id
     db.session.add(new_visit)
     db.session.commit()
 
