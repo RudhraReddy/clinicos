@@ -6,15 +6,15 @@ import { useAuth } from "@/lib/auth_context"
 import { useSettings } from "@/lib/settings_context"
 import { useRouter } from "next/navigation"
 import {
-  getAdminStats, getAdminUsers, updateAdminUser, getActivityLog, getSystemDiagnostics,
-  AdminUser, ActivityEntry, ActivityLogFilters, SystemDiagnostics,
+  api, getAdminStats, getAdminUsers, updateAdminUser, getActivityLog, getSystemDiagnostics,
+  AdminUser, ActivityEntry, ActivityLogFilters, SystemDiagnostics, type Location,
 } from "@/lib/api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle } from "lucide-react"
+import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Plus, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -749,8 +749,81 @@ function SettingsTab() {
         toast.success(`Expiry reminder set to ${val} months`)
     }
 
+    // ── Locations state ──
+    const [locations, setLocations] = useState<Location[]>([])
+    const [locLoading, setLocLoading] = useState(true)
+    const [newLocName, setNewLocName] = useState('')
+    const [addingLoc, setAddingLoc] = useState(false)
+    const [editingLocId, setEditingLocId] = useState<number | null>(null)
+    const [editingLocName, setEditingLocName] = useState('')
+
+    const loadLocations = async () => {
+        setLocLoading(true)
+        try {
+            setLocations(await api.getLocations())
+        } catch {
+            toast.error('Failed to load locations')
+        } finally {
+            setLocLoading(false)
+        }
+    }
+
+    useEffect(() => { loadLocations() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleAddLocation = async () => {
+        const name = newLocName.trim()
+        if (!name) return
+        try {
+            await api.createLocation(name)
+            setNewLocName('')
+            setAddingLoc(false)
+            await loadLocations()
+            toast.success(`Location "${name}" created`)
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create location')
+        }
+    }
+
+    const handleRenameLocation = async (id: number) => {
+        const name = editingLocName.trim()
+        if (!name) return
+        try {
+            await api.updateLocation(id, { name })
+            setEditingLocId(null)
+            await loadLocations()
+            toast.success('Location renamed')
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to rename')
+        }
+    }
+
+    const handleToggleActive = async (loc: Location) => {
+        try {
+            await api.updateLocation(loc.id, { is_active: !loc.is_active })
+            await loadLocations()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to update')
+        }
+    }
+
+    const handleDeleteLocation = async (loc: Location) => {
+        if (!window.confirm(`Delete location "${loc.name}"? This cannot be undone.`)) return
+        try {
+            const res = await api.deleteLocation(loc.id)
+            if (res.error) {
+                toast.error(res.error)
+            } else {
+                await loadLocations()
+                toast.success(`Deleted "${loc.name}"`)
+            }
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to delete')
+        }
+    }
+
     return (
         <div className="space-y-6 max-w-lg">
+            {/* ── Inventory Settings ── */}
             <div>
                 <h2 className="text-lg font-semibold mb-1">Inventory Settings</h2>
                 <p className="text-sm text-muted-foreground">
@@ -779,6 +852,106 @@ function SettingsTab() {
                     </div>
                 </div>
                 <Button size="sm" onClick={handleSave}>Save Settings</Button>
+            </div>
+
+            {/* ── Locations ── */}
+            <div>
+                <h2 className="text-lg font-semibold mb-1">Locations</h2>
+                <p className="text-sm text-muted-foreground">
+                    Clinic branches or chambers. Used to track inventory and billing per location.
+                </p>
+            </div>
+            <div className="rounded-lg border divide-y">
+                {locLoading ? (
+                    <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+                ) : locations.length === 0 && !addingLoc ? (
+                    <div className="p-4 text-sm text-muted-foreground">No locations yet.</div>
+                ) : (
+                    locations.map(loc => (
+                        <div key={loc.id} className="flex items-center gap-2 px-4 py-3">
+                            {editingLocId === loc.id ? (
+                                <>
+                                    <Input
+                                        autoFocus
+                                        value={editingLocName}
+                                        onChange={e => setEditingLocName(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') handleRenameLocation(loc.id)
+                                            if (e.key === 'Escape') setEditingLocId(null)
+                                        }}
+                                        className="h-8 flex-1"
+                                    />
+                                    <Button size="sm" onClick={() => handleRenameLocation(loc.id)}>Save</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingLocId(null)}>Cancel</Button>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="flex-1 text-sm font-medium">{loc.name}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${loc.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                                        {loc.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        title="Rename"
+                                        onClick={() => { setEditingLocId(loc.id); setEditingLocName(loc.name) }}
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        title={loc.is_active ? 'Deactivate' : 'Reactivate'}
+                                        onClick={() => handleToggleActive(loc)}
+                                    >
+                                        {loc.is_active ? <XCircle className="h-3.5 w-3.5 text-muted-foreground" /> : <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-rose-600 hover:text-rose-700"
+                                        title="Delete"
+                                        onClick={() => handleDeleteLocation(loc)}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    ))
+                )}
+
+                {addingLoc && (
+                    <div className="flex items-center gap-2 px-4 py-3">
+                        <Input
+                            autoFocus
+                            placeholder="Location name…"
+                            value={newLocName}
+                            onChange={e => setNewLocName(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') handleAddLocation()
+                                if (e.key === 'Escape') { setAddingLoc(false); setNewLocName('') }
+                            }}
+                            className="h-8 flex-1"
+                        />
+                        <Button size="sm" onClick={handleAddLocation}>Add</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setAddingLoc(false); setNewLocName('') }}>Cancel</Button>
+                    </div>
+                )}
+
+                <div className="px-4 py-3">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAddingLoc(true)}
+                        disabled={addingLoc}
+                    >
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Add Location
+                    </Button>
+                </div>
             </div>
         </div>
     )
