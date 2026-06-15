@@ -556,6 +556,7 @@ def get_inventory():
             'hsn_code': item.hsn_code,
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0.0,
             'formula': item.formula,
+            'min_stock_override': item.min_stock_override if item.min_stock_override is not None else False,
         })
 
     return jsonify(results), 200
@@ -907,6 +908,7 @@ def add_inventory_item():
         id=ProductMaster.generate_item_id(),
         item_name=data['item_name'],
         min_stock_level=data.get('min_stock_level', 10),
+        min_stock_override=False,
         manufacturer=data.get('supplier', ''),
         category=data.get('category', ''),
         pack_size=data.get('pack_size', ''),
@@ -952,6 +954,16 @@ def update_inventory_item(id):
         if item.min_stock_level != new_val:
             changed_fields.append('min_stock_level')
         item.min_stock_level = new_val
+        # If caller explicitly resets override to False, honour it; otherwise mark as custom
+        if 'min_stock_override' in data and data['min_stock_override'] is False:
+            item.min_stock_override = False
+        else:
+            item.min_stock_override = True
+    elif 'min_stock_override' in data and data['min_stock_override'] is False:
+        # Allow resetting to default without changing the value
+        item.min_stock_override = False
+        if 'min_stock_override' not in changed_fields:
+            changed_fields.append('min_stock_override')
     if 'pack_size' in data:
         if item.pack_size != data['pack_size']:
             changed_fields.append('pack_size')
@@ -1000,6 +1012,25 @@ def update_inventory_item(id):
     )
 
     return jsonify({'message': 'Item updated successfully'}), 200
+
+@inventory.route('/inventory/products/apply_default_min_stock', methods=['PATCH'])
+@require_auth
+@require_admin
+def apply_default_min_stock():
+    data = request.get_json() or {}
+    try:
+        default_val = int(data.get('default_min_stock', 10))
+        if default_val < 1:
+            return jsonify({'error': 'default_min_stock must be >= 1'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid default_min_stock value'}), 400
+
+    updated = ProductMaster.query.filter_by(min_stock_override=False).update(
+        {'min_stock_level': default_val},
+        synchronize_session=False,
+    )
+    db.session.commit()
+    return jsonify({'updated': updated}), 200
 
 @inventory.route('/inventory/<string:id>', methods=['DELETE'])
 @require_auth
@@ -1993,6 +2024,7 @@ def save_invoice():
                     pack_size=str(p_pack),
                     hsn_code=str(p_hsn),
                     formula=p_formula if p_formula else None,
+                    min_stock_override=False,
                 )
                 db.session.add(item)
                 db.session.flush()
