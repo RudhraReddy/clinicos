@@ -299,6 +299,7 @@ def me():
         'username': user.username,
         'role': user.role,
         'location_label': user.location_label,
+        'location_id': user.location_id,
     }), 200
 
 
@@ -369,6 +370,7 @@ def list_users():
             'username': u.username,
             'role': u.role,
             'location_label': u.location_label,
+            'location_id': u.location_id,
         }
         for u in users
     ]), 200

@@ -6,7 +6,7 @@ from flask import Blueprint, g, jsonify, request
 from sqlalchemy import func, text
 
 from extensions import db, get_ist_now
-from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient
+from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient, Location
 from routes.auth import require_admin, require_auth
 
 admin_bp = Blueprint('admin', __name__)
@@ -29,6 +29,8 @@ def list_all_users():
             'role': u.role,
             'is_active': u.is_active,
             'location_label': u.location_label,
+            'location_id': u.location_id,
+            'location_name': (db.session.get(Location, u.location_id).name if u.location_id else None),
             'created_at': u.created_at.isoformat() if u.created_at else None,
             'assigned_staff_ids': [a.staff_id for a in DoctorStaffAssignment.query.filter_by(doctor_id=u.id).all()] if u.role == 'doctor' else [],
         }
@@ -62,7 +64,20 @@ def update_user(user_id):
     if 'is_active' in data:
         user.is_active = bool(data['is_active'])
 
-    if 'location_label' in data:
+    if 'location_id' in data:
+        loc_id = data['location_id']
+        if loc_id is None:
+            user.location_id = None
+            user.location_label = None
+        else:
+            loc = db.session.get(Location, int(loc_id))
+            if not loc:
+                return jsonify({'error': 'Location not found'}), 404
+            user.location_id = loc.id
+            user.location_label = loc.name  # keep string in sync for backward compat
+
+    # Keep old handler so existing callers that send location_label still work
+    if 'location_label' in data and 'location_id' not in data:
         user.location_label = (data['location_label'] or '').strip() or None
 
     if 'assigned_staff_ids' in data:
