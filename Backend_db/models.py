@@ -40,6 +40,15 @@ class PurchaseInvoice(db.Model):
     source = db.Column(db.String(50)) # 'OCR', 'MANUAL', 'CSV_UPDATE', 'CSV_OVERWRITE'
     location = db.Column(db.String(50), nullable=True, default='Main') # For Dimensionality
     created_by_user_id = db.Column(db.String(36), nullable=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
+
+class Location(db.Model):
+    __tablename__ = 'locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
 
 class ProductMaster(db.Model):
     """
@@ -105,6 +114,7 @@ class InventoryBatch(db.Model):
     initial_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Qty at time of purchase (Paid + Free)
     free_quantity = db.Column(db.Numeric(10, 2), default=0.0) # Free Qty included in initial
     created_by_user_id = db.Column(db.String(36), nullable=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
 
 
 class InventoryHistory(db.Model):
@@ -149,6 +159,7 @@ class Visit(db.Model):
     payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid
     
     location = db.Column(db.String(50), nullable=True, default='Main')
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     updated_at = db.Column(db.DateTime, default=get_ist_now, onupdate=get_ist_now)
 
@@ -164,6 +175,7 @@ class Bill(db.Model):
 
     created_by_user_id = db.Column(db.String(50), db.ForeignKey('users.id'), nullable=True) # Admin/Staff ID
     location = db.Column(db.String(50), nullable=True, default='Main')
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
 
 
 
@@ -222,6 +234,7 @@ class ExpenseLedger(db.Model):
     frequency = db.Column(db.String(20), default='one-time') # one-time, daily, weekly, monthly, yearly
     date = db.Column(db.Date, default=datetime.now().date)
     location = db.Column(db.String(50), default='Main')
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     receipt_path = db.Column(db.String(255))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=get_ist_now)
@@ -239,6 +252,7 @@ class User(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     location_label = db.Column(db.String(100), nullable=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
 
 class DoctorStaffAssignment(db.Model):
     __tablename__ = 'doctor_staff_assignments'
