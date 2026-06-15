@@ -1239,6 +1239,54 @@ def export_inventory_edit():
         download_name=f'inventory_edit_{get_ist_now().strftime("%Y%m%d")}.csv'
     )
 
+KNOWN_IMPORT_FIELDS = {
+    'product id', 'item name', 'pack size', 'formula', 'category',
+    'manufacturer', 'mrp', 'expiry date', 'manufacture date',
+    'quantity', 'batch number', 'purchase rate', 'batch gst rate',
+    'product gst rate', 'hsn code', 'min stock', 'generic tags',
+    'initial quantity', 'free quantity', 'gst amount',
+}
+
+@inventory.route('/inventory/import/parse-headers', methods=['POST'])
+@require_auth
+def parse_import_headers():
+    from models import Location
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file'}), 400
+    file = request.files['file']
+    try:
+        stream = io.StringIO(file.stream.read().decode('UTF8'), newline=None)
+        reader = csv.DictReader(stream)
+        headers = list(reader.fieldnames or [])
+    except Exception as e:
+        return jsonify({'error': f'Could not read file: {e}'}), 400
+
+    if not headers:
+        return jsonify({'error': 'Empty or unreadable CSV'}), 400
+
+    location_names = {l.name.lower(): l.name for l in Location.query.filter_by(is_active=True).all()}
+
+    known_fields = []
+    known_clinics = []
+    unknown = []
+
+    for h in headers:
+        h_lower = h.strip().lower()
+        if h_lower in KNOWN_IMPORT_FIELDS:
+            known_fields.append(h)
+        elif h_lower in location_names:
+            known_clinics.append({'header': h, 'location_name': location_names[h_lower]})
+        else:
+            unknown.append(h)
+
+    return jsonify({
+        'headers': headers,
+        'known_fields': known_fields,
+        'known_clinics': known_clinics,
+        'unknown': unknown,
+        'needs_mapping': len(unknown) > 0,
+    })
+
 @inventory.route('/inventory/invoices/<invoice_number>/export', methods=['GET'])
 @require_auth
 def export_invoice(invoice_number):
@@ -1280,7 +1328,18 @@ def import_inventory():
         return jsonify({'error': 'No file part'}), 400
     file = request.files['file']
     mode = request.form.get('mode', 'update')
-    
+
+    import json as _json
+    try:
+        field_mapping = _json.loads(request.form.get('field_mapping', '{}') or '{}')
+    except Exception:
+        field_mapping = {}
+    try:
+        clinic_mapping = _json.loads(request.form.get('clinic_mapping', '{}') or '{}')
+        clinic_mapping = {k: int(v) for k, v in clinic_mapping.items()}
+    except Exception:
+        clinic_mapping = {}
+
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
         
@@ -1304,12 +1363,27 @@ def import_inventory():
 
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         csv_input = csv.DictReader(stream)
-        
+
+        if field_mapping and csv_input.fieldnames:
+            csv_input.fieldnames = [
+                field_mapping.get(h, h) for h in csv_input.fieldnames
+            ]
+
         if not csv_input.fieldnames:
              return jsonify({'error': 'Empty CSV'}), 400
              
         processed_count = 0
-        
+
+        from models import Location as _Location
+        loc_name_to_id = {l.name: l.id for l in _Location.query.filter_by(is_active=True).all()}
+        clinic_cols = {}
+        if csv_input.fieldnames:
+            for h in csv_input.fieldnames:
+                if h in clinic_mapping:
+                    clinic_cols[h] = clinic_mapping[h]
+                elif h in loc_name_to_id:
+                    clinic_cols[h] = loc_name_to_id[h]
+
         for row in csv_input:
             def get_val(keys):
                 for k in keys:
@@ -1377,6 +1451,149 @@ def import_inventory():
                         item.gst_rate = float(str(pgst).replace('%', ''))
                     except (ValueError, TypeError):
                         pass
+
+            # ── Per-clinic qty columns ──────────────────────────────────────────
+            has_clinic_cols = bool(clinic_cols) and any(h in row for h in clinic_cols)
+
+            if has_clinic_cols:
+                for col_header, location_id in clinic_cols.items():
+                    if col_header not in row:
+                        continue
+                    try:
+                        col_qty = int(float(row[col_header] or 0))
+                    except (ValueError, TypeError):
+                        col_qty = 0
+
+                    if col_qty <= 0 and mode == 'update':
+                        continue
+
+                    mrp_str = get_val(['MRP', 'price', 'Max MRP']) or '0'
+                    try:
+                        mrp = float(mrp_str)
+                    except (ValueError, TypeError):
+                        mrp = 0.0
+
+                    rate_str = get_val(['Purchase Rate', 'rate', 'Avg Purchase Rate']) or '0'
+                    try:
+                        rate = float(rate_str)
+                    except (ValueError, TypeError):
+                        rate = 0.0
+
+                    gst_str = get_val(['Batch GST Rate', 'GST', 'tax', 'GST Rate']) or '0'
+                    try:
+                        gst_rate = float(str(gst_str).replace('%', ''))
+                    except (ValueError, TypeError):
+                        gst_rate = 0.0
+
+                    batch_num = get_val(['Batch Number', 'Batch', 'batch no', 'Batch No']) or ''
+
+                    exp_str = get_val(['Expiry Date', 'Expiry', 'exp', 'Earliest Expiry'])
+                    expiry_date = parse_expiry_date(exp_str)
+
+                    existing_batch = None
+                    if batch_num and expiry_date:
+                        existing_batch = InventoryBatch.query.filter_by(
+                            product_id=item.id,
+                            batch_number=batch_num,
+                            expiry_date=expiry_date,
+                            location_id=location_id,
+                        ).first()
+                    elif batch_num:
+                        existing_batch = InventoryBatch.query.filter_by(
+                            product_id=item.id,
+                            batch_number=batch_num,
+                            location_id=location_id,
+                        ).first()
+
+                    if existing_batch:
+                        diff = col_qty - float(existing_batch.quantity)
+                        if abs(diff) >= 0.01:
+                            existing_batch.quantity = col_qty
+                            db.session.add(InventoryHistory(
+                                product_id=item.id,
+                                batch_id=existing_batch.id,
+                                change_amount=diff,
+                                type='ADJUSTMENT',
+                                notes=f'CSV Import {mode.capitalize()} — location batch update',
+                                purchase_invoice_number=import_id,
+                                user_id=g.current_user.get('user_id'),
+                                username=g.current_user.get('username'),
+                            ))
+                            total_import_value += abs(diff) * mrp
+                    elif mode == 'overwrite':
+                        current_loc_qty = float(
+                            db.session.query(func.sum(InventoryBatch.quantity))
+                            .filter_by(product_id=item.id, location_id=location_id)
+                            .scalar() or 0
+                        )
+                        diff = col_qty - current_loc_qty
+                        if diff > 0:
+                            batch = InventoryBatch(
+                                product_id=item.id,
+                                quantity=diff,
+                                initial_quantity=diff,
+                                mrp=mrp,
+                                purchase_rate=rate,
+                                gst_rate=gst_rate,
+                                expiry_date=expiry_date,
+                                purchase_invoice_number=import_id,
+                                batch_number=batch_num or 'ADJUST',
+                                location_id=location_id,
+                            )
+                            db.session.add(batch)
+                            db.session.flush()
+                            db.session.add(InventoryHistory(
+                                product_id=item.id,
+                                batch_id=batch.id,
+                                change_amount=diff,
+                                type='PURCHASE',
+                                notes=f'CSV Import Overwrite — location {location_id}',
+                                purchase_invoice_number=import_id,
+                                user_id=g.current_user.get('user_id'),
+                                username=g.current_user.get('username'),
+                            ))
+                            total_import_value += diff * mrp
+                        elif diff < 0:
+                            to_remove = abs(diff)
+                            fifo_batches = InventoryBatch.query.filter_by(
+                                product_id=item.id, location_id=location_id
+                            ).filter(InventoryBatch.quantity > 0).order_by(
+                                InventoryBatch.expiry_date.asc().nullslast()
+                            ).all()
+                            for fb in fifo_batches:
+                                if to_remove <= 0:
+                                    break
+                                deduct = min(float(fb.quantity), to_remove)
+                                fb.quantity = float(fb.quantity) - deduct
+                                to_remove -= deduct
+                    else:
+                        batch = InventoryBatch(
+                            product_id=item.id,
+                            quantity=col_qty,
+                            initial_quantity=col_qty,
+                            mrp=mrp,
+                            purchase_rate=rate,
+                            gst_rate=gst_rate,
+                            expiry_date=expiry_date,
+                            purchase_invoice_number=import_id,
+                            batch_number=batch_num or '',
+                            location_id=location_id,
+                        )
+                        db.session.add(batch)
+                        db.session.flush()
+                        db.session.add(InventoryHistory(
+                            product_id=item.id,
+                            batch_id=batch.id,
+                            change_amount=col_qty,
+                            type='PURCHASE',
+                            notes=f'CSV Import Update — location {location_id}',
+                            purchase_invoice_number=import_id,
+                            user_id=g.current_user.get('user_id'),
+                            username=g.current_user.get('username'),
+                        ))
+                        total_import_value += col_qty * mrp
+                    processed_count += 1
+                continue  # Skip the generic single-batch logic below
 
             qty_str = get_val(['Quantity', 'qty', 'Total Quantity']) or '0'
             try:
