@@ -1,10 +1,10 @@
 "use client"
 import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  TrendingUp, TrendingDown, DollarSign, Stethoscope, ShoppingBag, MapPin, 
-  UserCircle2, Package, Calendar, CreditCard, Landmark, Wallet, Plus, 
-  PieChart, ListOrdered, Activity, Receipt, QrCode, Trash2, Image as ImageIcon, 
+import {
+  TrendingUp, TrendingDown, DollarSign, Stethoscope, ShoppingBag, MapPin,
+  Package, Calendar, CreditCard, Landmark, Wallet, Plus,
+  PieChart, ListOrdered, Activity, Receipt, QrCode, Trash2, Image as ImageIcon,
   ArrowUpRight, ArrowDownRight, Smartphone, Briefcase, BarChart3, Percent,
   CheckCircle2, AlertCircle, FileText, CalendarDays, Clock, Users, Loader2,
   XCircle, AlertOctagon, MinusCircle, AlertTriangle, ShieldAlert
@@ -23,8 +23,9 @@ const fmt = (n: number) => `₹${(n || 0).toLocaleString('en-IN')}`
 
 export default function StatusPage() {
   // Top Level Controls
-  const [loc, setLoc] = useState("all")
-  const [staff, setStaff] = useState("all")
+  const [loc, setLoc] = useState<number | 'all'>('all')
+  const [locations, setLocations] = useState<{ id: number; name: string }[]>([])
+
   const [period, setPeriod] = useState("month")
   const [viewMode, setViewMode] = useState("money") // New: money | inventory
   const [alertTab, setAlertTab] = useState("all") // Current sub-alert filter in inventory
@@ -42,12 +43,19 @@ export default function StatusPage() {
   const [apiData, setApiData] = useState<any>(null)
   const [ledger, setLedger] = useState<any[]>([])
 
+  // Fetch active locations once on mount
+  useEffect(() => {
+    api.getLocations()
+      .then(locs => setLocations(locs.filter((l: { id: number; name: string; is_active: boolean }) => l.is_active)))
+      .catch(() => {})
+  }, [])
+
   // Initial Fetch logic
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const analytics = await api.getInventoryAnalytics()
-      const ledgerData = await api.getLedger()
+      const analytics = await api.getInventoryAnalytics(loc)
+      const ledgerData = await api.getLedger(loc)
       setApiData(analytics)
       setLedger(ledgerData)
     } catch (error) {
@@ -170,7 +178,7 @@ export default function StatusPage() {
         amount: parseFloat(form.amount),
         category: form.type,
         frequency: form.freq,
-        location: loc === 'all' ? 'Main' : loc
+        location: 'Main' // kept for backward compat; location_id filtering handled via loc state
       })
       setIsAddOpen(false)
       setForm({ title: "", amount: "", type: "Generic", freq: "one-time" })
@@ -236,13 +244,20 @@ export default function StatusPage() {
 
         {/* Dimensionality Filters */}
         <div className="flex items-center gap-2">
-          <Select value={loc} onValueChange={setLoc}>
-            <SelectTrigger className="h-9 w-36 border-slate-200 font-bold text-xs rounded-lg "><MapPin className="w-3.5 h-3.5 mr-2 text-slate-400"/><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">All Branches</SelectItem><SelectItem value="Main">Main Clinic</SelectItem></SelectContent>
-          </Select>
-          <Select value={staff} onValueChange={setStaff}>
-            <SelectTrigger className="h-9 w-36 border-slate-200 font-bold text-xs rounded-lg "><UserCircle2 className="w-3.5 h-3.5 mr-2 text-slate-400"/><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">Total Staff</SelectItem><SelectItem value="current">Current User</SelectItem></SelectContent>
+          <Select
+            value={loc === 'all' ? 'all' : loc.toString()}
+            onValueChange={val => setLoc(val === 'all' ? 'all' : parseInt(val))}
+          >
+            <SelectTrigger className="h-9 w-44 border-slate-200 font-bold text-xs rounded-lg">
+              <MapPin className="w-3.5 h-3.5 mr-2 text-slate-400" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Branches</SelectItem>
+              {locations.map(l => (
+                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       </div>
