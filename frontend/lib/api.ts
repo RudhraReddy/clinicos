@@ -635,6 +635,8 @@ export interface AdminUser {
   role: 'staff' | 'doctor' | 'admin'
   is_active: boolean
   location_label?: string | null
+  location_id?: number | null
+  location_name?: string | null
   created_at: string
   assigned_staff_ids?: string[]
 }

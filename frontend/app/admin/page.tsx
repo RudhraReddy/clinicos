@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
@@ -342,9 +343,15 @@ function UsersTab() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [editUsername, setEditUsername] = useState("")
   const [editRole, setEditRole] = useState<'staff' | 'doctor' | 'admin'>("staff")
-  const [editLocation, setEditLocation] = useState("")
+  const [editLocationId, setEditLocationId] = useState<number | null>(null)
   const [editActive, setEditActive] = useState(true)
   const [editAssignedStaffIds, setEditAssignedStaffIds] = useState<string[]>([])
+
+  const [locations, setLocations] = useState<Location[]>([])
+
+  useEffect(() => {
+    api.getLocations().then(setLocations).catch(() => {})
+  }, [])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -360,7 +367,7 @@ function UsersTab() {
     setEditingUser(u)
     setEditUsername(u.username)
     setEditRole(u.role)
-    setEditLocation(u.location_label || "")
+    setEditLocationId(u.location_id ?? null)
     setEditActive(u.is_active)
     setEditAssignedStaffIds(u.assigned_staff_ids || [])
   }
@@ -372,7 +379,7 @@ function UsersTab() {
       const payload: any = {
         username: editUsername,
         role: editRole,
-        location_label: editLocation || null,
+        location_id: editLocationId,
         is_active: editActive,
       }
       if (editRole === 'doctor') {
@@ -426,7 +433,7 @@ function UsersTab() {
                     {u.role}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{u.location_label ?? '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{u.location_name ?? u.location_label ?? '—'}</TableCell>
                 <TableCell>
                   <Badge variant={u.is_active ? 'default' : 'secondary'}>
                     {u.is_active ? 'Active' : 'Inactive'}
@@ -480,12 +487,20 @@ function UsersTab() {
 
               <div className="space-y-1">
                 <Label htmlFor="edit-location" className="text-sm font-semibold">Location</Label>
-                <Input
-                  id="edit-location"
-                  value={editLocation}
-                  onChange={(e) => setEditLocation(e.target.value)}
-                  placeholder="Location / Chamber Label"
-                />
+                <Select
+                  value={editLocationId?.toString() ?? 'none'}
+                  onValueChange={val => setEditLocationId(val === 'none' ? null : parseInt(val))}
+                >
+                  <SelectTrigger id="edit-location">
+                    <SelectValue placeholder="No location assigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No location</SelectItem>
+                    {locations.filter(l => l.is_active).map(l => (
+                      <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1">
