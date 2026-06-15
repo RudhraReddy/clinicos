@@ -9,6 +9,7 @@ export interface AuthUser {
   username: string
   role: 'staff' | 'doctor' | 'admin'
   location_label?: string | null
+  location_id?: number | null
 }
 
 interface AuthContextType {
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           username: data.username,
           role: data.role,
           location_label: data.location_label,
+          location_id: data.location_id ?? null,
         })
       } else {
         setUser(null)
