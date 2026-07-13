@@ -24,7 +24,7 @@ def create_patient():
         if ref_id == patient_id:
             return jsonify({'error': 'Patient cannot reference themselves'}), 400
         if not Patient.query.filter_by(patient_id=ref_id).first():
-            return jsonify({'error': 'Referenced patient not found'}), 404
+            return jsonify({'error': 'Referenced patient not found'}), 400
 
     new_patient = Patient(
         patient_id=patient_id,
@@ -139,7 +139,7 @@ def update_patient(patient_id):
             if ref_id == patient_id:
                 return jsonify({'error': 'Patient cannot reference themselves'}), 400
             if not Patient.query.filter_by(patient_id=ref_id).first():
-                return jsonify({'error': 'Referenced patient not found'}), 404
+                return jsonify({'error': 'Referenced patient not found'}), 400
         patient.reference_patient_id = ref_id
 
     db.session.commit()
