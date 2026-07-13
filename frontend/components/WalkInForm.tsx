@@ -41,6 +41,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [address, setAddress] = useState('')
     const [visit, setVisit] = useState(emptyVisit())
     const [submitting, setSubmitting] = useState(false)
+    const [patientVisits, setPatientVisits] = useState<import('@/lib/api').Visit[]>([])
 
     useEffect(() => {
         if (phone.length < 4) {
@@ -51,6 +52,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 setName('')
                 setAge('')
                 setSex('')
+                setPatientVisits([])
             }
             return
         }
@@ -66,6 +68,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     setName(data[0].name)
                     setAge(data[0].age?.toString() ?? '')
                     setSex(data[0].sex ?? '')
+                    api.getVisits(data[0].patient_id)
+                        .then(vs => setPatientVisits(vs.filter(v => v.status !== 'deleted')))
+                        .catch(() => setPatientVisits([]))
                 } else {
                     setMatchedPatient(null)
                     setMatchCount(0)
@@ -73,10 +78,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     setName('')
                     setAge('')
                     setSex('')
+                    setPatientVisits([])
                 }
             } catch {
                 setMatchedPatient(null)
                 setFormState('not_found')
+                setPatientVisits([])
             }
         }, 300)
         return () => clearTimeout(timer)
@@ -102,6 +109,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setSex('')
         setAddress('')
         setVisit(emptyVisit())
+        setPatientVisits([])
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -263,6 +271,35 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         disabled={patientBlank}
                         className={patientLocked ? 'bg-muted/60' : ''}
                     />
+
+                    {/* Past visits for found patient */}
+                    {formState === 'found' && (
+                        <div className="border rounded-md overflow-hidden">
+                            <div className="px-3 py-1.5 bg-muted/40 border-b flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Past Visits</span>
+                                {patientVisits.length > 0 && (
+                                    <span className="text-[11px] text-muted-foreground">{patientVisits.length}</span>
+                                )}
+                            </div>
+                            {patientVisits.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center py-2.5">No past visits</p>
+                            ) : (
+                                <div className="max-h-36 overflow-y-auto divide-y divide-border/50">
+                                    {patientVisits.map(v => (
+                                        <div key={v.visit_id} className="flex items-center justify-between px-3 py-1.5 text-xs gap-3">
+                                            <span className="text-muted-foreground font-mono shrink-0">{v.visit_date}</span>
+                                            <span className="truncate text-foreground/80">{v.reason || '—'}</span>
+                                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                v.status === 'done' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                                                : v.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                                                : 'bg-secondary text-muted-foreground'
+                                            }`}>{v.status}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Action row for found state */}
                     {formState === 'found' && (

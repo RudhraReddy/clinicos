@@ -137,10 +137,6 @@ export default function Dashboard() {
     const waitingCount = todayVisits.filter(v =>
         !['in_progress', 'done', 'cancelled'].includes(v.status.toLowerCase())
     ).length
-    const recentVisits = visits
-        .filter(v => v.visit_date < today)
-        .sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.visit_time || '').localeCompare(a.visit_time || ''))
-        .slice(0, 20)
 
     const handleDeleteVisit = async (visitId: string) => {
         if (!confirm("Delete this visit?")) return
@@ -249,17 +245,6 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {/* Recent */}
-                        {recentVisits.length > 0 && (
-                            <>
-                                <div className="px-4 py-1.5 bg-muted/40 border-y mt-1">
-                                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Recent</span>
-                                </div>
-                                <div className="text-sm">
-                                    {recentVisits.map(v => renderVisitRow(v, true))}
-                                </div>
-                            </>
-                        )}
                     </>
                 )}
             </CardContent>
