@@ -137,6 +137,10 @@ export default function Dashboard() {
     const waitingCount = todayVisits.filter(v =>
         !['in_progress', 'done', 'cancelled'].includes(v.status.toLowerCase())
     ).length
+    const recentVisits = visits
+        .filter(v => v.visit_date < today)
+        .sort((a, b) => b.visit_date.localeCompare(a.visit_date) || (b.visit_time || '').localeCompare(a.visit_time || ''))
+        .slice(0, 20)
 
     const handleDeleteVisit = async (visitId: string) => {
         if (!confirm("Delete this visit?")) return
@@ -157,13 +161,66 @@ export default function Dashboard() {
         }
     }
 
+    const renderVisitRow = (visit: Visit, showDate = false) => (
+        <div
+            key={visit.visit_id}
+            className="grid grid-cols-[1fr_auto] items-center gap-2 py-2.5 border-b last:border-0 border-border/50 hover:bg-muted/30 transition-all rounded-sm px-4"
+        >
+            <div className="space-y-0.5 text-left overflow-hidden">
+                <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-sm leading-none truncate">{visit.patient_name}</p>
+                    {visit.patient_id && <PatientContactPopover patientId={visit.patient_id} />}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{visit.reason || "No reason"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end">
+                    <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                        {showDate ? visit.visit_date : formatTime(visit.visit_time, visit.created_at)}
+                    </span>
+                    {!showDate && formatUpdatedTime(visit.updated_at, visit.created_at) && (
+                        <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 tabular-nums">
+                            Edited {formatUpdatedTime(visit.updated_at, visit.created_at)}
+                        </span>
+                    )}
+                </div>
+                <div className="flex items-center">
+                    <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 rounded-full hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-500/20"
+                        onClick={() => handleDoneAndBill(visit)}
+                        title="Done & Bill"
+                    >
+                        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 rounded-full hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20"
+                        onClick={() => { setSelectedVisit(visit); setEditVisitOpen(true) }}
+                        title="Edit"
+                    >
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20"
+                        onClick={() => handleDeleteVisit(visit.visit_id)}
+                        title="Delete"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+    )
+
     const renderTodaysList = () => (
         <Card className="flex-1 flex flex-col overflow-hidden">
-            <CardHeader className="pb-3 pt-5 px-5 shrink-0">
+            <CardHeader className="pb-2 pt-4 px-4 shrink-0">
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Today&apos;s List</CardTitle>
-                    <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-                        {loading ? "..." : waitingCount} Waiting
+                    <CardTitle className="text-base">Visits</CardTitle>
+                    <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">
+                        {loading ? "..." : waitingCount} waiting today
                     </span>
                 </div>
             </CardHeader>
@@ -178,65 +235,32 @@ export default function Dashboard() {
                     <div className="py-10 text-center text-muted-foreground text-sm">
                         <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Loading...
                     </div>
-                ) : orderedTodayVisits.length === 0 ? (
-                    <div className="py-4 mx-5 text-center text-muted-foreground text-sm border-2 border-dashed rounded-lg mt-2">
-                        No appointments today.
-                    </div>
                 ) : (
-                    <div className="space-y-0 text-sm">
-                        {orderedTodayVisits.map(visit => (
-                            <div
-                                key={visit.visit_id}
-                                className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b last:border-0 border-border/50 hover:bg-muted/30 transition-all rounded-sm px-5"
-                            >
-                                <div className="space-y-0.5 text-left overflow-hidden">
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium text-sm leading-none truncate">{visit.patient_name}</p>
-                                        {visit.patient_id && <PatientContactPopover patientId={visit.patient_id} />}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">{visit.reason || "No reason"}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex flex-col items-end mr-1">
-                                        <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                                            {formatTime(visit.visit_time, visit.created_at)}
-                                        </span>
-                                        {formatUpdatedTime(visit.updated_at, visit.created_at) && (
-                                            <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 tabular-nums">
-                                                Edited {formatUpdatedTime(visit.updated_at, visit.created_at)}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost" size="icon"
-                                            className="h-8 w-8 rounded-full hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-500/20"
-                                            onClick={() => handleDoneAndBill(visit)}
-                                            title="Done & Bill"
-                                        >
-                                            <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost" size="icon"
-                                            className="h-8 w-8 rounded-full hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20"
-                                            onClick={() => { setSelectedVisit(visit); setEditVisitOpen(true) }}
-                                            title="Edit"
-                                        >
-                                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost" size="icon"
-                                            className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20"
-                                            onClick={() => handleDeleteVisit(visit.visit_id)}
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                        </Button>
-                                    </div>
-                                </div>
+                    <>
+                        {/* Today */}
+                        <div className="px-4 py-1.5 bg-muted/40 border-b">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Today</span>
+                        </div>
+                        {orderedTodayVisits.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-3">No appointments today</p>
+                        ) : (
+                            <div className="text-sm">
+                                {orderedTodayVisits.map(v => renderVisitRow(v, false))}
                             </div>
-                        ))}
-                    </div>
+                        )}
+
+                        {/* Recent */}
+                        {recentVisits.length > 0 && (
+                            <>
+                                <div className="px-4 py-1.5 bg-muted/40 border-y mt-1">
+                                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Recent</span>
+                                </div>
+                                <div className="text-sm">
+                                    {recentVisits.map(v => renderVisitRow(v, true))}
+                                </div>
+                            </>
+                        )}
+                    </>
                 )}
             </CardContent>
         </Card>

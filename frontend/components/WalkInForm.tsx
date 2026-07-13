@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, UserPlus, CheckCircle2, XCircle } from "lucide-react"
+import { Loader2, UserPlus } from "lucide-react"
 import { api, type Patient } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
 import { toast } from "sonner"
@@ -29,29 +29,29 @@ const emptyVisit = () => ({
     payment_status: 'unpaid',
 })
 
-const emptyNewPatient = () => ({
-    name: '',
-    age: '',
-    sex: '',
-    address: '',
-})
-
 export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [phone, setPhone] = useState('')
     const [formState, setFormState] = useState<FormState>('idle')
     const [matchedPatient, setMatchedPatient] = useState<Patient | null>(null)
     const [matchCount, setMatchCount] = useState(0)
     const [referencePatientId, setReferencePatientId] = useState<string | null>(null)
-    const [newPatient, setNewPatient] = useState(emptyNewPatient())
+    const [name, setName] = useState('')
+    const [age, setAge] = useState('')
+    const [sex, setSex] = useState('')
+    const [address, setAddress] = useState('')
     const [visit, setVisit] = useState(emptyVisit())
     const [submitting, setSubmitting] = useState(false)
 
-    // Phone search — debounced 300ms, fires when ≥ 4 digits
     useEffect(() => {
         if (phone.length < 4) {
-            setFormState('idle')
-            setMatchedPatient(null)
-            setMatchCount(0)
+            if (formState !== 'idle') {
+                setFormState('idle')
+                setMatchedPatient(null)
+                setMatchCount(0)
+                setName('')
+                setAge('')
+                setSex('')
+            }
             return
         }
 
@@ -63,10 +63,16 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     setMatchedPatient(data[0])
                     setMatchCount(data.length)
                     setFormState('found')
+                    setName(data[0].name)
+                    setAge(data[0].age?.toString() ?? '')
+                    setSex(data[0].sex ?? '')
                 } else {
                     setMatchedPatient(null)
                     setMatchCount(0)
                     setFormState('not_found')
+                    setName('')
+                    setAge('')
+                    setSex('')
                 }
             } catch {
                 setMatchedPatient(null)
@@ -78,7 +84,10 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
     const handleCreateNewPatient = () => {
         setReferencePatientId(matchedPatient?.patient_id ?? null)
-        setNewPatient(emptyNewPatient())
+        setName('')
+        setAge('')
+        setSex('')
+        setAddress('')
         setFormState('new_patient')
     }
 
@@ -88,13 +97,16 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setMatchedPatient(null)
         setMatchCount(0)
         setReferencePatientId(null)
-        setNewPatient(emptyNewPatient())
+        setName('')
+        setAge('')
+        setSex('')
+        setAddress('')
         setVisit(emptyVisit())
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (formState === 'searching') return
+        if (formState === 'idle' || formState === 'searching') return
         setSubmitting(true)
 
         try {
@@ -103,13 +115,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
             if (formState === 'found' && matchedPatient) {
                 patientId = matchedPatient.patient_id
             } else {
-                // not_found or new_patient — create patient first
                 const created = await api.createPatient({
-                    name: newPatient.name,
+                    name,
                     phone_number: phone,
-                    age: newPatient.age ? parseInt(newPatient.age) : undefined,
-                    sex: newPatient.sex || undefined,
-                    address: newPatient.address || undefined,
+                    age: age ? parseInt(age) : undefined,
+                    sex: sex || undefined,
+                    address: address || undefined,
                     reference_patient_id: referencePatientId || undefined,
                     dob: null,
                 }) as { patient_id: string }
@@ -141,227 +152,190 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         }
     }
 
-    const showVisitFields = formState !== 'idle'
+    const patientLocked = formState === 'found'
+    const patientBlank = formState === 'idle' || formState === 'searching'
+    const showAddressField = formState === 'not_found' || formState === 'new_patient'
+    const canSubmit = !submitting && (
+        formState === 'found' ||
+        ((formState === 'not_found' || formState === 'new_patient') && name.trim() !== '')
+    )
 
     return (
         <Card className="flex flex-col h-full overflow-hidden">
-            <CardHeader className="pb-3 pt-5 px-5 shrink-0">
-                <CardTitle className="text-lg">Walk-in / Book Appointment</CardTitle>
+            <CardHeader className="pb-2 pt-4 px-5 shrink-0">
+                <CardTitle className="text-base">Walk-in / Book Appointment</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto px-5 pb-5">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Phone input */}
-                    <div className="space-y-1">
-                        <label className="text-sm font-medium">Phone Number</label>
-                        <div className="relative">
+            <CardContent className="flex-1 overflow-y-auto px-5 pb-4">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+
+                    {/* Phone */}
+                    <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</label>
+                        <div className="relative mt-1">
                             <Input
                                 value={phone}
                                 onChange={e => setPhone(e.target.value)}
-                                placeholder="Enter phone number to search..."
+                                placeholder="Search by phone number..."
                                 className="pr-8"
                                 autoComplete="off"
                                 readOnly={formState === 'new_patient'}
                             />
                             {formState === 'searching' && (
-                                <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                                <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                            {formState === 'found' && (
+                                <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />
+                            )}
+                            {formState === 'not_found' && (
+                                <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />
+                            )}
+                        </div>
+                        {matchCount > 1 && formState === 'found' && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                {matchCount} patients share this number
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Patient fields — always visible */}
+                    <div className="grid grid-cols-[1fr_72px_96px] gap-2">
+                        <div>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Name{showAddressField && <span className="text-destructive ml-0.5">*</span>}
+                            </label>
+                            <Input
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                placeholder="Patient name"
+                                readOnly={patientLocked}
+                                disabled={patientBlank}
+                                className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Age</label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="120"
+                                value={age}
+                                onChange={e => setAge(e.target.value)}
+                                placeholder="—"
+                                readOnly={patientLocked}
+                                disabled={patientBlank}
+                                className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sex</label>
+                            {patientLocked || patientBlank ? (
+                                <Input
+                                    value={sex}
+                                    readOnly
+                                    disabled={patientBlank}
+                                    placeholder="—"
+                                    className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                                />
+                            ) : (
+                                <Select value={sex} onValueChange={setSex}>
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue placeholder="—" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Male">Male</SelectItem>
+                                        <SelectItem value="Female">Female</SelectItem>
+                                        <SelectItem value="Other">Other</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             )}
                         </div>
                     </div>
 
-                    {/* Found state — patient card */}
-                    {formState === 'found' && matchedPatient && (
-                        <div className="space-y-2">
-                            <div className="flex items-start gap-2 p-3 rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm leading-none">{matchedPatient.name}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {[matchedPatient.age ? `${matchedPatient.age}y` : null, matchedPatient.sex].filter(Boolean).join(' · ')}
-                                    </p>
-                                    {matchCount > 1 && (
-                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                            {matchCount} patients share this number
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={handleCreateNewPatient}
-                            >
-                                <UserPlus className="mr-2 h-3.5 w-3.5" />
-                                Create New Patient with this number
-                            </Button>
-                        </div>
+                    {/* Address — only when creating new patient */}
+                    {showAddressField && (
+                        <Input
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
+                            placeholder="Address (optional)"
+                        />
                     )}
 
-                    {/* Not found — new patient fields */}
-                    {formState === 'not_found' && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 p-2 rounded-md border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
-                                <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-                                <p className="text-xs text-red-700 dark:text-red-400 font-medium">Patient not found — enter details to register</p>
-                            </div>
-                            {renderNewPatientFields()}
-                        </div>
+                    {/* Action row for found state */}
+                    {formState === 'found' && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCreateNewPatient}
+                        >
+                            <UserPlus className="mr-2 h-3.5 w-3.5" />
+                            Create New Patient with this number
+                        </Button>
                     )}
-
-                    {/* New patient mode */}
                     {formState === 'new_patient' && (
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 p-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
-                                <UserPlus className="h-4 w-4 text-blue-500 shrink-0" />
-                                <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
-                                    New patient — referred by {matchedPatient?.name}
-                                </p>
-                            </div>
-                            {renderNewPatientFields()}
-                        </div>
-                    )}
-
-                    {/* Visit fields */}
-                    {showVisitFields && (
-                        <div className="space-y-3 pt-2 border-t">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Appointment Details</p>
-                            <div>
-                                <label className="text-sm font-medium">Reason</label>
-                                <Input
-                                    value={visit.reason}
-                                    onChange={e => setVisit(v => ({ ...v, reason: e.target.value }))}
-                                    placeholder="Reason for visit (optional)"
-                                    className="mt-1"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-sm font-medium">Date</label>
-                                    <Input
-                                        type="date"
-                                        value={visit.visit_date}
-                                        onChange={e => setVisit(v => ({ ...v, visit_date: e.target.value }))}
-                                        className="mt-1"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium">Time</label>
-                                    <Input
-                                        type="time"
-                                        value={visit.visit_time}
-                                        onChange={e => setVisit(v => ({ ...v, visit_time: e.target.value }))}
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-sm font-medium">Fee (&#8377;)</label>
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        value={visit.visiting_fee}
-                                        onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
-                                        placeholder="0"
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium">Payment</label>
-                                    <Select
-                                        value={visit.payment_status}
-                                        onValueChange={val => setVisit(v => ({ ...v, payment_status: val }))}
-                                    >
-                                        <SelectTrigger className="mt-1">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="unpaid">Unpaid</SelectItem>
-                                            <SelectItem value="partial">Partial</SelectItem>
-                                            <SelectItem value="full">Paid</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <Button type="submit" className="w-full" disabled={submitting}>
-                                {submitting ? (
-                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
-                                ) : formState === 'found' ? (
-                                    'Book Appointment'
-                                ) : (
-                                    'Create Patient & Book'
-                                )}
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Idle placeholder */}
-                    {formState === 'idle' && (
-                        <p className="text-sm text-muted-foreground text-center py-6">
-                            Enter the patient&apos;s phone number above to begin
+                        <p className="text-xs text-blue-600 dark:text-blue-400">
+                            ↳ Referred by {matchedPatient?.name}
                         </p>
                     )}
+
+                    {/* Appointment */}
+                    <div className="border-t pt-2.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Appointment</label>
+                        <div className="flex flex-col gap-2 mt-2">
+                            <Input
+                                value={visit.reason}
+                                onChange={e => setVisit(v => ({ ...v, reason: e.target.value }))}
+                                placeholder="Reason for visit (optional)"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                    type="date"
+                                    value={visit.visit_date}
+                                    onChange={e => setVisit(v => ({ ...v, visit_date: e.target.value }))}
+                                    required
+                                />
+                                <Input
+                                    type="time"
+                                    value={visit.visit_time}
+                                    onChange={e => setVisit(v => ({ ...v, visit_time: e.target.value }))}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    value={visit.visiting_fee}
+                                    onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
+                                    placeholder="Fee (₹)"
+                                />
+                                <Select
+                                    value={visit.payment_status}
+                                    onValueChange={val => setVisit(v => ({ ...v, payment_status: val }))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                                        <SelectItem value="partial">Partial</SelectItem>
+                                        <SelectItem value="full">Paid</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={!canSubmit}>
+                        {submitting ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+                        ) : formState === 'found' ? (
+                            'Book Appointment'
+                        ) : (
+                            'Create Patient & Book'
+                        )}
+                    </Button>
                 </form>
             </CardContent>
         </Card>
     )
-
-    function renderNewPatientFields() {
-        return (
-            <>
-                <div>
-                    <label className="text-sm font-medium">Full Name <span className="text-destructive">*</span></label>
-                    <Input
-                        value={newPatient.name}
-                        onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))}
-                        placeholder="Patient name"
-                        required
-                        className="mt-1"
-                    />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label className="text-sm font-medium">Age</label>
-                        <Input
-                            type="number"
-                            min="0"
-                            max="120"
-                            value={newPatient.age}
-                            onChange={e => setNewPatient(p => ({ ...p, age: e.target.value }))}
-                            placeholder="e.g. 30"
-                            className="mt-1"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium">Sex</label>
-                        <Select
-                            value={newPatient.sex}
-                            onValueChange={val => setNewPatient(p => ({ ...p, sex: val }))}
-                        >
-                            <SelectTrigger className="mt-1">
-                                <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Male">Male</SelectItem>
-                                <SelectItem value="Female">Female</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <div>
-                    <label className="text-sm font-medium">Address</label>
-                    <Input
-                        value={newPatient.address}
-                        onChange={e => setNewPatient(p => ({ ...p, address: e.target.value }))}
-                        placeholder="Address (optional)"
-                        className="mt-1"
-                    />
-                </div>
-            </>
-        )
-    }
 }
