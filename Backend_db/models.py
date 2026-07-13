@@ -12,7 +12,7 @@ class Patient(db.Model):
     age = db.Column(db.Integer)
     sex = db.Column(db.String(10))
     address = db.Column(db.Text)
-    reference = db.Column(db.String(100))
+    reference_patient_id = db.Column(db.String(8), db.ForeignKey('patients.patient_id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     created_by_user_id = db.Column(db.String(36), nullable=True)
 

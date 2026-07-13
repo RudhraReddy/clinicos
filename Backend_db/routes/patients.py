@@ -13,24 +13,30 @@ patients = Blueprint('patients', __name__)
 @require_auth
 def create_patient():
     data = request.get_json()
-    
+
     if not all(k in data for k in ('phone_number', 'name')):
         return jsonify({'error': 'Missing required fields: name, phone_number'}), 400
-    
+
     patient_id = Patient.generate_patient_id()
-    
+
+    ref_id = data.get('reference_patient_id')
+    if ref_id:
+        if ref_id == patient_id:
+            return jsonify({'error': 'Patient cannot reference themselves'}), 400
+        if not Patient.query.filter_by(patient_id=ref_id).first():
+            return jsonify({'error': 'Referenced patient not found'}), 404
+
     new_patient = Patient(
         patient_id=patient_id,
         phone_number=data['phone_number'],
         name=data['name'],
-        age=int(data.get('age', 0)) if data.get('age') else None,
+        age=int(data['age']) if data.get('age') else None,
         sex=data.get('sex'),
         address=data.get('address'),
-        reference=data.get('reference'),
-        dob=None,
+        dob=data.get('dob'),
+        reference_patient_id=ref_id,
         created_by_user_id=g.current_user.get('user_id'),
     )
-
     db.session.add(new_patient)
     db.session.commit()
 
@@ -68,7 +74,14 @@ def get_patients():
         )
 
     patients_list = q.offset((page - 1) * limit).limit(limit).all()
-        
+
+    # Batch-load reference names (one extra query at most)
+    ref_ids = [p.reference_patient_id for p in patients_list if p.reference_patient_id]
+    ref_map: dict = {}
+    if ref_ids:
+        refs = Patient.query.filter(Patient.patient_id.in_(ref_ids)).all()
+        ref_map = {r.patient_id: r.name for r in refs}
+
     results = []
     for p in patients_list:
         results.append({
@@ -78,7 +91,8 @@ def get_patients():
             'age': p.age,
             'sex': p.sex,
             'address': p.address,
-            'reference': p.reference,
+            'reference_patient_id': p.reference_patient_id,
+            'reference_patient_name': ref_map.get(p.reference_patient_id) if p.reference_patient_id else None,
             'created_at': p.created_at.isoformat() if p.created_at else None,
         })
     return jsonify(results), 200
@@ -87,6 +101,10 @@ def get_patients():
 @require_auth
 def get_patient_detail(patient_id):
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
+    ref_name = None
+    if patient.reference_patient_id:
+        ref = Patient.query.filter_by(patient_id=patient.reference_patient_id).first()
+        ref_name = ref.name if ref else None
     return jsonify({
         'patient_id': patient.patient_id,
         'name': patient.name,
@@ -94,8 +112,9 @@ def get_patient_detail(patient_id):
         'age': patient.age,
         'sex': patient.sex,
         'address': patient.address,
-        'reference': patient.reference,
-        'created_at': patient.created_at
+        'reference_patient_id': patient.reference_patient_id,
+        'reference_patient_name': ref_name,
+        'created_at': patient.created_at.isoformat() if patient.created_at else None,
     }), 200
 
 @patients.route('/patients/<patient_id>', methods=['PUT'])
@@ -114,9 +133,15 @@ def update_patient(patient_id):
         patient.sex = data['sex']
     if 'address' in data:
         patient.address = data['address']
-    if 'reference' in data:
-        patient.reference = data['reference']
-        
+    if 'reference_patient_id' in data:
+        ref_id = data['reference_patient_id']
+        if ref_id is not None:
+            if ref_id == patient_id:
+                return jsonify({'error': 'Patient cannot reference themselves'}), 400
+            if not Patient.query.filter_by(patient_id=ref_id).first():
+                return jsonify({'error': 'Referenced patient not found'}), 404
+        patient.reference_patient_id = ref_id
+
     db.session.commit()
 
     log_activity(
@@ -144,8 +169,15 @@ def export_patients():
     writer = csv.writer(output)
     
     # Headers
-    writer.writerow(['Patient ID', 'Name', 'Phone Number', 'Age', 'Sex', 'Address', 'Reference', 'Registration Date'])
-    
+    writer.writerow(['Patient ID', 'Name', 'Phone Number', 'Age', 'Sex', 'Address', 'Referred By', 'Registration Date'])
+
+    # Batch-load reference names
+    all_ref_ids = [p.reference_patient_id for p in all_patients if p.reference_patient_id]
+    all_ref_map: dict = {}
+    if all_ref_ids:
+        refs = Patient.query.filter(Patient.patient_id.in_(all_ref_ids)).all()
+        all_ref_map = {r.patient_id: r.name for r in refs}
+
     for p in all_patients:
         writer.writerow([
             p.patient_id,
@@ -154,7 +186,7 @@ def export_patients():
             p.age if p.age is not None else '',
             p.sex or '',
             p.address or '',
-            p.reference or '',
+            all_ref_map.get(p.reference_patient_id, '') if p.reference_patient_id else '',
             p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else ''
         ])
         
@@ -244,19 +276,12 @@ def import_patients():
 
             addr_val = safe_get(row, ['Address', 'Residence'])
             clean_addr = str(addr_val).strip() if addr_val else None
-            
-            ref_val = safe_get(row, ['Reference', 'Referred By'])
-            clean_ref = str(ref_val).strip() if ref_val else None
-            if clean_ref and len(clean_ref) > 100:
-                db.session.rollback()
-                return jsonify({'error': f"Row {row_count + 1}: Reference field exceeds the maximum limit of 100 characters."}), 400
 
             if existing:
                 # Perform subtle attribute alignment
                 if clean_age is not None: existing.age = clean_age
                 if clean_sex: existing.sex = clean_sex
                 if clean_addr: existing.address = clean_addr
-                if clean_ref: existing.reference = clean_ref
                 updated += 1
             else:
                 # Genesis insert
@@ -267,7 +292,6 @@ def import_patients():
                     age=clean_age,
                     sex=clean_sex,
                     address=clean_addr,
-                    reference=clean_ref,
                     created_by_user_id=g.current_user.get('user_id')
                 )
                 db.session.add(new_entity)

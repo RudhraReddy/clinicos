@@ -51,6 +51,9 @@ def _apply_migrations(db):
         # 2026-06-15: min_stock_override flag for default vs custom min stock tracking
         "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS min_stock_override BOOLEAN DEFAULT FALSE",
         "UPDATE product_master SET min_stock_override = (min_stock_level != 10) WHERE min_stock_override = FALSE",
+        # Task 1: replace free-text reference string with FK to self
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS reference_patient_id VARCHAR(8) REFERENCES patients(patient_id) ON DELETE SET NULL",
+        "ALTER TABLE patients DROP COLUMN IF EXISTS reference",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
