@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, UserPlus } from "lucide-react"
+import { Loader2, UserPlus, AlertCircle } from "lucide-react"
 import { api, type Patient } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
 import { toast } from "sonner"
@@ -186,10 +186,13 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             {formState === 'found' && (
                                 <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />
                             )}
-                            {formState === 'not_found' && (
-                                <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background" />
-                            )}
                         </div>
+                        {formState === 'not_found' && (
+                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium">
+                                <AlertCircle className="h-3 w-3 shrink-0" />
+                                Patient not found
+                            </span>
+                        )}
                         {matchCount > 1 && formState === 'found' && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                                 {matchCount} patients share this number
