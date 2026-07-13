@@ -31,7 +31,7 @@ export const ALL_PATIENT_COLUMNS = [
     { id: 'age',          label: 'Age',          required: false },
     { id: 'sex',          label: 'Sex',          required: false },
     { id: 'address',      label: 'Address',      required: false },
-    { id: 'reference',    label: 'Referred By',  required: false },
+    { id: 'reference_patient_name', label: 'Referred By', required: false },
     { id: 'created_at',   label: 'Joined',       required: false },
 ] as const
 

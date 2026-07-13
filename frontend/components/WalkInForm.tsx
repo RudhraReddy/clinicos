@@ -58,9 +58,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setFormState('searching')
         const timer = setTimeout(async () => {
             try {
-                const res = await fetch(`/api/patients?phone_number=${encodeURIComponent(phone)}`)
-                if (!res.ok) throw new Error('Search failed')
-                const data: Patient[] = await res.json()
+                const data = await api.getPatientsByPhone(phone)
                 if (data.length > 0) {
                     setMatchedPatient(data[0])
                     setMatchCount(data.length)
@@ -96,6 +94,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (formState === 'searching') return
         setSubmitting(true)
 
         try {

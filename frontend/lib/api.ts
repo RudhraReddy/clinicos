@@ -185,6 +185,11 @@ export const api = {
         return fetchApi(`/api/patients?page=${page}&limit=${limit}`);
     },
 
+    async getPatientsByPhone(phone: string): Promise<Patient[]> {
+        const data = await fetchApi<{ patients: Patient[] }>(`/api/patients?phone_number=${encodeURIComponent(phone)}`)
+        return data.patients || []
+    },
+
     async getPatient(id: string): Promise<Patient> {
         return fetchApi(`/api/patients/${id}`);
     },

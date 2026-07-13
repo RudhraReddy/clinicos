@@ -253,7 +253,7 @@ export default function PatientsPage() {
                                             {visibleColumns.has('age') && <TableHead>Age</TableHead>}
                                             {visibleColumns.has('sex') && <TableHead>Sex</TableHead>}
                                             {visibleColumns.has('address') && <TableHead>Address</TableHead>}
-                                            {visibleColumns.has('reference') && <TableHead>Referred By</TableHead>}
+                                            {visibleColumns.has('reference_patient_name') && <TableHead>Referred By</TableHead>}
                                             {visibleColumns.has('created_at') && <TableHead>Joined</TableHead>}
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -288,7 +288,7 @@ export default function PatientsPage() {
                                                     {visibleColumns.has('address') && (
                                                         <TableCell className="max-w-[150px] truncate" title={patient.address || ""}>{patient.address || "N/A"}</TableCell>
                                                     )}
-                                                    {visibleColumns.has('reference') && (
+                                                    {visibleColumns.has('reference_patient_name') && (
                                                         <TableCell className="max-w-[150px] truncate" title={patient.reference_patient_name || ""}>
                                                             {patient.reference_patient_name ?? "—"}
                                                         </TableCell>
