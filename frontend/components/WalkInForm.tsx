@@ -154,7 +154,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
     const patientLocked = formState === 'found'
     const patientBlank = formState === 'idle' || formState === 'searching'
-    const showAddressField = formState === 'not_found' || formState === 'new_patient'
+    const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
     const canSubmit = !submitting && (
         formState === 'found' ||
         ((formState === 'not_found' || formState === 'new_patient') && name.trim() !== '')
@@ -172,12 +172,10 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     <div>
                         <div className="flex items-center gap-2">
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</label>
-                            {formState === 'not_found' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium">
-                                    <AlertCircle className="h-3 w-3 shrink-0" />
-                                    Patient not found
-                                </span>
-                            )}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium ${formState !== 'not_found' ? 'invisible' : ''}`}>
+                                <AlertCircle className="h-3 w-3 shrink-0" />
+                                Patient not found
+                            </span>
                         </div>
                         <div className="relative mt-1">
                             <Input
@@ -206,7 +204,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     <div className="grid grid-cols-[1fr_72px_96px] gap-2">
                         <div>
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                Name{showAddressField && <span className="text-destructive ml-0.5">*</span>}
+                                Name{isNewPatientMode && <span className="text-destructive ml-0.5">*</span>}
                             </label>
                             <Input
                                 value={name}
@@ -256,14 +254,15 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         </div>
                     </div>
 
-                    {/* Address — only when creating new patient */}
-                    {showAddressField && (
-                        <Input
-                            value={address}
-                            onChange={e => setAddress(e.target.value)}
-                            placeholder="Address (optional)"
-                        />
-                    )}
+                    {/* Address — always visible */}
+                    <Input
+                        value={address}
+                        onChange={e => setAddress(e.target.value)}
+                        placeholder="Address (optional)"
+                        readOnly={patientLocked}
+                        disabled={patientBlank}
+                        className={patientLocked ? 'bg-muted/60' : ''}
+                    />
 
                     {/* Action row for found state */}
                     {formState === 'found' && (
