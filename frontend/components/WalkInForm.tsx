@@ -142,7 +142,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         }
     }
 
-    const showVisitFields = formState === 'found' || formState === 'not_found' || formState === 'new_patient'
+    const showVisitFields = formState !== 'idle'
 
     return (
         <Card className="flex flex-col h-full overflow-hidden">
