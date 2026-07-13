@@ -13,20 +13,39 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, Download, Upload } from "lucide-react"
+import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, Download, Upload, Columns } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { api, type Patient } from "@/lib/api"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
 import { PatientDetailsView } from "@/components/PatientDetailsView"
 import { useAuth } from "@/lib/auth_context"
-import { useSettings } from "@/lib/settings_context"
+import { useSettings, ALL_PATIENT_COLUMNS } from "@/lib/settings_context"
 import { toast } from "sonner"
 
 const PAGE_LIMIT = 50
 
 export default function PatientsPage() {
     const { role } = useAuth()
-    const { appFontSize } = useSettings()
+    const { defaultPatientColumns } = useSettings()
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(defaultPatientColumns))
+
+    useEffect(() => {
+        setVisibleColumns(new Set(defaultPatientColumns))
+    }, [defaultPatientColumns])
+
+    const toggleColumn = (id: string) => {
+        if (id === 'name') return
+        setVisibleColumns(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+                next.delete(id)
+            } else {
+                next.add(id)
+            }
+            return next
+        })
+    }
     const [patients, setPatients] = useState<Patient[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -122,6 +141,34 @@ export default function PatientsPage() {
                         </Button>
                     </div>
 
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="shadow-sm h-9">
+                                <Columns className="mr-1.5 h-3.5 w-3.5" />
+                                Columns
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2" align="end">
+                            <h4 className="font-medium leading-none mb-2 px-2 text-sm">Toggle Columns</h4>
+                            {ALL_PATIENT_COLUMNS.map(col => (
+                                <label
+                                    key={col.id}
+                                    className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={visibleColumns.has(col.id)}
+                                        onChange={() => toggleColumn(col.id)}
+                                        disabled={col.required}
+                                        className="h-4 w-4 rounded border-gray-300"
+                                    />
+                                    {col.label}
+                                    {col.required && <span className="text-xs text-muted-foreground ml-auto">(always)</span>}
+                                </label>
+                            ))}
+                        </PopoverContent>
+                    </Popover>
+
                     <AddPatientDialog
                         open={dialogOpen}
                         onOpenChange={setDialogOpen}
@@ -200,14 +247,14 @@ export default function PatientsPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            {appFontSize <= 16 && <TableHead>Public ID</TableHead>}
+                                            {visibleColumns.has('patient_id') && <TableHead>Public ID</TableHead>}
                                             <TableHead>Name</TableHead>
-                                            <TableHead>Phone</TableHead>
-                                            <TableHead>Age</TableHead>
-                                            {appFontSize <= 16 && <TableHead>Sex</TableHead>}
-                                            {appFontSize <= 16 && <TableHead>Address</TableHead>}
-                                            {appFontSize <= 16 && <TableHead>Reference</TableHead>}
-                                            {appFontSize <= 16 && <TableHead>Joined</TableHead>}
+                                            {visibleColumns.has('phone_number') && <TableHead>Phone</TableHead>}
+                                            {visibleColumns.has('age') && <TableHead>Age</TableHead>}
+                                            {visibleColumns.has('sex') && <TableHead>Sex</TableHead>}
+                                            {visibleColumns.has('address') && <TableHead>Address</TableHead>}
+                                            {visibleColumns.has('reference') && <TableHead>Referred By</TableHead>}
+                                            {visibleColumns.has('created_at') && <TableHead>Joined</TableHead>}
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -221,26 +268,32 @@ export default function PatientsPage() {
                                         ) : (
                                             filteredPatients.map((patient, index) => (
                                                 <TableRow key={`${patient.patient_id}-${index}`}>
-                                                    {appFontSize <= 16 && (
+                                                    {visibleColumns.has('patient_id') && (
                                                         <TableCell className="font-medium font-mono text-xs text-muted-foreground">
                                                             {patient.patient_id}
                                                         </TableCell>
                                                     )}
                                                     <TableCell className="font-semibold">{patient.name}</TableCell>
-                                                    <TableCell>{patient.phone_number}</TableCell>
-                                                    <TableCell>
-                                                        {patient.age || (patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : "N/A")}
-                                                    </TableCell>
-                                                    {appFontSize <= 16 && (
+                                                    {visibleColumns.has('phone_number') && (
+                                                        <TableCell>{patient.phone_number}</TableCell>
+                                                    )}
+                                                    {visibleColumns.has('age') && (
+                                                        <TableCell>
+                                                            {patient.age || (patient.dob ? Math.floor((Date.now() - new Date(patient.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : "N/A")}
+                                                        </TableCell>
+                                                    )}
+                                                    {visibleColumns.has('sex') && (
                                                         <TableCell>{patient.sex || "N/A"}</TableCell>
                                                     )}
-                                                    {appFontSize <= 16 && (
+                                                    {visibleColumns.has('address') && (
                                                         <TableCell className="max-w-[150px] truncate" title={patient.address || ""}>{patient.address || "N/A"}</TableCell>
                                                     )}
-                                                    {appFontSize <= 16 && (
-                                                        <TableCell className="max-w-[150px] truncate" title={patient.reference || ""}>{patient.reference || "N/A"}</TableCell>
+                                                    {visibleColumns.has('reference') && (
+                                                        <TableCell className="max-w-[150px] truncate" title={patient.reference_patient_name || ""}>
+                                                            {patient.reference_patient_name ?? "—"}
+                                                        </TableCell>
                                                     )}
-                                                    {appFontSize <= 16 && (
+                                                    {visibleColumns.has('created_at') && (
                                                         <TableCell>{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : "N/A"}</TableCell>
                                                     )}
                                                     <TableCell className="text-right">
