@@ -170,7 +170,15 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
                     {/* Phone */}
                     <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</label>
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</label>
+                            {formState === 'not_found' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium">
+                                    <AlertCircle className="h-3 w-3 shrink-0" />
+                                    Patient not found
+                                </span>
+                            )}
+                        </div>
                         <div className="relative mt-1">
                             <Input
                                 value={phone}
@@ -187,12 +195,6 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />
                             )}
                         </div>
-                        {formState === 'not_found' && (
-                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium">
-                                <AlertCircle className="h-3 w-3 shrink-0" />
-                                Patient not found
-                            </span>
-                        )}
                         {matchCount > 1 && formState === 'found' && (
                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                                 {matchCount} patients share this number
