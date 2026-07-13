@@ -11,7 +11,8 @@ export interface Patient {
     sex?: string;
     dob?: string | null; // Deprecated but kept for type compat
     address?: string;
-    reference?: string;
+    reference_patient_id?: string | null;
+    reference_patient_name?: string | null;
     created_at?: string;
 }
 

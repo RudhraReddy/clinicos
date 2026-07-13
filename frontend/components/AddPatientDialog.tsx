@@ -38,7 +38,6 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
         age: "",
         sex: "",
         address: "",
-        reference: "",
     })
 
     // Suggestion Logic
@@ -89,7 +88,6 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
             // Usually we keep what we typed if we found partial, but here we want to associate.
             phone_number: patient.phone_number,
             address: patient.address || prev.address,
-            reference: patient.reference || prev.reference,
             // Clear personal details
             name: "",
             age: "",
@@ -109,7 +107,6 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
                 age: formData.age ? parseInt(formData.age) : undefined,
                 sex: formData.sex,
                 address: formData.address || undefined,
-                reference: formData.reference || undefined,
                 dob: null // Explicitly null
             })
 
@@ -120,7 +117,6 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
                 age: "",
                 sex: "",
                 address: "",
-                reference: ""
             })
 
             // Close dialog and notify success
@@ -256,17 +252,7 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="reference" className="text-sm font-medium">
-                                Reference
-                            </label>
-                            <Input
-                                id="reference"
-                                value={formData.reference}
-                                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                                placeholder="How did you hear about us?"
-                            />
-                        </div>
+
                     </div>
                     <DialogFooter>
                         <Button type="submit" disabled={submitting}>

@@ -22,6 +22,8 @@ import {
 import { Loader2 } from "lucide-react"
 import { api, Patient } from "@/lib/api"
 import { Textarea } from "@/components/ui/textarea"
+import { PatientSearch } from "@/components/PatientSearch"
+import { toast } from "sonner"
 
 interface EditPatientDialogProps {
     patient: Patient
@@ -39,7 +41,8 @@ export function EditPatientDialog({ patient, open, onOpenChange, onSuccess, trig
         age: "",
         sex: "",
         address: "",
-        reference: "",
+        reference_patient_id: null as string | null,
+        reference_patient_name: null as string | null,
     })
 
     useEffect(() => {
@@ -50,7 +53,8 @@ export function EditPatientDialog({ patient, open, onOpenChange, onSuccess, trig
                 age: patient.age ? patient.age.toString() : "",
                 sex: patient.sex || "",
                 address: patient.address || "",
-                reference: patient.reference || "",
+                reference_patient_id: patient.reference_patient_id ?? null,
+                reference_patient_name: patient.reference_patient_name ?? null,
             })
         }
     }, [open, patient])
@@ -66,13 +70,13 @@ export function EditPatientDialog({ patient, open, onOpenChange, onSuccess, trig
                 age: formData.age ? parseInt(formData.age) : undefined,
                 sex: formData.sex,
                 address: formData.address || undefined,
-                reference: formData.reference || undefined,
+                reference_patient_id: formData.reference_patient_id,
             })
 
             onOpenChange(false)
             onSuccess?.()
         } catch (err) {
-            alert(`Failed to update patient: ${err instanceof Error ? err.message : "Unknown error"}`)
+            toast.error(`Failed to update patient: ${err instanceof Error ? err.message : "Unknown error"}`)
         } finally {
             setSubmitting(false)
         }
@@ -165,15 +169,32 @@ export function EditPatientDialog({ patient, open, onOpenChange, onSuccess, trig
                         </div>
 
                         <div className="space-y-2">
-                            <label htmlFor="edit-reference" className="text-sm font-medium">
-                                Reference
-                            </label>
-                            <Input
-                                id="edit-reference"
-                                value={formData.reference}
-                                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                                placeholder="How did you hear about us?"
-                            />
+                            <label className="text-sm font-medium">Referred By</label>
+                            {formData.reference_patient_name ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm border rounded-md px-3 py-2 flex-1 bg-muted/30">
+                                        {formData.reference_patient_name}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setFormData(f => ({ ...f, reference_patient_id: null, reference_patient_name: null }))}
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                            ) : (
+                                <PatientSearch
+                                    key={open ? "open" : "closed"}
+                                    onSelect={(p) => setFormData(f => ({
+                                        ...f,
+                                        reference_patient_id: p?.patient_id ?? null,
+                                        reference_patient_name: p?.name ?? null,
+                                    }))}
+                                />
+                            )}
+                            <p className="text-xs text-muted-foreground">Patient who referred this person to the clinic.</p>
                         </div>
                     </div>
                     <DialogFooter>
