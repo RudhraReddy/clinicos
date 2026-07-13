@@ -24,6 +24,19 @@ export const DEFAULT_INVENTORY_COLUMNS = [
     'quantity', 'price', 'expiry_date', 'status',
 ]
 
+export const ALL_PATIENT_COLUMNS = [
+    { id: 'patient_id',   label: 'ID',          required: false },
+    { id: 'name',         label: 'Name',         required: true  },
+    { id: 'phone_number', label: 'Phone',        required: false },
+    { id: 'age',          label: 'Age',          required: false },
+    { id: 'sex',          label: 'Sex',          required: false },
+    { id: 'address',      label: 'Address',      required: false },
+    { id: 'reference',    label: 'Referred By',  required: false },
+    { id: 'created_at',   label: 'Joined',       required: false },
+] as const
+
+export const DEFAULT_PATIENT_COLUMNS = ['name', 'phone_number', 'age', 'sex']
+
 interface SettingsContextType {
     clinicName: string
     clinicAddress: string
@@ -33,6 +46,7 @@ interface SettingsContextType {
     expiryReminderMonths: number
     defaultMinStock: number
     defaultInventoryColumns: string[]
+    defaultPatientColumns: string[]
     setSettings: (settings: Partial<Omit<SettingsContextType, 'setSettings' | 'setPreviewFontSize'>>) => void
     setPreviewFontSize: (size: number | null) => void
 }
@@ -48,6 +62,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [expiryReminderMonths, setExpiryReminderMonths] = useState(6)
     const [defaultMinStock, setDefaultMinStock] = useState(10)
     const [defaultInventoryColumns, setDefaultInventoryColumns] = useState<string[]>(DEFAULT_INVENTORY_COLUMNS)
+    const [defaultPatientColumns, setDefaultPatientColumns] = useState<string[]>(DEFAULT_PATIENT_COLUMNS)
     const [previewFontSize, setPreviewFontSize] = useState<number | null>(null)
 
     const currentFontSize = previewFontSize !== null ? previewFontSize : appFontSize
@@ -83,6 +98,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 const parsed = JSON.parse(storedCols)
                 if (Array.isArray(parsed) && parsed.length > 0) setDefaultInventoryColumns(parsed)
             } catch { /* ignore corrupt value */ }
+        }
+        const storedPatientCols = localStorage.getItem("patient_columns")
+        if (storedPatientCols) {
+            try {
+                const parsed = JSON.parse(storedPatientCols)
+                if (Array.isArray(parsed) && parsed.length > 0) setDefaultPatientColumns(parsed)
+            } catch { /* ignore */ }
         }
     }, [])
 
@@ -124,6 +146,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             setDefaultInventoryColumns(cols)
             localStorage.setItem("inventory_default_columns", JSON.stringify(cols))
         }
+        if (settings.defaultPatientColumns !== undefined) {
+            const cols = ['name', ...settings.defaultPatientColumns.filter(c => c !== 'name')]
+            setDefaultPatientColumns(cols)
+            localStorage.setItem("patient_columns", JSON.stringify(cols))
+        }
     }
 
     return (
@@ -136,6 +163,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             expiryReminderMonths,
             defaultMinStock,
             defaultInventoryColumns,
+            defaultPatientColumns,
             setSettings,
             setPreviewFontSize
         }}>
