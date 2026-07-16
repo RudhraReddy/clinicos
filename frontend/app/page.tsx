@@ -117,7 +117,7 @@ export default function Dashboard() {
             key={visit.visit_id}
             className={`mx-3 mb-2 rounded-lg border px-3 py-2.5 transition-colors ${
                 visit.status === 'done'
-                    ? 'border-border bg-muted/40 dark:bg-muted/20'
+                    ? 'border-border bg-background dark:bg-muted/10'
                     : 'border-border bg-muted/60 hover:bg-muted/80 dark:bg-muted/30 dark:hover:bg-muted/50'
             }`}
         >
