@@ -139,7 +139,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 patient_id: patientId,
                 visit_date: visit.visit_date,
                 visit_time: visit.visit_time || undefined,
-                status: 'scheduled',
+                status: 'in_progress',
                 reason: visit.reason || undefined,
                 visiting_fee: visit.visiting_fee ? parseFloat(visit.visiting_fee) : 0,
                 amount_paid: 0,

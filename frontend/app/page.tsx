@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { CreditCard, Loader2, Pencil, Phone, Trash2 } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -11,8 +11,7 @@ import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { api, type Visit, type Patient } from "@/lib/api"
+import { api, type Visit } from "@/lib/api"
 
 function formatTime(timeStr: string | null | undefined, createdAt?: string | null) {
     if (!timeStr) {
@@ -49,46 +48,6 @@ function formatUpdatedTime(updatedAtStr?: string, createdAtStr?: string) {
     return null
 }
 
-const PatientContactPopover = ({ patientId }: { patientId: string }) => {
-    const [patient, setPatient] = useState<Patient | null>(null)
-    const [loadFailed, setLoadFailed] = useState(false)
-    const [open, setOpen] = useState(false)
-
-    useEffect(() => {
-        if (!open || patient || loadFailed) return
-        api.getPatient(patientId)
-            .then(setPatient)
-            .catch(err => { console.error(err); setLoadFailed(true) })
-    }, [open, patient, patientId, loadFailed])
-
-    const loading = open && !patient && !loadFailed
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    className="inline-flex items-center justify-center p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                    onClick={e => e.stopPropagation()}
-                >
-                    <Phone className="h-3.5 w-3.5" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-4" onClick={e => e.stopPropagation()}>
-                <h4 className="font-semibold leading-none mb-3">Contact</h4>
-                {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                ) : patient ? (
-                    <div className="space-y-2 text-sm">
-                        <div><span className="font-medium">Name: </span>{patient.name}</div>
-                        <div><span className="font-medium">Phone: </span>{patient.phone_number}</div>
-                    </div>
-                ) : (
-                    <p className="text-sm text-destructive">Failed to load</p>
-                )}
-            </PopoverContent>
-        </Popover>
-    )
-}
 
 export default function Dashboard() {
     const [visits, setVisits] = useState<Visit[]>([])
@@ -146,64 +105,65 @@ export default function Dashboard() {
         } catch { /* silent */ }
     }
 
-    const handleDoneAndBill = async (visit: Visit) => {
+    const handleMarkDone = async (visitId: string) => {
         try {
-            if (visit.status !== 'done') {
-                await api.updateVisit(visit.visit_id, { status: 'done' })
-            }
-            router.push(`/billing?patient_id=${visit.patient_id}&visit_id=${visit.visit_id}`)
-        } catch (err) {
-            console.error("Failed to complete visit:", err)
-        }
+            await api.updateVisit(visitId, { status: 'done' })
+            fetchVisits()
+        } catch { /* silent */ }
     }
 
-    const renderVisitRow = (visit: Visit, showDate = false) => (
+    const renderVisitCard = (visit: Visit) => (
         <div
             key={visit.visit_id}
-            className="grid grid-cols-[1fr_auto] items-center gap-2 py-2.5 border-b last:border-0 border-border/50 hover:bg-muted/30 transition-all rounded-sm px-4"
+            className={`mx-3 mb-2 rounded-lg border px-3 py-2.5 transition-colors ${
+                visit.status === 'done'
+                    ? 'border-border/40 bg-muted/20 opacity-60'
+                    : 'border-border bg-card hover:bg-muted/30'
+            }`}
         >
-            <div className="space-y-0.5 text-left overflow-hidden">
-                <div className="flex items-center gap-1.5">
-                    <p className="font-medium text-sm leading-none truncate">{visit.patient_name}</p>
-                    {visit.patient_id && <PatientContactPopover patientId={visit.patient_id} />}
-                </div>
-                <p className="text-xs text-muted-foreground truncate">{visit.reason || "No reason"}</p>
+            {/* Name row */}
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="font-semibold text-sm leading-none truncate">{visit.patient_name}</p>
+                {visit.status === 'done' && (
+                    <span className="text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0">Done</span>
+                )}
             </div>
-            <div className="flex items-center gap-2">
-                <div className="flex flex-col items-end">
-                    <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                        {showDate ? visit.visit_date : formatTime(visit.visit_time, visit.created_at)}
+            {/* Fee + time + actions */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium tabular-nums">
+                        {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
                     </span>
-                    {!showDate && formatUpdatedTime(visit.updated_at, visit.created_at) && (
-                        <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 tabular-nums">
-                            Edited {formatUpdatedTime(visit.updated_at, visit.created_at)}
-                        </span>
-                    )}
+                    <span className="text-xs text-muted-foreground font-mono">
+                        {formatTime(visit.visit_time, visit.created_at)}
+                    </span>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center gap-0.5">
+                    {visit.status !== 'done' && (
+                        <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 rounded-md hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-500/20"
+                            onClick={() => handleMarkDone(visit.visit_id)}
+                            title="Mark done"
+                        >
+                            <Check className="h-3.5 w-3.5" />
+                        </Button>
+                    )}
                     <Button
                         variant="ghost" size="icon"
-                        className="h-7 w-7 rounded-full hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-500/20"
-                        onClick={() => handleDoneAndBill(visit)}
-                        title="Done & Bill"
-                    >
-                        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                    <Button
-                        variant="ghost" size="icon"
-                        className="h-7 w-7 rounded-full hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20"
+                        className="h-7 w-7 rounded-md hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20"
                         onClick={() => { setSelectedVisit(visit); setEditVisitOpen(true) }}
                         title="Edit"
                     >
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                         variant="ghost" size="icon"
-                        className="h-7 w-7 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20"
+                        className="h-7 w-7 rounded-md hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20"
                         onClick={() => handleDeleteVisit(visit.visit_id)}
                         title="Delete"
                     >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                 </div>
             </div>
@@ -214,13 +174,13 @@ export default function Dashboard() {
         <Card className="flex-1 flex flex-col overflow-hidden">
             <CardHeader className="pb-2 pt-4 px-4 shrink-0">
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Visits</CardTitle>
+                    <CardTitle className="text-base">Today&apos;s Visits</CardTitle>
                     <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">
-                        {loading ? "..." : waitingCount} waiting today
+                        {loading ? "..." : waitingCount} waiting
                     </span>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-0 custom-scrollbar">
+            <CardContent className="flex-1 overflow-y-auto pt-2 pb-3 px-0 custom-scrollbar">
                 <style jsx global>{`
                     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -231,21 +191,10 @@ export default function Dashboard() {
                     <div className="py-10 text-center text-muted-foreground text-sm">
                         <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Loading...
                     </div>
+                ) : orderedTodayVisits.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">No appointments today</p>
                 ) : (
-                    <>
-                        {/* Today */}
-                        <div className="px-4 py-1.5 bg-muted/40 border-b">
-                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Today</span>
-                        </div>
-                        {orderedTodayVisits.length === 0 ? (
-                            <p className="text-xs text-muted-foreground text-center py-3">No appointments today</p>
-                        ) : (
-                            <div className="text-sm">
-                                {orderedTodayVisits.map(v => renderVisitRow(v, false))}
-                            </div>
-                        )}
-
-                    </>
+                    orderedTodayVisits.map(v => renderVisitCard(v))
                 )}
             </CardContent>
         </Card>
