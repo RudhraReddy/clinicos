@@ -117,13 +117,13 @@ export default function Dashboard() {
             key={visit.visit_id}
             className={`mx-3 mb-2 rounded-lg border px-3 py-2.5 transition-colors ${
                 visit.status === 'done'
-                    ? 'border-border/40 bg-muted/40 opacity-60'
+                    ? 'border-border bg-muted/40 dark:bg-muted/20'
                     : 'border-border bg-muted/60 hover:bg-muted/80 dark:bg-muted/30 dark:hover:bg-muted/50'
             }`}
         >
             {/* Name row */}
             <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="font-semibold text-sm leading-none truncate">{visit.patient_name}</p>
+                <p className="font-semibold text-base leading-none truncate">{visit.patient_name}</p>
                 {visit.status === 'done' && (
                     <span className="text-[10px] font-medium text-green-600 dark:text-green-400 shrink-0">Done</span>
                 )}
@@ -131,7 +131,7 @@ export default function Dashboard() {
             {/* Fee + time + actions */}
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium tabular-nums">
+                    <span className={`text-sm font-medium tabular-nums ${visit.payment_status === 'full' ? 'text-green-600 dark:text-green-400' : ''}`}>
                         {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
                     </span>
                     <span className="text-xs text-muted-foreground font-mono">
