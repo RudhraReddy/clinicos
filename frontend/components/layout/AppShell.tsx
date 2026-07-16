@@ -1,12 +1,11 @@
 "use client"
 
-import { Menu } from "lucide-react"
+import { Menu, Stethoscope } from "lucide-react"
 import { Sidebar } from "./Sidebar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { useEffect } from "react"
 
 export default function AppShell({
     children,
@@ -16,7 +15,6 @@ export default function AppShell({
     const [open, setOpen] = useState(false)
     const pathname = usePathname()
 
-    // Close mobile sidebar on route change
     useEffect(() => {
         setOpen(false)
     }, [pathname])
@@ -25,18 +23,12 @@ export default function AppShell({
     if (noShell) return <>{children}</>
 
     return (
-        <div className="flex min-h-screen flex-col md:flex-row">
-            {/* Desktop Sidebar */}
-            <aside className="hidden w-[265px] flex-col md:flex">
-                <Sidebar className="fixed w-[265px]" />
-            </aside>
-
-            {/* Mobile Header & Nav */}
-            <div className="md:hidden sticky top-0 z-40 border-b bg-white dark:bg-slate-950 px-4 py-3 flex items-center justify-between">
-                <span className="font-bold text-lg text-primary">ClinicOS</span>
+        <div className="flex min-h-screen flex-col">
+            {/* Top bar */}
+            <header className="sticky top-0 z-40 border-b bg-white dark:bg-[#181818] px-4 h-13 flex items-center gap-3">
                 <Sheet open={open} onOpenChange={setOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="shrink-0">
                             <Menu className="h-5 w-5" />
                             <span className="sr-only">Toggle Menu</span>
                         </Button>
@@ -46,10 +38,14 @@ export default function AppShell({
                         <Sidebar className="border-none" />
                     </SheetContent>
                 </Sheet>
-            </div>
+                <div className="flex items-center gap-2 font-bold text-lg text-primary">
+                    <Stethoscope className="h-5 w-5" />
+                    <span>ClinicOS</span>
+                </div>
+            </header>
 
-            {/* Main Content */}
-            <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-8 bg-gray-50/50 dark:bg-background min-h-screen">
+            {/* Main content — full width */}
+            <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-8 bg-gray-50/50 dark:bg-background">
                 <div className="w-full">
                     {children}
                 </div>
