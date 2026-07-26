@@ -387,9 +387,7 @@ export default function InvoiceEditPage() {
                                                 inventory={inventory}
                                                 onSelect={(item) => selectProduct(i, item)}
                                                 onChangeValue={(val) => updateRow(i, 'product_name', val)}
-                                                matchType={row.match_type}
                                             />
-                                            {row.match_type === 'exact' && <span className="text-xs text-green-600 flex items-center mt-1"><Check className="w-3 h-3 mr-1" /> Matched</span>}
                                             {row.match_type === 'partial' && <span className="text-xs text-orange-500 flex items-center mt-1"><AlertCircle className="w-3 h-3 mr-1" /> Partial Match (Verify)</span>}
                                         </div>
                                     </TableCell>
@@ -436,9 +434,7 @@ export default function InvoiceEditPage() {
                                     inventory={inventory}
                                     onSelect={(item) => selectProduct(i, item)}
                                     onChangeValue={(val) => updateRow(i, 'product_name', val)}
-                                    matchType={row.match_type}
                                 />
-                                {row.match_type === 'exact' && <span className="text-xs text-green-600 flex items-center"><Check className="w-3 h-3 mr-1" /> Matched</span>}
                                 {row.match_type === 'partial' && <span className="text-xs text-orange-500 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> Partial Match</span>}
                             </div>
 
@@ -512,35 +508,36 @@ function ProductSelector({
     inventory,
     onSelect,
     onChangeValue,
-    matchType
 }: {
     value: string,
     inventory: InventoryItem[],
     onSelect: (item: InventoryItem) => void,
     onChangeValue: (val: string) => void,
-    matchType?: 'exact' | 'partial'
 }) {
     const [open, setOpen] = useState(false)
+    const canOpen = value.trim().length >= 3
 
-    const filtered = value.trim()
+    const filtered = canOpen
         ? inventory.filter(i => i.item_name.toLowerCase().includes(value.trim().toLowerCase()))
-        : inventory
+        : []
+
+    const handleOpenChange = (next: boolean) => {
+        if (next && !canOpen) return
+        setOpen(next)
+    }
 
     return (
         <div className="relative">
-            <Popover open={open} onOpenChange={setOpen}>
+            <Popover open={open} onOpenChange={handleOpenChange}>
                 <PopoverTrigger asChild>
                     <div className="relative">
                         <Input
-                            className={cn(
-                                "h-8 w-full",
-                                matchType === 'exact' ? "border-green-500 ring-green-500/20" : "",
-                                matchType === 'partial' ? "border-orange-500 ring-orange-500/20" : ""
-                            )}
+                            className="h-8 w-full border-0 shadow-none"
                             value={value}
                             onChange={(e) => {
                                 onChangeValue(e.target.value)
-                                if (!open) setOpen(true)
+                                const willOpen = e.target.value.trim().length >= 3
+                                if (willOpen !== open) setOpen(willOpen)
                             }}
                         />
                     </div>
