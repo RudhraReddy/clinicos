@@ -190,20 +190,7 @@ function OverviewTab() {
             {diag ? (
               <div className="p-4 space-y-4">
                 {/* Quick Info Cards Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* OCR Indicator */}
-                  <div className="flex items-center gap-3 p-2 bg-background/50 border rounded-xl">
-                    {diag.ocr_configured ? (
-                      <div className="h-7 w-7 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" /></div>
-                    ) : (
-                      <div className="h-7 w-7 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400"><XCircle className="h-4 w-4" /></div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-0.5">OCR Service</p>
-                      <p className="text-xs font-bold truncate">{diag.ocr_configured ? 'Google Vision Active' : 'Not Configured'}</p>
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-1 gap-3">
                   {/* DB Size */}
                   <div className="flex items-center gap-3 p-2 bg-background/50 border rounded-xl">
                     <div className="h-7 w-7 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400"><Database className="h-4 w-4" /></div>
