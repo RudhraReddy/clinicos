@@ -7,8 +7,9 @@ import {
   PieChart, ListOrdered, Activity, Receipt, QrCode, Trash2, Image as ImageIcon,
   ArrowUpRight, ArrowDownRight, Smartphone, Briefcase, BarChart3, Percent,
   CheckCircle2, AlertCircle, FileText, CalendarDays, Clock, Users, Loader2,
-  XCircle, AlertOctagon, MinusCircle, AlertTriangle, ShieldAlert
+  XCircle, AlertOctagon, MinusCircle, AlertTriangle, ShieldAlert, Menu
 } from "lucide-react"
+import { useMenu } from "@/components/layout/AppShell"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -22,6 +23,7 @@ import { ResponsiveContainer, PieChart as RePie, Pie, Cell, Tooltip as ReTooltip
 const fmt = (n: number) => `₹${(n || 0).toLocaleString('en-IN')}`
 
 export default function StatusPage() {
+  const { openMenu } = useMenu()
   // Top Level Controls
   const [loc, setLoc] = useState<number | 'all'>('all')
   const [locations, setLocations] = useState<{ id: number; name: string }[]>([])
@@ -203,13 +205,18 @@ export default function StatusPage() {
       {/* GLOBAL HEADER */}
       <div className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-card/80 border-b border-slate-200 dark:border-muted -mx-2 px-4 py-3 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={openMenu}
+            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+          >
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Toggle Menu</span>
+          </button>
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md">
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BarChart3 className="w-6 h-6" />}
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight">Clinic Insights</h1>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Live Production Engine</p>
-          </div>
+          <h1 className="text-xl font-black tracking-tight">Clinic Insights</h1>
         </div>
 
         {/* Timeline Switcher */}

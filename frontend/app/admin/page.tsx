@@ -14,7 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Plus, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle } from "lucide-react"
+import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Plus, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle, Menu } from "lucide-react"
+import { useMenu } from "@/components/layout/AppShell"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -1123,6 +1124,7 @@ function SettingsTab() {
 export default function AdminPage() {
   const { role, isLoading } = useAuth()
   const router = useRouter()
+  const { openMenu } = useMenu()
   const [allUsers, setAllUsers] = useState<AdminUser[]>([])
 
   useEffect(() => {
@@ -1146,11 +1148,16 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={openMenu}
+          className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+        >
+          <Menu className="h-6 w-6" />
+          <span className="sr-only">Toggle Menu</span>
+        </button>
         <ShieldCheck className="h-7 w-7 text-purple-600" />
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
-          <p className="text-muted-foreground">System administration, user management, and audit log</p>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
       </div>
 
       <Tabs defaultValue="overview">

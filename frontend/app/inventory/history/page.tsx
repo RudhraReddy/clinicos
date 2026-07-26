@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter } from "next/navigation"
-import { FileText, Eye, Search, RotateCcw, ArrowLeft } from "lucide-react"
+import { FileText, Eye, Search, RotateCcw, ArrowLeft, Menu } from "lucide-react"
+import { useMenu } from "@/components/layout/AppShell"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
@@ -17,6 +18,7 @@ import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
 
 export default function InvoiceHistoryPage() {
     const router = useRouter()
+    const { openMenu } = useMenu()
     const [invoices, setInvoices] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [date, setDate] = useState<DateRange | undefined>()
@@ -72,10 +74,17 @@ export default function InvoiceHistoryPage() {
         <div className="container mx-auto py-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Invoice History</h1>
-                    <p className="text-muted-foreground mt-2">
-                        View past uploads and their extraction logs.
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={openMenu}
+                            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                        >
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </button>
+                        <h1 className="text-3xl font-bold tracking-tight">Invoice History</h1>
+                    </div>
                 </div>
                 <Button variant="outline" onClick={() => router.push('/inventory')}>
                     <ArrowLeft className="mr-2 h-4 w-4" />

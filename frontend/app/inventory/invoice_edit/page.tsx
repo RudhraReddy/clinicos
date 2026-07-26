@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone } from "lucide-react"
+import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone, Menu } from "lucide-react"
+import { useMenu } from "@/components/layout/AppShell"
 import { api, API_BASE_URL, InventoryItem } from "@/lib/api"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -37,6 +38,7 @@ interface ProductRow {
 }
 
 export default function InvoiceEditPage() {
+    const { openMenu } = useMenu()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [viewImage, setViewImage] = useState(false)
@@ -239,6 +241,14 @@ export default function InvoiceEditPage() {
         <div className="container mx-auto py-8 space-y-8">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
                     <Button variant="ghost" onClick={() => window.history.back()}>
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back
                     </Button>

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu } from "lucide-react"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
+import { useMenu } from "@/components/layout/AppShell"
 
 // const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 // We can use API_BASE_URL directly
@@ -16,6 +17,7 @@ export default function InvoiceDetailPage() {
     const router = useRouter()
     const params = useParams()
     const invoiceId = params.id as string
+    const { openMenu } = useMenu()
 
     const [invoice, setInvoice] = useState<any>(null)
     const [items, setItems] = useState<any[]>([])
@@ -47,6 +49,14 @@ export default function InvoiceDetailPage() {
     return (
         <div className="container mx-auto py-6 space-y-6">
             <div className="flex items-center gap-4">
+                <button
+                    type="button"
+                    onClick={openMenu}
+                    className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                >
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Toggle Menu</span>
+                </button>
                 <Button variant="ghost" onClick={() => router.back()}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back

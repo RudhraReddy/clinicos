@@ -8,10 +8,12 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Image as ImageIcon, Calendar, User, FileText, Trash2, RotateCcw, X } from "lucide-react"
+import { Search, Image as ImageIcon, Calendar, User, FileText, Trash2, RotateCcw, X, Menu } from "lucide-react"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
+import { useMenu } from "@/components/layout/AppShell"
 
 export default function GalleryPage() {
+    const { openMenu } = useMenu()
     const [images, setImages] = useState<any[]>([])
     const [filteredImages, setFilteredImages] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -147,8 +149,17 @@ export default function GalleryPage() {
         <div className="container mx-auto py-6 space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Patient Image Gallery</h1>
-                    <p className="text-muted-foreground">View all uploaded patient photos and reports.</p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={openMenu}
+                            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                        >
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </button>
+                        <h1 className="text-3xl font-bold tracking-tight">Patient Image Gallery</h1>
+                    </div>
                 </div>
             </div>
 

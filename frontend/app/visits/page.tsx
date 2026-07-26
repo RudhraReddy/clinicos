@@ -21,11 +21,13 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Calendar, Loader2, AlertCircle } from "lucide-react"
+import { Plus, Calendar, Loader2, AlertCircle, Menu } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { api, type Visit, type Patient } from "@/lib/api"
+import { useMenu } from "@/components/layout/AppShell"
 
 export default function VisitsPage() {
+    const { openMenu } = useMenu()
     const [visits, setVisits] = useState<Visit[]>([])
     const [patients, setPatients] = useState<Patient[]>([])
     const [loading, setLoading] = useState(true)
@@ -138,8 +140,17 @@ export default function VisitsPage() {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Visits</h1>
-                    <p className="text-muted-foreground">Manage patient visits and records</p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={openMenu}
+                            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                        >
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </button>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Visits</h1>
+                    </div>
                 </div>
                 <Card className="border-red-500/50 bg-red-500/10">
                     <CardHeader>
@@ -163,10 +174,17 @@ export default function VisitsPage() {
         <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Visits</h1>
-                    <p className="text-muted-foreground">
-                        Manage patient visits and records
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={openMenu}
+                            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                        >
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </button>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Visits</h1>
+                    </div>
                 </div>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
