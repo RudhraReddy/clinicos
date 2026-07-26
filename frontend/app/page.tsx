@@ -1,11 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { useAuth } from "@/lib/auth_context"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
@@ -202,17 +203,33 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
-            <div className="flex flex-col gap-1 flex-shrink-0">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-                <p className="text-muted-foreground text-sm">Walk-in registration and today&apos;s appointments.</p>
-            </div>
-
-            <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-                <div className="mb-4">
+            <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden gap-4">
+                <div className="flex items-center gap-4 flex-shrink-0">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="visits">All Visits</TabsTrigger>
                     </TabsList>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/inventory">
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
+                                Inventory
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/billing">
+                                <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                                Billing
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/patients">
+                                <Users className="mr-1.5 h-3.5 w-3.5" />
+                                Patients
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
                 <TabsContent value="overview" className="flex-1 overflow-hidden m-0">

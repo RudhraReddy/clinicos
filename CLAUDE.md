@@ -86,7 +86,6 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 | Route | File | Roles |
 |---|---|---|
 | `/` | `app/page.tsx` | frontdesk |
-| `/dashboard` | `app/dashboard/page.tsx` | frontdesk (identical to `/`) |
 | `/doctor` | `app/doctor/page.tsx` | doctor (auto-redirected from `/`) |
 | `/patients` | `app/patients/page.tsx` | all |
 | `/visits` | `app/visits/page.tsx` | frontdesk |
