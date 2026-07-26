@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight } from "lucide-react"
+import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
+import { useMenu } from "@/components/layout/AppShell"
+import Link from "next/link"
 import { PatientSearch } from "@/components/PatientSearch"
 import { useAuth } from "@/lib/auth_context"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
@@ -67,6 +69,7 @@ const getPackMultiplier = (packSize?: string) => {
 function BillingContent() {
     const searchParams = useSearchParams()
     const { role } = useAuth()
+    const { openMenu } = useMenu()
     const [showQR, setShowQR] = useState(false)
 
     // Tab
@@ -260,28 +263,51 @@ function BillingContent() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
                     <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-                    <p className="text-muted-foreground">Create invoices and manage history.</p>
+                    {role !== 'doctor' && (
+                        <TabsList>
+                            <TabsTrigger value="new">New Bill</TabsTrigger>
+                            <TabsTrigger value="history">History</TabsTrigger>
+                        </TabsList>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/inventory">
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
+                                Inventory
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/">
+                                <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
+                                Dashboard
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/patients">
+                                <Users className="mr-1.5 h-3.5 w-3.5" />
+                                Patients
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-                {role !== 'doctor' && (
-                    <TabsList>
-                        <TabsTrigger value="new">New Bill</TabsTrigger>
-                        <TabsTrigger value="history">History</TabsTrigger>
-                    </TabsList>
-                )}
-
-                <TabsContent value="new" className="space-y-6">
-                    {/* Patient & Actions Section */}
+                <TabsContent value="new" className="space-y-6 m-0">
                     <Card>
-                        <CardContent className="p-6">
-                            <div className="flex flex-col md:flex-row gap-6 md:items-start justify-between">
-                                <div className="flex-1 max-w-xl space-y-4">
-                                    <Label>Select Patient</Label>
+                        <CardContent className="p-6 flex flex-col gap-6">
+                            {/* Patient & Actions Row */}
+                            <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
+                                <div className="flex-1 max-w-xl">
                                     <PatientSearch
                                         selectedPatient={patient}
                                         onSelect={(p) => {
@@ -289,117 +315,88 @@ function BillingContent() {
                                             setPatientId(p?.patient_id || "")
                                         }}
                                     />
-                                    {patient && (
-                                        <div className="flex justify-start gap-2">
-                                            <Button variant="secondary" size="sm" onClick={() => setShowQR(true)}>
-                                                <Smartphone className="mr-2 h-4 w-4" />
-                                                Upload via QR
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
-                                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 bg-muted/30 p-4 rounded-lg border">
-                                    <div className="space-y-1">
-                                        <Label htmlFor="payment-type" className="text-sm font-medium">
-                                            Payment Method
-                                        </Label>
-                                        <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
-                                            <SelectTrigger id="payment-type" className="w-[140px] bg-background">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="CASH">Cash</SelectItem>
-                                                <SelectItem value="CARD">Card</SelectItem>
-                                                <SelectItem value="UPI">UPI</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1">
-                                        <span className="text-sm font-medium text-foreground h-5 flex items-center">
-                                            {billItems.length > 0 ? `Total: ₹${calculateTotal().toFixed(2)}` : 'Total: ₹0.00'}
-                                        </span>
-                                        <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill} className="w-full sm:w-auto">
-                                            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Create Bill
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <QRCodeUpload
-                        open={showQR}
-                        onOpenChange={setShowQR}
-                        contextType="patient"
-                        contextId={patientId}
-                        onSuccess={() => toast.success("Images uploaded! Check gallery.")}
-                    />
-
-                    {/* Bill Items */}
-                    <Card className="min-h-[500px] flex flex-col">
-                        <CardHeader className="pb-3 flex flex-row justify-between items-center">
-                            <CardTitle className="text-base">Items</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 flex flex-col gap-4">
-                            {/* Item search */}
-                            <div className="relative w-full max-w-md">
-                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    className="pl-9"
-                                    placeholder="Search by Product ID, Name, or Generic..."
-                                    value={itemQuery}
-                                    onChange={(e) => setItemQuery(e.target.value)}
-                                />
-                                {searchResults.length > 0 && (
-                                    <div className="absolute z-10 w-full bg-popover border rounded-md shadow-md mt-1 max-h-60 overflow-y-auto">
-                                        {searchResults.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className="p-2 hover:bg-accent cursor-pointer border-b last:border-0"
-                                                onClick={() => addToBill(item)}
-                                            >
-                                                <div className="flex justify-between">
-                                                    <span className="font-medium">{item.item_name}</span>
-                                                    <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
-                                                        {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
-                                                    </span>
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {item.manufacturer} | GST: {item.gst_rate || 0}%
-                                                </div>
-                                                {item.substitutes && item.substitutes.length > 0 && (
-                                                    <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
-                                                        <span className="font-semibold text-yellow-700">Substitutes: </span>
-                                                        {item.substitutes.map((s: { name: string; qty: number }) => `${s.name} (${s.qty})`).join(', ')}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                {patient && (
+                                    <Button variant="secondary" size="sm" onClick={() => setShowQR(true)} className="shrink-0">
+                                        <Smartphone className="mr-2 h-4 w-4" />
+                                        Upload via QR
+                                    </Button>
                                 )}
-                                <p className="text-xs text-center text-muted-foreground mt-2">
-                                    Type to search inventory. Click to add to bill.
-                                </p>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
+                                        <SelectTrigger id="payment-type" className="w-[140px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="CASH">Cash</SelectItem>
+                                            <SelectItem value="CARD">Card</SelectItem>
+                                            <SelectItem value="UPI">UPI</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill}>
+                                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Bill
+                                    </Button>
+                                </div>
                             </div>
 
-                            {/* Table */}
-                            <div className="overflow-x-auto">
-                            <div className="border rounded-md flex-1">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[50px]">No.</TableHead>
-                                            <TableHead>Product Name</TableHead>
-                                            <TableHead>Batch</TableHead>
-                                            <TableHead className="w-[100px]">Qty</TableHead>
-                                            <TableHead className="w-[100px]">Unit</TableHead>
-                                            <TableHead className="w-[100px]">Price (Est)</TableHead>
-                                            <TableHead className="w-[100px]">Total</TableHead>
-                                            <TableHead className="w-[50px]"></TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {billItems.map((item, idx) => (
+                            {/* Items */}
+                            <div>
+                                <h3 className="font-semibold text-base mb-3">Items</h3>
+                                <div className="overflow-x-auto">
+                                <div className="border rounded-md">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[50px]">No.</TableHead>
+                                                <TableHead>
+                                                    <div className="relative">
+                                                        <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                                        <Input
+                                                            className="h-8 pl-8 font-normal"
+                                                            placeholder="Search by Product ID, Name, or Generic..."
+                                                            value={itemQuery}
+                                                            onChange={(e) => setItemQuery(e.target.value)}
+                                                        />
+                                                        {searchResults.length > 0 && (
+                                                            <div className="absolute z-10 w-full bg-popover border rounded-md shadow-md mt-1 max-h-60 overflow-y-auto">
+                                                                {searchResults.map((item) => (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        className="p-2 hover:bg-accent cursor-pointer border-b last:border-0"
+                                                                        onClick={() => addToBill(item)}
+                                                                    >
+                                                                        <div className="flex justify-between">
+                                                                            <span className="font-medium">{item.item_name}</span>
+                                                                            <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
+                                                                                {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {item.manufacturer} | GST: {item.gst_rate || 0}%
+                                                                        </div>
+                                                                        {item.substitutes && item.substitutes.length > 0 && (
+                                                                            <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
+                                                                                <span className="font-semibold text-yellow-700">Substitutes: </span>
+                                                                                {item.substitutes.map((s: { name: string; qty: number }) => `${s.name} (${s.qty})`).join(', ')}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </TableHead>
+                                                <TableHead>Batch</TableHead>
+                                                <TableHead className="w-[100px]">Qty</TableHead>
+                                                <TableHead className="w-[100px]">Unit</TableHead>
+                                                <TableHead className="w-[100px]">Price (Est)</TableHead>
+                                                <TableHead className="w-[100px]">Total</TableHead>
+                                                <TableHead className="w-[50px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {billItems.map((item, idx) => (
                                             <TableRow key={idx}>
                                                 <TableCell>{idx + 1}</TableCell>
                                                 <TableCell className="font-medium">{item.item_name}</TableCell>
@@ -459,8 +456,16 @@ function BillingContent() {
                                     </span>
                                 </div>
                             )}
+                            </div>
                         </CardContent>
                     </Card>
+                    <QRCodeUpload
+                        open={showQR}
+                        onOpenChange={setShowQR}
+                        contextType="patient"
+                        contextId={patientId}
+                        onSuccess={() => toast.success("Images uploaded! Check gallery.")}
+                    />
                 </TabsContent>
 
                 <TabsContent value="history">
