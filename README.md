@@ -35,14 +35,11 @@ clinic_related/
 │   │   ├── patients.py         # Patient CRUD
 │   │   ├── visits.py           # Visit CRUD
 │   │   ├── billing.py          # Billing + FIFO stock deduction
-│   │   ├── inventory.py        # Inventory + OCR invoice import
+│   │   ├── inventory.py        # Inventory management
 │   │   ├── images.py           # Patient image upload/retrieval
 │   │   └── upload.py           # QR-code mobile upload sessions
 │   ├── scripts/            # DB seed / reset / migration scripts
 │   └── archive/            # Old migration scripts (not in use)
-│
-├── models/
-│   └── invoice_ocr.py      # (Legacy AI-powered scanner, replaced by Google Cloud Vision)
 │
 └── .vscode/
     └── tasks.json          # VSCode task runner for starting services
@@ -58,7 +55,6 @@ clinic_related/
 | State | React useState/useEffect, Context API |
 | Backend | Python 3.11, Flask, Flask-SQLAlchemy, Flask-CORS |
 | Database | PostgreSQL (`clinic_db`) |
-| OCR | Google Cloud Vision API (REST integration) |
 | Drag & Drop | react-dnd (calendar appointments) |
 
 ---
@@ -113,7 +109,7 @@ Pass: vs@9699
 - **Patients** — Register, search, view history, edit demographics
 - **Visits** — Schedule appointments, update status (in_progress → done → cancelled)
 - **Billing** — FIFO batch inventory deduction, printable invoices, billing history
-- **Inventory** — Product master + batch-level stock, OCR invoice import, CSV import/export, status tags (LOW STOCK, EXPIRED, etc.)
+- **Inventory** — Product master + batch-level stock, CSV import/export, status tags (LOW STOCK, EXPIRED, etc.)
 - **Gallery** — Patient images separated into Prescriptions / Patient Images / Invoice Images
 - **Doctor View** — Prescription carousel, patient image timeline grouped by visit date
 - **QR Upload** — Generate a QR code on desktop; scan with phone to upload images directly

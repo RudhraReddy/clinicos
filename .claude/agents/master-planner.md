@@ -25,7 +25,6 @@ Supporting: InventoryHistory, PatientImage, PrescriptionItem, UploadSession
 - Role system: `frontdesk`, `doctor`, `admin` stored in `localStorage["clinic_role"]` — no server-side auth
 - All timestamps: IST (UTC+5:30) via `get_ist_now()` — never `utcnow()`
 - File storage: `$UPLOAD_BASE_DIR/patients/<id>/`, `/invoices/`, `/temp/<session_id>/` — ephemeral `/tmp/clinic_uploads` on Render
-- OCR flow: image → PaddleOCR in `models/` → parsed rows → user confirms → `POST /api/inventory/save_invoice`
 - QR upload: desktop creates session → mobile uploads → desktop polls → finalize moves files from temp to permanent
 
 ## Your role
