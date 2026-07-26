@@ -13,9 +13,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert } from "lucide-react"
+import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert, Menu, LayoutDashboard, CreditCard, Users } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
+import { useMenu } from "@/components/layout/AppShell"
 import { cn } from "@/lib/utils"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
 import { ImportInventoryDialog } from "@/components/ImportInventoryDialog"
@@ -269,6 +270,7 @@ function AllChangesPanel() {
 export default function InventoryPage() {
     const { appFontSize, expiryReminderMonths, defaultInventoryColumns } = useSettings()
     const { role } = useAuth()
+    const { openMenu } = useMenu()
     const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [loading, setLoading] = useState(true)
@@ -505,122 +507,143 @@ export default function InventoryPage() {
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Inventory</h1>
-                    <p className="text-muted-foreground">
-                        Manage clinic supplies, medicines, and equipment.
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" title="Export" onClick={() => setExportDialogOpen(true)}>
-                        <Download className="h-4 w-4" />
-                    </Button>
-                    <ImportInventoryDialog trigger={
-                        <Button variant="ghost" size="icon" title="Import CSV">
-                            <Upload className="h-4 w-4" />
-                        </Button>
-                    } onSuccess={loadData} />
-                    {role === 'admin' && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Wipe Inventory"
-                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                            onClick={() => { setWipeDialogOpen(true); setWipeCode(''); setWipeError(null) }}
-                        >
-                            <ShieldAlert className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {locations.length > 0 && (
-                <div className="flex gap-2 flex-wrap shrink-0">
-                    <button
-                        onClick={() => setActiveLocationId('all')}
-                        className={cn(
-                            "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                            activeLocationId === 'all'
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        )}
-                    >
-                        All Locations
-                    </button>
-                    {locations.map(loc => (
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="flex-1 flex flex-col overflow-hidden gap-4">
+                <div className="flex items-center justify-between shrink-0 gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <button
-                            key={loc.id}
-                            onClick={() => setActiveLocationId(loc.id)}
+                            type="button"
+                            onClick={openMenu}
+                            className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                        >
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </button>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Inventory</h1>
+                        <TabsList className="shrink-0">
+                            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                            <TabsTrigger value="all-changes">All Changes</TabsTrigger>
+                        </TabsList>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/">
+                                    <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
+                                    Dashboard
+                                </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/billing">
+                                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                                    Billing
+                                </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/patients">
+                                    <Users className="mr-1.5 h-3.5 w-3.5" />
+                                    Patients
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Export
+                        </Button>
+                        <ImportInventoryDialog trigger={
+                            <Button variant="outline" size="sm">
+                                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                Import
+                            </Button>
+                        } onSuccess={loadData} />
+                        <Button variant="outline" size="sm" onClick={() => window.location.href = '/inventory/history'}>
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
+                            History
+                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Columns className="mr-1.5 h-3.5 w-3.5" />
+                                    Columns
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56" align="end">
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none mb-2">Toggle Columns</h4>
+                                    {allColumns.map(col => (
+                                        <div key={col.id} className="flex items-center space-x-2 rounded px-2 hover:bg-accent py-1">
+                                            <input
+                                                type="checkbox"
+                                                id={`col-${col.id}`}
+                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                checked={visibleColumns.has(col.id)}
+                                                onChange={() => toggleColumn(col.id)}
+                                            />
+                                            <label
+                                                htmlFor={`col-${col.id}`}
+                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                                            >
+                                                {col.label}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                        <Link href="/inventory/invoice_edit?manual=true">
+                            <Button size="sm">
+                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                Add Invoice
+                            </Button>
+                        </Link>
+                        {role === 'admin' && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Wipe Inventory"
+                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                onClick={() => { setWipeDialogOpen(true); setWipeCode(''); setWipeError(null) }}
+                            >
+                                <ShieldAlert className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                {locations.length > 0 && (
+                    <div className="flex gap-2 flex-wrap shrink-0">
+                        <button
+                            onClick={() => setActiveLocationId('all')}
                             className={cn(
                                 "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                                activeLocationId === loc.id
+                                activeLocationId === 'all'
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                             )}
                         >
-                            {loc.name}
+                            All Locations
                         </button>
-                    ))}
-                </div>
-            )}
-
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="flex-1 flex flex-col overflow-hidden gap-4">
-                <TabsList className="shrink-0">
-                    <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                    <TabsTrigger value="all-changes">All Changes</TabsTrigger>
-                </TabsList>
+                        {locations.map(loc => (
+                            <button
+                                key={loc.id}
+                                onClick={() => setActiveLocationId(loc.id)}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                    activeLocationId === loc.id
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                )}
+                            >
+                                {loc.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 <TabsContent value="all-changes" className="flex-1 overflow-y-auto m-0">
                     <AllChangesPanel />
                 </TabsContent>
 
                 <TabsContent value="inventory" className="flex-1 flex flex-col overflow-hidden gap-6 m-0">
-            <div className="flex gap-2 items-center flex-wrap justify-between shrink-0">
-                <div className="flex flex-row items-center gap-2 overflow-x-auto pb-1 w-full md:w-auto scrollbar-hide">
-                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => window.location.href = '/inventory/history'}>
-                        <FileText className="mr-1.5 h-3.5 w-3.5" />
-                        History
-                    </Button>
-                    <Link href="/inventory/invoice_edit?manual=true" className="shrink-0">
-                        <Button size="sm">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            Add Invoice
-                        </Button>
-                    </Link>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="shrink-0 ml-auto">
-                                <Columns className="mr-1.5 h-3.5 w-3.5" />
-                                Columns
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-56" align="end">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none mb-2">Toggle Columns</h4>
-                                {allColumns.map(col => (
-                                    <div key={col.id} className="flex items-center space-x-2 rounded px-2 hover:bg-accent py-1">
-                                        <input
-                                            type="checkbox"
-                                            id={`col-${col.id}`}
-                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                            checked={visibleColumns.has(col.id)}
-                                            onChange={() => toggleColumn(col.id)}
-                                        />
-                                        <label
-                                            htmlFor={`col-${col.id}`}
-                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                                        >
-                                            {col.label}
-                                        </label>
-                                    </div>
-                                ))}
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            </div>
 
 
             {!stockAlertDismissed && !loading && (lowCount > 0 || outCount > 0) && (
