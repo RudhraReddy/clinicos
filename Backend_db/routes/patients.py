@@ -73,7 +73,7 @@ def get_patients():
             (Patient.patient_id.contains(query_str.upper()))
         )
 
-    patients_list = q.offset((page - 1) * limit).limit(limit).all()
+    patients_list = q.order_by(Patient.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
     # Batch-load reference names (one extra query at most)
     ref_ids = [p.reference_patient_id for p in patients_list if p.reference_patient_id]

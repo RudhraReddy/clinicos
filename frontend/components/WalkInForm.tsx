@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, UserPlus, AlertCircle } from "lucide-react"
-import { api, type Patient } from "@/lib/api"
-import { getTodayIST } from "@/lib/utils"
+import { Loader2, UserPlus, AlertCircle, Users, Check } from "lucide-react"
+import { api, type Patient, type Visit } from "@/lib/api"
+import { getTodayIST, cn } from "@/lib/utils"
 import { toast } from "sonner"
 
 type FormState = 'idle' | 'searching' | 'found' | 'not_found' | 'new_patient'
@@ -19,6 +19,19 @@ interface WalkInFormProps {
 function getCurrentTimeStr() {
     const now = new Date()
     return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+}
+
+function VisitFee({ visit }: { visit: Visit }) {
+    const fee = visit.visiting_fee ?? 0
+    const paid = visit.amount_paid ?? 0
+
+    if (visit.payment_status === 'full') {
+        return <span className="font-semibold tabular-nums">₹{fee}</span>
+    }
+    if (visit.payment_status === 'partial') {
+        return <span className="font-semibold tabular-nums">₹{paid}/₹{fee}</span>
+    }
+    return <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">₹{fee}</span>
 }
 
 const emptyVisit = () => ({
@@ -33,7 +46,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [phone, setPhone] = useState('')
     const [formState, setFormState] = useState<FormState>('idle')
     const [matchedPatient, setMatchedPatient] = useState<Patient | null>(null)
-    const [matchCount, setMatchCount] = useState(0)
+    const [matches, setMatches] = useState<Patient[]>([])
+    const [pickerOpen, setPickerOpen] = useState(false)
+    const phoneFieldRef = useRef<HTMLDivElement>(null)
     const [referencePatientId, setReferencePatientId] = useState<string | null>(null)
     const [name, setName] = useState('')
     const [age, setAge] = useState('')
@@ -41,14 +56,42 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [address, setAddress] = useState('')
     const [visit, setVisit] = useState(emptyVisit())
     const [submitting, setSubmitting] = useState(false)
-    const [patientVisits, setPatientVisits] = useState<import('@/lib/api').Visit[]>([])
+    const [patientVisits, setPatientVisits] = useState<Visit[]>([])
+
+    const selectPatient = (patient: Patient) => {
+        setMatchedPatient(patient)
+        setName(patient.name)
+        setAge(patient.age?.toString() ?? '')
+        setSex(patient.sex ?? '')
+        api.getVisits(patient.patient_id)
+            .then(vs => setPatientVisits(vs.filter(v => v.status !== 'deleted')))
+            .catch(() => setPatientVisits([]))
+    }
+
+    const handleSelectMatch = (patientId: string) => {
+        const patient = matches.find(m => m.patient_id === patientId)
+        if (patient) selectPatient(patient)
+        setPickerOpen(false)
+    }
+
+    // Close the match picker on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (phoneFieldRef.current && !phoneFieldRef.current.contains(event.target as Node)) {
+                setPickerOpen(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
 
     useEffect(() => {
         if (phone.length < 4) {
             if (formState !== 'idle') {
                 setFormState('idle')
                 setMatchedPatient(null)
-                setMatchCount(0)
+                setMatches([])
+                setPickerOpen(false)
                 setName('')
                 setAge('')
                 setSex('')
@@ -62,18 +105,14 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
             try {
                 const data = await api.getPatientsByPhone(phone)
                 if (data.length > 0) {
-                    setMatchedPatient(data[0])
-                    setMatchCount(data.length)
+                    setMatches(data)
                     setFormState('found')
-                    setName(data[0].name)
-                    setAge(data[0].age?.toString() ?? '')
-                    setSex(data[0].sex ?? '')
-                    api.getVisits(data[0].patient_id)
-                        .then(vs => setPatientVisits(vs.filter(v => v.status !== 'deleted')))
-                        .catch(() => setPatientVisits([]))
+                    setPickerOpen(data.length > 1)
+                    selectPatient(data[0])
                 } else {
                     setMatchedPatient(null)
-                    setMatchCount(0)
+                    setMatches([])
+                    setPickerOpen(false)
                     setFormState('not_found')
                     setName('')
                     setAge('')
@@ -82,12 +121,14 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 }
             } catch {
                 setMatchedPatient(null)
+                setMatches([])
+                setPickerOpen(false)
                 setFormState('not_found')
                 setPatientVisits([])
             }
         }, 300)
         return () => clearTimeout(timer)
-    }, [phone])
+    }, [phone]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleCreateNewPatient = () => {
         setReferencePatientId(matchedPatient?.patient_id ?? null)
@@ -102,7 +143,8 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setPhone('')
         setFormState('idle')
         setMatchedPatient(null)
-        setMatchCount(0)
+        setMatches([])
+        setPickerOpen(false)
         setReferencePatientId(null)
         setName('')
         setAge('')
@@ -173,8 +215,50 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
             <CardHeader className="pb-2 pt-4 px-5 shrink-0">
                 <CardTitle className="text-base">Walk-in / Book Appointment</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto px-5 pb-4">
-                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <CardContent className="flex-1 overflow-hidden px-5 pb-4 flex flex-col">
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
+
+                    {/* LEFT: Past Visits */}
+                    <div className="md:w-2/5 shrink-0 flex flex-col border rounded-md overflow-hidden">
+                        <div className="px-3 py-1.5 bg-muted/40 border-b flex items-center justify-between shrink-0">
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Past Visits</span>
+                            {formState === 'found' && patientVisits.length > 0 && (
+                                <span className="text-[11px] text-muted-foreground">{patientVisits.length}</span>
+                            )}
+                        </div>
+                        <div className="flex-1 overflow-y-auto min-h-0">
+                            {formState !== 'found' ? (
+                                <p className="text-xs text-muted-foreground text-center py-6 px-3">
+                                    Search a phone number to view past visits
+                                </p>
+                            ) : patientVisits.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center py-6">No past visits</p>
+                            ) : (
+                                <div className="divide-y divide-border/50">
+                                    {patientVisits.map(v => (
+                                        <div key={v.visit_id} className="flex items-start justify-between px-3 py-2 text-xs gap-2">
+                                            <div className="min-w-0">
+                                                <p className="text-muted-foreground font-mono">{v.visit_date}</p>
+                                                <p className="truncate text-foreground/80">{v.reason || '—'}</p>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <VisitFee visit={v} />
+                                                <span className={cn(
+                                                    "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                                    v.status === 'done' ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                                                        : v.status === 'cancelled' ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                                                            : "bg-secondary text-muted-foreground"
+                                                )}>{v.status}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* RIGHT: Patient + Appointment details */}
+                    <div className="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0">
 
                     {/* Phone */}
                     <div>
@@ -185,10 +269,11 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 Patient not found
                             </span>
                         </div>
-                        <div className="relative mt-1">
+                        <div className="relative mt-1" ref={phoneFieldRef}>
                             <Input
                                 value={phone}
                                 onChange={e => setPhone(e.target.value)}
+                                onFocus={() => { if (matches.length > 1) setPickerOpen(true) }}
                                 placeholder="Search by phone number..."
                                 className="pr-8"
                                 autoComplete="off"
@@ -200,12 +285,35 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             {formState === 'found' && (
                                 <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />
                             )}
+
+                            {pickerOpen && matches.length > 1 && formState === 'found' && (
+                                <div className="absolute z-20 top-full left-0 mt-1 w-full bg-popover border rounded-md shadow-md max-h-56 overflow-y-auto">
+                                    <div className="px-3 py-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 border-b flex items-center gap-1.5">
+                                        <Users className="h-3 w-3 shrink-0" />
+                                        {matches.length} patients share this number
+                                    </div>
+                                    {matches.map(m => (
+                                        <button
+                                            key={m.patient_id}
+                                            type="button"
+                                            onClick={() => handleSelectMatch(m.patient_id)}
+                                            className={cn(
+                                                "w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
+                                                matchedPatient?.patient_id === m.patient_id && "bg-accent/60"
+                                            )}
+                                        >
+                                            <span className="truncate">
+                                                <span className="font-medium">{m.name}</span>
+                                                <span className="text-muted-foreground"> · {m.age ?? '—'}y · {m.sex ?? '—'}</span>
+                                            </span>
+                                            {matchedPatient?.patient_id === m.patient_id && (
+                                                <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        {matchCount > 1 && formState === 'found' && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                {matchCount} patients share this number
-                            </p>
-                        )}
                     </div>
 
                     {/* Patient fields — always visible */}
@@ -271,35 +379,6 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         disabled={patientBlank}
                         className={patientLocked ? 'bg-muted/60' : ''}
                     />
-
-                    {/* Past visits for found patient */}
-                    {formState === 'found' && (
-                        <div className="border rounded-md overflow-hidden">
-                            <div className="px-3 py-1.5 bg-muted/40 border-b flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Past Visits</span>
-                                {patientVisits.length > 0 && (
-                                    <span className="text-[11px] text-muted-foreground">{patientVisits.length}</span>
-                                )}
-                            </div>
-                            {patientVisits.length === 0 ? (
-                                <p className="text-xs text-muted-foreground text-center py-2.5">No past visits</p>
-                            ) : (
-                                <div className="max-h-36 overflow-y-auto divide-y divide-border/50">
-                                    {patientVisits.map(v => (
-                                        <div key={v.visit_id} className="flex items-center justify-between px-3 py-1.5 text-xs gap-3">
-                                            <span className="text-muted-foreground font-mono shrink-0">{v.visit_date}</span>
-                                            <span className="truncate text-foreground/80">{v.reason || '—'}</span>
-                                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                                v.status === 'done' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                                                : v.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
-                                                : 'bg-secondary text-muted-foreground'
-                                            }`}>{v.status}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* Action row for found state */}
                     {formState === 'found' && (
@@ -375,6 +454,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             'Create Patient & Book'
                         )}
                     </Button>
+                    </div>
                 </form>
             </CardContent>
         </Card>

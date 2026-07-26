@@ -103,6 +103,9 @@ def get_patient_visits(patient_id):
             'visit_time': v.visit_time.strftime('%H:%M') if v.visit_time else None,
             'reason': v.reason,
             'status': v.status,
+            'visiting_fee': v.visiting_fee,
+            'amount_paid': v.amount_paid,
+            'payment_status': v.payment_status,
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })
