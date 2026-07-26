@@ -13,11 +13,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, Package, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert } from "lucide-react"
+import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert } from "lucide-react"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
-import { UploadInventoryReportDialog } from "@/components/UploadInventoryReportDialog"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
 import { ImportInventoryDialog } from "@/components/ImportInventoryDialog"
 import { ViewBatchesDialog } from "@/components/ViewBatchesDialog"
@@ -587,17 +586,9 @@ export default function InventoryPage() {
                     <Link href="/inventory/invoice_edit?manual=true" className="shrink-0">
                         <Button size="sm">
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            Manual
+                            Add Invoice
                         </Button>
                     </Link>
-                    <UploadInventoryReportDialog
-                        trigger={
-                            <Button size="sm" className="shrink-0">
-                                <Package className="mr-1.5 h-3.5 w-3.5" />
-                                Upload
-                            </Button>
-                        }
-                    />
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="shrink-0 ml-auto">
