@@ -1,3 +1,0 @@
-paddlepaddle
-paddleocr
-opencv-python-headless

@@ -1,4 +1,0 @@
-# Install these locally only — too large for cloud free tier
-# pip install -r requirements-ocr.txt
-paddlepaddle
-paddleocr
