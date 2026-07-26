@@ -213,7 +213,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     return (
         <Card className="flex flex-col h-full overflow-hidden">
             <CardHeader className="pb-2 pt-4 px-5 shrink-0">
-                <CardTitle className="text-base">Walk-in / Book Appointment</CardTitle>
+                <CardTitle className="text-base">Appointment</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden px-5 pb-4 flex flex-col">
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden">
@@ -428,19 +428,23 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                     onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
                                     placeholder="Fee (₹)"
                                 />
-                                <Select
-                                    value={visit.payment_status}
-                                    onValueChange={val => setVisit(v => ({ ...v, payment_status: val }))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="unpaid">Unpaid</SelectItem>
-                                        <SelectItem value="partial">Partial</SelectItem>
-                                        <SelectItem value="full">Paid</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="inline-flex items-center rounded-md border bg-muted p-0.5 h-9 w-full">
+                                    {(['full', 'partial', 'unpaid'] as const).map(status => (
+                                        <button
+                                            key={status}
+                                            type="button"
+                                            onClick={() => setVisit(v => ({ ...v, payment_status: status }))}
+                                            className={cn(
+                                                "flex-1 h-full rounded-sm text-xs font-medium transition-colors",
+                                                visit.payment_status === status
+                                                    ? "bg-background text-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {status === 'full' ? 'Full Paid' : status === 'partial' ? 'Partial Pay' : 'Unpaid'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
