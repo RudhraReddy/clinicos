@@ -249,10 +249,7 @@ def admin_diagnostics():
     On-demand system health and resource diagnostics gathering.
     Calculates database footprint, dynamic disk usage and system health checks.
     """
-    # 1. OCR Status Detection
-    ocr_active = bool(os.environ.get('GOOGLE_CLOUD_API_KEY', '').strip())
-
-    # 2. File Storage Telemetry (Images/Invoices)
+    # 1. File Storage Telemetry (Images/Invoices)
     storage_base = os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads')
     media_used_bytes = 0
     if os.path.exists(storage_base):
@@ -271,7 +268,7 @@ def admin_diagnostics():
     except Exception:
         d_total, d_used, d_free = 0, 0, 0
 
-    # 3. Database Size Inquiry (Postgres Safe fallback)
+    # 2. Database Size Inquiry (Postgres Safe fallback)
     db_size_bytes = 0
     try:
         db_size_bytes = db.session.execute(text("SELECT pg_database_size(current_database())")).scalar() or 0
@@ -279,7 +276,6 @@ def admin_diagnostics():
         db_size_bytes = 0  # Graceful fallback for SQLite fallback tests
 
     return jsonify({
-        'ocr_configured': ocr_active,
         'db_size_bytes': int(db_size_bytes),
         'media_size_bytes': int(media_used_bytes),
         'system_disk': {
