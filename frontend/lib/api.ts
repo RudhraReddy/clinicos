@@ -136,7 +136,6 @@ export interface BillingHistoryResponse {
 export interface UploadInventoryResponse {
     message: string;
     path: string;
-    ocr_data: string | Record<string, unknown> | { error: string };
 }
 
 class ApiError extends Error {
@@ -715,7 +714,6 @@ export async function getAdminStats() {
 }
 
 export interface SystemDiagnostics {
-  ocr_configured: boolean
   db_size_bytes: number
   media_size_bytes: number
   system_disk: {
