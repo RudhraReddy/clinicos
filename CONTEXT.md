@@ -42,7 +42,6 @@ clinic_related/
 │   │   ├── VisitsTab.tsx         # All-visits table
 │   │   ├── InvoicePrint.tsx      # Printable invoice template
 │   │   ├── QRCodeUpload.tsx      # QR code mobile upload widget
-│   │   ├── UploadInventoryReportDialog.tsx # OCR invoice upload
 │   │   ├── ImportInventoryDialog.tsx       # CSV import
 │   │   ├── EditInventoryDialog.tsx
 │   │   ├── ViewBatchesDialog.tsx
@@ -61,7 +60,7 @@ clinic_related/
 │       ├── patients.py           # /api/patients
 │       ├── visits.py             # /api/visits
 │       ├── billing.py            # /api/billing
-│       ├── inventory.py          # /api/inventory  (+ analytics, export, import, OCR)
+│       ├── inventory.py          # /api/inventory  (+ analytics, export, import)
 │       ├── locations.py          # /api/admin/locations (CRUD)
 │       ├── admin.py              # /api/admin/* (users, stats, diagnostics, activity log)
 │       ├── auth.py               # /api/auth/* (login, logout, me, users)
@@ -69,7 +68,6 @@ clinic_related/
 │       ├── images.py             # /api/patients/<id>/images
 │       └── upload.py             # /api/upload (QR sessions)
 │
-├── models/invoice_ocr.py         # AIInvoiceScanner (PaddleOCR/AI Studio)
 ├── README.md                     # Full project overview
 ├── docs/api_endpoints.md         # All API endpoints documented
 ├── docs/database_schema.md       # All DB tables documented
@@ -170,8 +168,8 @@ Hardcoded admin accounts: `saivelapati`, `tejavelapati` (TOTP-gated, auto-provis
 - `GET /api/inventory/invoices/<num>` — invoice detail + items
 - `GET /api/inventory/invoices/<num>/image` — serve invoice image
 - `GET /api/inventory/invoices/<num>/export` — download invoice CSV
-- `POST /api/inventory/upload` — upload image → OCR → returns parsed data
-- `POST /api/inventory/save_invoice` — commit OCR/manual invoice to DB (auto-tags batches with creator's location_id)
+- `POST /api/inventory/upload` — save an invoice image, returns its path
+- `POST /api/inventory/save_invoice` — commit a manually-entered invoice to DB (auto-tags batches with creator's location_id)
 - `GET /api/inventory_analytics[?location_id=N]` — revenue/stock KPIs, scoped to location when provided
 
 ### Locations `/api/admin/locations`
@@ -206,7 +204,6 @@ Hardcoded admin accounts: `saivelapati`, `tejavelapati` (TOTP-gated, auto-provis
 - **CSV export — two modes:** "Total Inventory" = full batch-level dump (19 columns). "Edit Inventory" = one-row-per-product with per-clinic qty columns, suitable for round-trip import to adjust stock.
 - **CSV import — header mapping:** `parse-headers` classifies each column first. Unknown columns trigger a mapping step in the dialog where the user assigns them to a known field or a clinic. The import then applies `field_mapping` and `clinic_mapping` JSON.
 - **Image tags:** `Prescription`, `Prescription - Front`, `Prescription - Back`, `Lab`, `X-Ray`, `Medical Record`
-- **OCR flow:** upload image → Google Cloud Vision API → `_parse_vision_response()` → user reviews → `save_invoice` commits
 - **QR upload flow:** desktop generates session → mobile opens URL → uploads files → desktop polls/finalizes
 - **Status tags on inventory:** `OK`, `LOW STOCK` (qty < min_stock_level), `OUT OF STOCK` (qty=0), `EXPIRES SOON` (configurable, default 6 months), `EXPIRED`
 - **API base URL:** empty string `''` in `lib/api.ts` so all requests go through Next.js proxy (works for remote access via Twingate)

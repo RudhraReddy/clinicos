@@ -141,8 +141,6 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 
 **Visit lifecycle:** `in_progress` → `done` → bill optionally created (sets `visit.invoice_id`). Payment status (`full`/`partial`/`unpaid`) tracked on the visit.
 
-**OCR Invoice Import:** Upload image → `_run_ocr()` in `routes/inventory.py` → calls **Google Cloud Vision API** (`DOCUMENT_TEXT_DETECTION`) → `_parse_vision_response()` extracts metadata + line items via bounding-box spatial analysis → `_transform_ocr_result()` maps to frontend schema → user confirms → `POST /api/inventory/save_invoice` creates `PurchaseInvoice` + batches. The `ocr_cloud/` directory (legacy Fly.io/PaddleOCR service) is no longer deployed.
-
 **QR Mobile Upload:** Desktop creates session → mobile opens `/connect/[sessionId]` and uploads images → desktop polls and finalizes. Files move from temp dir to permanent storage on finalize.
 
 ### File Storage
@@ -164,7 +162,6 @@ Production stack, projected ~$15/month (Render Hobby workspace):
 | `clinicos-frontend` | Render | Starter Node web | 512MB | $7/mo |
 | `clinicos-db` | Render | **Free** PostgreSQL (256MB, 1GB storage) | — | $0 → **must upgrade to $7/mo** |
 | `clinic-uploads` disk | Render | 10GB persistent (attached to clinicos-api) | — | $1/mo |
-| Google Cloud Vision API | GCP | pay-per-use (1000 free/mo) | — | $0/mo (budget alert set at $10) |
 
 > **URGENT:** `clinicos-db` is on the **Free plan** and will be **auto-deleted on 2026-05-29** (~22 days). Upgrade to Starter ($7/mo) at the Render dashboard before that date to preserve all data.
 
@@ -186,17 +183,6 @@ Notes:
 - `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
 - No health check paths configured on either service — Render cannot detect hung workers
 
-### OCR (Google Cloud Vision API)
-
-OCR runs directly inside `clinicos-api` via the Google Cloud Vision REST API — no separate microservice.
-
-- **API:** `vision.googleapis.com/v1/images:annotate` with `DOCUMENT_TEXT_DETECTION` feature
-- **Implementation:** `Backend_db/routes/inventory.py` — `_run_ocr()` + `_parse_vision_response()`
-- **Env var:** `GOOGLE_CLOUD_API_KEY` (secret, set in Render dashboard — GCP project `gen-lang-client-0545184621`, key restricted to Cloud Vision API only)
-- **Cost:** Free up to 1000 calls/month; clinic usage (~20 calls/day) stays within free tier
-- **No cold starts, no container, no OOM crashes** — replaces the Fly.io/PaddleOCR service which was OOM-killed on every invocation (PaddleOCR exceeded the 2GB Fly machine RAM)
-- `ocr_cloud/` directory kept in repo but no longer deployed
-
 ### Environment Variables
 
 **`clinicos-api` (set in render.yaml or Render dashboard):**
@@ -207,7 +193,6 @@ OCR runs directly inside `clinicos-api` via the Google Cloud Vision REST API —
 | `UPLOAD_BASE_DIR` | `/var/data/clinic_uploads` |
 | `FLASK_DEBUG` | `false` |
 | `CORS_ORIGINS` | `https://clinicos-frontend.onrender.com` |
-| `GOOGLE_CLOUD_API_KEY` | GCP Vision API key (secret — set in dashboard, restricted to Cloud Vision API) |
 
 **`clinicos-frontend`:**
 
@@ -294,6 +279,8 @@ These three strings are passed as props at two call sites and are currently hard
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **OCR Feature Removed (2026-07-25):** The Google Cloud Vision invoice-scanning feature has been fully removed. `UploadInventoryReportDialog.tsx`, the OCR helper functions in `routes/inventory.py`, and the legacy dead `ocr_cloud/`/`models/invoice_ocr.py`/`Backend_db/ocr_service.py` scanners have all been deleted. Manual entry (`/inventory/invoice_edit?manual=true`) is now the only way to add a purchase invoice; users can still attach a photo of the physical invoice via "Attach Image" or "Upload via QR" — the image is just stored, not parsed. `GOOGLE_CLOUD_API_KEY` should be removed from the Render dashboard manually (not tracked in `render.yaml`).
 
 - **Multi-Location Inventory System (2026-06-14):** Full per-clinic stock tracking across three sub-projects:
   - **SP1 — Location Foundation:** New `Location` model (`id`, `name`, `is_active`). Nullable `location_id` FK added to `User`, `Visit`, `Bill`, `PurchaseInvoice`, `ExpenseLedger`, `InventoryBatch` (additive — no data loss). CRUD API at `GET/POST/PATCH/DELETE /api/admin/locations` (GET is `@require_auth`; mutations are `@require_admin`). `_apply_migrations()` in `app.py` handles the 6 new FK columns on existing tables. Admin Settings tab has a **Locations card** (create, rename inline, activate/deactivate, delete). Admin Users dialog location field is now a **Select dropdown** (not free text) that saves `location_id` and syncs `location_label` for backward compat.

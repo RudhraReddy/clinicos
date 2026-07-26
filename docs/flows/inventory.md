@@ -52,16 +52,11 @@ A reset "×" button appears in the header when any filter is active.
 
 ## Adding Stock
 
-### Upload Report (OCR Invoice)
-1. Click **Upload Report** → `UploadInventoryReportDialog`
-2. Select an invoice image (JPG, PNG, PDF)
-3. File is sent to `POST /api/inventory/upload` → saved to disk → passed through `AIInvoiceScanner`
-4. OCR-parsed data is returned and shown for review on the invoice edit page
-5. User confirms/edits → `POST /api/inventory/save_invoice` commits everything
-
 ### Manual Entry
-- Link to `/inventory/invoice_edit?manual=true`
+- Click **Add Invoice** → `/inventory/invoice_edit?manual=true`
 - User fills in invoice details and product rows manually
+- Optionally attaches a photo of the physical invoice via "Attach Image" (`POST /api/inventory/upload` — stores the file, no extraction) or "Upload via QR" (same storage-only behavior via the QR mobile-upload session)
+- `POST /api/inventory/save_invoice` commits everything
 
 ### Import CSV
 - `ImportInventoryDialog` — upload a CSV with columns like Item Name, Pack Size, Quantity, MRP, Expiry, etc.
@@ -89,7 +84,6 @@ A reset "×" button appears in the header when any filter is active.
 
 | Component | Purpose |
 |---|---|
-| `UploadInventoryReportDialog` | Upload invoice image + trigger OCR |
 | `ImportInventoryDialog` | Bulk CSV import |
 | `EditInventoryDialog` | Edit product master fields |
 | `ViewBatchesDialog` | Per-batch stock breakdown + batch edit |

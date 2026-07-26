@@ -264,16 +264,16 @@ Download the invoice's line items as a CSV file.
 ---
 
 ### `POST /api/inventory/upload`
-Upload an invoice image and run OCR on it. Returns OCR-parsed product data.
+Save an uploaded invoice image to disk and return its path, for attaching to a manually-entered invoice.
 
 **Form Data:** `file` — image file (JPG, PNG, etc.)
 
-**Response:** `200 { "message": "...", "path": "/media/.../filename.jpg", "ocr_data": { ... } }`
+**Response:** `200 { "message": "...", "path": "/media/.../filename.jpg" }`
 
 ---
 
 ### `POST /api/inventory/save_invoice`
-Save a confirmed invoice (after OCR review or manual entry) with all product details. Creates `PurchaseInvoice`, `ProductMaster` (if new), `InventoryBatch`, and `InventoryHistory` records.
+Save a manually-entered invoice with all product details. Creates `PurchaseInvoice`, `ProductMaster` (if new), `InventoryBatch`, and `InventoryHistory` records.
 
 **Request Body (JSON):**
 ```json
