@@ -185,8 +185,7 @@ export const api = {
     },
 
     async getPatientsByPhone(phone: string): Promise<Patient[]> {
-        const data = await fetchApi<{ patients: Patient[] }>(`/api/patients?phone_number=${encodeURIComponent(phone)}`)
-        return data.patients || []
+        return fetchApi<Patient[]>(`/api/patients?phone_number=${encodeURIComponent(phone)}`)
     },
 
     async getPatient(id: string): Promise<Patient> {
