@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
     TableBody,
@@ -13,20 +13,21 @@ import {
     TableRow,
 } from "@/components/ui/table"
 
-import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, ChevronLeft, ChevronRight, FileText, Download, Upload, Columns } from "lucide-react"
+import { UserPlus, Search, Eye, Edit, Loader2, AlertCircle, FileText, Download, Upload, Columns, Menu, Package, CreditCard, LayoutDashboard } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import Link from "next/link"
 import { api, type Patient } from "@/lib/api"
 import { AddPatientDialog } from "@/components/AddPatientDialog"
 import { EditPatientDialog } from "@/components/EditPatientDialog"
 import { PatientDetailsView } from "@/components/PatientDetailsView"
 import { useAuth } from "@/lib/auth_context"
+import { useMenu } from "@/components/layout/AppShell"
 import { useSettings, ALL_PATIENT_COLUMNS } from "@/lib/settings_context"
 import { toast } from "sonner"
 
-const PAGE_LIMIT = 50
-
 export default function PatientsPage() {
     const { role } = useAuth()
+    const { openMenu } = useMenu()
     const { defaultPatientColumns } = useSettings()
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(defaultPatientColumns))
 
@@ -54,7 +55,6 @@ export default function PatientsPage() {
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
     const [viewMode, setViewMode] = useState<'full' | 'visits-only'>('full')
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-    const [page, setPage] = useState(1)
     const [importing, setImporting] = useState(false)
 
     const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,7 +64,7 @@ export default function PatientsPage() {
         try {
             const res = await api.importPatients(file)
             toast.success(`Batch Sync Complete: Added ${res.counts?.new || 0}, Updated ${res.counts?.updated || 0}.`)
-            loadData(1) // reload from page 1
+            loadData()
         } catch (err: any) {
             toast.error(err.message || "Failed to ingest patient document.")
         } finally {
@@ -82,11 +82,11 @@ export default function PatientsPage() {
 
 
 
-    const loadData = async (pageNum = page) => {
+    const loadData = async () => {
         setLoading(true)
         setError(null)
         try {
-            const data = await api.getPatients(pageNum, PAGE_LIMIT)
+            const data = await api.getPatients(1, 100000)
             setPatients(data)
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load patients")
@@ -96,8 +96,8 @@ export default function PatientsPage() {
     }
 
     useEffect(() => {
-        loadData(page)
-    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+        loadData()
+    }, [])
 
 
 
@@ -111,11 +111,36 @@ export default function PatientsPage() {
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-                <div>
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Patients</h1>
-                    <p className="text-muted-foreground">
-                        Manage patient records and history.
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/inventory">
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
+                                Inventory
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/billing">
+                                <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                                Billing
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/">
+                                <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
+                                Dashboard
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -174,7 +199,7 @@ export default function PatientsPage() {
                         onOpenChange={setDialogOpen}
                         onSuccess={() => {
                             setDialogOpen(false)
-                            loadData(page)
+                            loadData()
                         }}
                         trigger={
                             <Button className="shadow-sm h-9" size="sm">
@@ -192,7 +217,7 @@ export default function PatientsPage() {
                             onOpenChange={setEditDialogOpen}
                             patient={selectedPatient}
                             onSuccess={() => {
-                                loadData(page)
+                                loadData()
                                 setEditDialogOpen(false)
                             }}
                         />
@@ -216,7 +241,7 @@ export default function PatientsPage() {
                             Make sure your backend is running and CORS is enabled.
                         </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => loadData(page)} className="border-red-500/20 hover:bg-red-500/20">
+                    <Button variant="outline" size="sm" onClick={() => loadData()} className="border-red-500/20 hover:bg-red-500/20">
                         Retry
                     </Button>
                 </div>
@@ -224,7 +249,7 @@ export default function PatientsPage() {
 
             <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 shrink-0">
-                    <CardTitle className="text-lg font-medium">Patient List — Page {page}</CardTitle>
+                    <CardTitle className="text-lg font-medium">Patient List ({filteredPatients.length})</CardTitle>
                     <div className="relative w-72">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -390,57 +415,6 @@ export default function PatientsPage() {
                         </>
                     )}
                 </CardContent>
-                {!loading && (
-                    <CardFooter className="shrink-0 border-t flex items-center justify-between py-4">
-                        <p className="text-sm text-muted-foreground">
-                            Page {page} &middot; {patients.length} records
-                        </p>
-                        <div className="flex items-center gap-2">
-                            {/* Desktop buttons */}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="hidden md:inline-flex"
-                                onClick={() => setPage(p => p - 1)}
-                                disabled={page === 1}
-                            >
-                                <ChevronLeft className="h-4 w-4 mr-1" />
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="hidden md:inline-flex"
-                                onClick={() => setPage(p => p + 1)}
-                                disabled={patients.length < PAGE_LIMIT}
-                            >
-                                Next
-                                <ChevronRight className="h-4 w-4 ml-1" />
-                            </Button>
-                            {/* Mobile icon-only buttons */}
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="md:hidden"
-                                onClick={() => setPage(p => p - 1)}
-                                disabled={page === 1}
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                                <span className="sr-only">Previous</span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="md:hidden"
-                                onClick={() => setPage(p => p + 1)}
-                                disabled={patients.length < PAGE_LIMIT}
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                                <span className="sr-only">Next</span>
-                            </Button>
-                        </div>
-                    </CardFooter>
-                )}
             </Card>
         </div>
     )
