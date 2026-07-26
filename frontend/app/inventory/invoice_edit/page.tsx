@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone, Menu } from "lucide-react"
+import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone, Menu, Loader2 } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import { api, API_BASE_URL, InventoryItem } from "@/lib/api"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -235,10 +235,14 @@ export default function InvoiceEditPage() {
         setRows(rows.filter((_, i) => i !== index))
     }
 
-    if (loading) return <div className="p-8">Loading...</div>
+    if (loading) return (
+        <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+    )
 
     return (
-        <div className="container mx-auto py-8 space-y-8">
+        <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button
