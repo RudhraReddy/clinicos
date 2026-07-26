@@ -504,8 +504,8 @@ export default function InventoryPage() {
     const outCount = inventory.filter(i => i.status.includes("OUT OF STOCK")).length
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Inventory</h1>
                     <p className="text-muted-foreground">
@@ -536,7 +536,7 @@ export default function InventoryPage() {
             </div>
 
             {locations.length > 0 && (
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap shrink-0">
                     <button
                         onClick={() => setActiveLocationId('all')}
                         className={cn(
@@ -566,18 +566,18 @@ export default function InventoryPage() {
             )}
 
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="space-y-4">
-                <TabsList>
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="flex-1 flex flex-col overflow-hidden gap-4">
+                <TabsList className="shrink-0">
                     <TabsTrigger value="inventory">Inventory</TabsTrigger>
                     <TabsTrigger value="all-changes">All Changes</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="all-changes">
+                <TabsContent value="all-changes" className="flex-1 overflow-y-auto m-0">
                     <AllChangesPanel />
                 </TabsContent>
 
-                <TabsContent value="inventory" className="space-y-6 mt-0">
-            <div className="flex gap-2 items-center flex-wrap justify-between">
+                <TabsContent value="inventory" className="flex-1 flex flex-col overflow-hidden gap-6 m-0">
+            <div className="flex gap-2 items-center flex-wrap justify-between shrink-0">
                 <div className="flex flex-row items-center gap-2 overflow-x-auto pb-1 w-full md:w-auto scrollbar-hide">
                     <Button variant="outline" size="sm" className="shrink-0" onClick={() => window.location.href = '/inventory/history'}>
                         <FileText className="mr-1.5 h-3.5 w-3.5" />
@@ -624,7 +624,7 @@ export default function InventoryPage() {
 
 
             {!stockAlertDismissed && !loading && (lowCount > 0 || outCount > 0) && (
-                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 flex items-center gap-3 text-yellow-700 dark:text-yellow-400">
+                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 flex items-center gap-3 text-yellow-700 dark:text-yellow-400 shrink-0">
                     <AlertTriangle className="h-5 w-5 shrink-0" />
                     <p className="flex-1 text-sm font-medium">
                         {lowCount > 0 && outCount > 0
@@ -645,7 +645,7 @@ export default function InventoryPage() {
 
             {
                 error && (
-                    <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 flex items-center gap-3 text-red-500">
+                    <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 flex items-center gap-3 text-red-500 shrink-0">
                         <AlertCircle className="h-5 w-5" />
                         <div className="flex-1">
                             <p className="font-medium">Connection Error</p>
@@ -655,8 +655,8 @@ export default function InventoryPage() {
                 )
             }
 
-            <Card>
-                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between space-y-0 pb-4">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between space-y-0 pb-4 shrink-0">
                     <CardTitle className="text-lg font-medium">Inventory List ({filteredInventory.length})</CardTitle>
                     <div className="flex items-center gap-2">
                         {/* Quick Search */}
@@ -671,7 +671,7 @@ export default function InventoryPage() {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-hidden flex flex-col min-h-0">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -679,9 +679,9 @@ export default function InventoryPage() {
                     ) : (
                         <>
                         {/* Desktop table — hidden on mobile */}
-                        <div className="hidden md:block overflow-x-auto">
+                        <div className="hidden md:flex md:flex-col flex-1 overflow-hidden min-h-0 [&>div]:flex-1 [&>div]:min-h-0">
                             <Table>
-                                <TableHeader>
+                                <TableHeader className="sticky top-0 z-10 bg-card">
                                     <TableRow>
                                         {visibleColumns.has('id') && <TableHead>
                                             <DataTableColumnFilter
@@ -928,7 +928,7 @@ export default function InventoryPage() {
                         </div>
 
                         {/* Mobile card list — shown only on mobile */}
-                        <div className="md:hidden divide-y">
+                        <div className="md:hidden flex-1 overflow-y-auto min-h-0 divide-y">
                             {filteredInventory.length === 0 ? (
                                 <p className="text-center py-8 text-muted-foreground text-sm">No items found.</p>
                             ) : (

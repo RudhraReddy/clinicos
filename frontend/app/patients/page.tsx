@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
     TableBody,
@@ -109,8 +109,8 @@ export default function PatientsPage() {
     )
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Patients</h1>
                     <p className="text-muted-foreground">
@@ -207,7 +207,7 @@ export default function PatientsPage() {
             </div>
 
             {error && (
-                <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 flex items-center gap-3 text-red-500">
+                <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 flex items-center gap-3 text-red-500 shrink-0">
                     <AlertCircle className="h-5 w-5" />
                     <div className="flex-1">
                         <p className="font-medium">Connection Error</p>
@@ -222,8 +222,8 @@ export default function PatientsPage() {
                 </div>
             )}
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 shrink-0">
                     <CardTitle className="text-lg font-medium">Patient List — Page {page}</CardTitle>
                     <div className="relative w-72">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -235,7 +235,7 @@ export default function PatientsPage() {
                         />
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-hidden flex flex-col min-h-0">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -243,9 +243,9 @@ export default function PatientsPage() {
                     ) : (
                         <>
                             {/* Desktop table */}
-                            <div className="hidden md:block">
+                            <div className="hidden md:flex md:flex-col flex-1 overflow-hidden min-h-0 [&>div]:flex-1 [&>div]:min-h-0">
                                 <Table>
-                                    <TableHeader>
+                                    <TableHeader className="sticky top-0 z-10 bg-card">
                                         <TableRow>
                                             {visibleColumns.has('patient_id') && <TableHead>Public ID</TableHead>}
                                             <TableHead>Name</TableHead>
@@ -331,36 +331,10 @@ export default function PatientsPage() {
                                         )}
                                     </TableBody>
                                 </Table>
-                                {/* Desktop pagination controls */}
-                                <div className="flex items-center justify-between pt-4 border-t mt-4">
-                                    <p className="text-sm text-muted-foreground">
-                                        Page {page} &middot; {patients.length} records
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setPage(p => p - 1)}
-                                            disabled={page === 1}
-                                        >
-                                            <ChevronLeft className="h-4 w-4 mr-1" />
-                                            Previous
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setPage(p => p + 1)}
-                                            disabled={patients.length < PAGE_LIMIT}
-                                        >
-                                            Next
-                                            <ChevronRight className="h-4 w-4 ml-1" />
-                                        </Button>
-                                    </div>
-                                </div>
                             </div>
 
                             {/* Mobile card list */}
-                            <div className="md:hidden">
+                            <div className="md:hidden flex-1 overflow-y-auto min-h-0">
                                 {filteredPatients.length === 0 ? (
                                     <p className="text-center py-8 text-muted-foreground text-sm">
                                         No patients found.
@@ -412,36 +386,61 @@ export default function PatientsPage() {
                                         ))}
                                     </div>
                                 )}
-                                {/* Mobile pagination controls */}
-                                <div className="flex items-center justify-between pt-4 border-t mt-4">
-                                    <p className="text-sm text-muted-foreground">
-                                        Page {page} &middot; {patients.length} records
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => setPage(p => p - 1)}
-                                            disabled={page === 1}
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                            <span className="sr-only">Previous</span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => setPage(p => p + 1)}
-                                            disabled={patients.length < PAGE_LIMIT}
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                            <span className="sr-only">Next</span>
-                                        </Button>
-                                    </div>
-                                </div>
                             </div>
                         </>
                     )}
                 </CardContent>
+                {!loading && (
+                    <CardFooter className="shrink-0 border-t flex items-center justify-between py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Page {page} &middot; {patients.length} records
+                        </p>
+                        <div className="flex items-center gap-2">
+                            {/* Desktop buttons */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="hidden md:inline-flex"
+                                onClick={() => setPage(p => p - 1)}
+                                disabled={page === 1}
+                            >
+                                <ChevronLeft className="h-4 w-4 mr-1" />
+                                Previous
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="hidden md:inline-flex"
+                                onClick={() => setPage(p => p + 1)}
+                                disabled={patients.length < PAGE_LIMIT}
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                            {/* Mobile icon-only buttons */}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="md:hidden"
+                                onClick={() => setPage(p => p - 1)}
+                                disabled={page === 1}
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="sr-only">Previous</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="md:hidden"
+                                onClick={() => setPage(p => p + 1)}
+                                disabled={patients.length < PAGE_LIMIT}
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                                <span className="sr-only">Next</span>
+                            </Button>
+                        </div>
+                    </CardFooter>
+                )}
             </Card>
         </div>
     )
