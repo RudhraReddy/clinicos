@@ -5,7 +5,7 @@ import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLef
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
-import { getTodayIST } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -48,12 +48,8 @@ export default function DoctorDashboard() {
     const today = getTodayIST()
     const todayVisits = visits.filter(v => v.visit_date === today)
 
-    // Sort by time
-    const orderedTodayVisits = [...todayVisits].sort((a, b) => {
-        const timeA = a.visit_time || "23:59"
-        const timeB = b.visit_time || "23:59"
-        return timeA.localeCompare(timeB)
-    })
+    // Not-done visits ordered by time; done visits sink below, most recent first
+    const orderedTodayVisits = orderTodayVisits(todayVisits)
 
     const selectedVisit = visits.find(v => v.visit_id === selectedVisitId)
 

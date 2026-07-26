@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getTodayIST } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -89,13 +89,7 @@ export default function Dashboard() {
 
     const today = getTodayIST()
     const todayVisits = visits.filter(v => v.visit_date === today)
-    const orderedTodayVisits = [...todayVisits].sort((a, b) => {
-        const timeA = a.visit_time || "23:59"
-        const timeB = b.visit_time || "23:59"
-        return timeA === timeB
-            ? (a.created_at || "").localeCompare(b.created_at || "")
-            : timeA.localeCompare(timeB)
-    })
+    const orderedTodayVisits = orderTodayVisits(todayVisits)
     const waitingCount = todayVisits.filter(v =>
         !['in_progress', 'done', 'cancelled'].includes(v.status.toLowerCase())
     ).length
