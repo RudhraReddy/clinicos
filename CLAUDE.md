@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClinicOS is a full-stack clinic management system. The backend is a Flask REST API (`Backend_db/`) and the frontend is a Next.js 16 App Router app (`frontend/`). There is also an AI/OCR module in `models/` for invoice scanning (PaddleOCR). See `CONTEXT.md` for a quick-reference of all tables, endpoints, and key flows. See `docs/` for per-feature flow docs.
+ClinicOS is a full-stack clinic management system. The backend is a Flask REST API (`Backend_db/`) and the frontend is a Next.js 16 App Router app (`frontend/`). See `CONTEXT.md` for a quick-reference of all tables, endpoints, and key flows. See `docs/` for per-feature flow docs.
 
 ## Development Commands
 
@@ -177,8 +177,7 @@ Notes:
 - Both web services (`clinicos-api`, `clinicos-frontend`) are on **Starter** plan — always-on, no spin-down
 - Persistent disk `clinic-uploads` (10GB) mounted at `/var/data/clinic_uploads` on `clinicos-api` (env `UPLOAD_BASE_DIR`). Render takes daily snapshots with 7-day retention.
 - **`clinicos-db` is on Free plan** — expiry 2026-05-29. Actual DB name has a Render suffix (`clinic_db_s5ra`) but this is transparent since `DATABASE_URL` is injected. PostgreSQL 18, 1GB storage, 256MB RAM.
-- Gunicorn timeout 120s (OCR calls can take 30-60s); `--max-requests-jitter 50` is active in the live start command (also in render.yaml)
-- `OCR_SERVICE_URL` set as a **secret env var** in Render dashboard (not in render.yaml) — set to `https://clinicos-ocr.fly.dev`
+- Gunicorn timeout 120s; `--max-requests-jitter 50` is active in the live start command (also in render.yaml)
 - `DATABASE_URL` injected from Render PostgreSQL; `app.py` normalises `postgres://` → `postgresql://` on startup
 - `db.create_all()` runs inside `create_app()` — tables are created idempotently on every deploy
 - No health check paths configured on either service — Render cannot detect hung workers
