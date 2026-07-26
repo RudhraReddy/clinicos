@@ -1,13 +1,14 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTodayIST } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth_context"
+import { useMenu } from "@/components/layout/AppShell"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -58,6 +59,7 @@ export default function Dashboard() {
 
     const { role, isLoading } = useAuth()
     const router = useRouter()
+    const { openMenu } = useMenu()
 
     useEffect(() => {
         if (!isLoading && role === 'doctor') router.push('/doctor')
@@ -204,7 +206,15 @@ export default function Dashboard() {
     return (
         <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
             <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden gap-4">
-                <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
                     <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
