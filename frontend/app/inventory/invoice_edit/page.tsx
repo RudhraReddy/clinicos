@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone, Menu, Loader2 } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import { api, API_BASE_URL, InventoryItem } from "@/lib/api"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -163,7 +163,7 @@ export default function InvoiceEditPage() {
                         mfg: match.item.manufacturer || row.mfg,
                         pack: match.item.pack_size || row.pack,
                         hsn: match.item.hsn_code || row.hsn,
-                        gst: match.item.gst_rate ? match.item.gst_rate.toString() : row.gst
+                        gst: match.item.gst_rate != null ? match.item.gst_rate.toString() : row.gst
                     }
                 }
                 return row
@@ -211,20 +211,37 @@ export default function InvoiceEditPage() {
     }
 
     const selectProduct = (index: number, item: InventoryItem) => {
-        const newRows = [...rows]
-        newRows[index] = {
-            ...newRows[index],
-            product_name: item.item_name,
-            // dosage removed
-            mfg: item.manufacturer || "",
-            category: item.category || "Medicine",
-            pack: item.pack_size || "",
-            hsn: item.hsn_code || "",
-            gst: item.gst_rate ? item.gst_rate.toString() : "",
-            matched_id: item.id,
-            match_type: 'exact'
-        }
-        setRows(newRows)
+        setRows(prev => {
+            const newRows = [...prev]
+            newRows[index] = {
+                ...newRows[index],
+                product_name: item.item_name,
+                // dosage removed
+                mfg: item.manufacturer || "",
+                category: item.category || "Medicine",
+                pack: item.pack_size || "",
+                hsn: item.hsn_code || "",
+                gst: item.gst_rate != null ? item.gst_rate.toString() : "",
+                mrp: item.price != null ? item.price.toString() : newRows[index].mrp,
+                matched_id: item.id,
+                match_type: 'exact'
+            }
+            return newRows
+        })
+
+        // Rate (purchase cost) isn't on the product catalog itself — pull it
+        // from the most recent batch as a starting suggestion.
+        api.getInventoryBatches(item.id).then(batches => {
+            if (batches.length === 0) return
+            const latest = batches.reduce((a, b) => (b.id > a.id ? b : a))
+            if (!latest.purchase_rate) return
+            setRows(prev => {
+                if (prev[index]?.matched_id !== item.id) return prev
+                const newRows = [...prev]
+                newRows[index] = { ...newRows[index], rate: latest.purchase_rate.toString() }
+                return newRows
+            })
+        }).catch(e => console.error("Failed to fetch last purchase rate", e))
     }
 
     const addRow = () => {
@@ -505,6 +522,10 @@ function ProductSelector({
 }) {
     const [open, setOpen] = useState(false)
 
+    const filtered = value.trim()
+        ? inventory.filter(i => i.item_name.toLowerCase().includes(value.trim().toLowerCase()))
+        : inventory
+
     return (
         <div className="relative">
             <Popover open={open} onOpenChange={setOpen}>
@@ -517,18 +538,19 @@ function ProductSelector({
                                 matchType === 'partial' ? "border-orange-500 ring-orange-500/20" : ""
                             )}
                             value={value}
-                            onChange={(e) => onChangeValue(e.target.value)}
-                            onFocus={() => setOpen(true)}
+                            onChange={(e) => {
+                                onChangeValue(e.target.value)
+                                if (!open) setOpen(true)
+                            }}
                         />
                     </div>
                 </PopoverTrigger>
-                <PopoverContent className="p-0" align="start">
-                    <Command>
-                        <CommandInput placeholder="Search inventory..." />
+                <PopoverContent className="p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                    <Command shouldFilter={false}>
                         <CommandList>
                             <CommandEmpty>No item found (New Item)</CommandEmpty>
                             <CommandGroup>
-                                {inventory.map((item) => (
+                                {filtered.slice(0, 50).map((item) => (
                                     <CommandItem
                                         key={item.id}
                                         value={item.item_name}
