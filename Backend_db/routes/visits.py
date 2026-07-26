@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Visit, Patient, ProductMaster, User
+from models import Visit, Patient, ProductMaster, User, Bill
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
@@ -68,6 +68,13 @@ def get_all_visits():
         query = query.filter(Visit.created_by_user_id == created_by)
 
     visits_list = query.limit(50).all()
+
+    invoice_ids = [v.invoice_id for v in visits_list if v.invoice_id]
+    bills_map = {}
+    if invoice_ids:
+        bills = Bill.query.filter(Bill.invoice_id.in_(invoice_ids)).all()
+        bills_map = {b.invoice_id: float(b.total_amount) for b in bills}
+
     results = []
     for v in visits_list:
         patient = Patient.query.get(v.patient_id)
@@ -84,6 +91,7 @@ def get_all_visits():
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'payment_status': v.payment_status,
+            'billed_amount': bills_map.get(v.invoice_id),
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })

@@ -31,6 +31,7 @@ export interface Visit {
     visiting_fee?: number;
     amount_paid?: number;
     payment_status?: string;
+    billed_amount?: number | null;
 }
 
 export interface InventoryBatch {

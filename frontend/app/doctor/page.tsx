@@ -1,21 +1,24 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone } from 'lucide-react'
+import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone, Menu, Package, CreditCard, Users } from 'lucide-react'
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
-import { getTodayIST, orderTodayVisits } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits, cn } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import Link from "next/link"
+import { useMenu } from "@/components/layout/AppShell"
 
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
 export default function DoctorDashboard() {
+    const { openMenu } = useMenu()
     const [visits, setVisits] = useState<Visit[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
@@ -84,52 +87,67 @@ export default function DoctorDashboard() {
     }, [selectedVisitId, selectedVisit?.visit_id, selectedVisit?.patient_id, refreshTrigger])
 
     // Image Dialog State
-    const [uploadPreview, setUploadPreview] = useState<string | null>(null)
-    const [uploadFile, setUploadFile] = useState<File | null>(null)
+    const [uploadFiles, setUploadFiles] = useState<{ file: File, preview: string }[]>([])
     const [uploadNotes, setUploadNotes] = useState("")
+    const [uploading, setUploading] = useState(false)
 
     // Lightbox State: holds the current image AND the list of images to navigate through
     const [lightboxState, setLightboxState] = useState<{ image: any, context: any[] } | null>(null)
 
     // Handle File Selection -> Show Preview Dialog
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || !e.target.files[0]) return
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (!files || files.length === 0) return
 
-        const file = e.target.files[0]
-        setUploadFile(file)
+        const fileArray = Array.from(files)
+        const readAsDataURL = (file: File) => new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.readAsDataURL(file)
+        })
+        const previews = await Promise.all(fileArray.map(readAsDataURL))
+        setUploadFiles(prev => [...prev, ...fileArray.map((file, i) => ({ file, preview: previews[i] }))])
+    }
 
-        // Create Preview URL
-        const reader = new FileReader()
-        reader.onloadend = () => {
-            setUploadPreview(reader.result as string)
-        }
-        reader.readAsDataURL(file)
+    const removeUploadFile = (index: number) => {
+        setUploadFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     const confirmUpload = async () => {
-        if (!uploadFile || !selectedVisitId || !selectedVisit) return
+        if (uploadFiles.length === 0 || !selectedVisitId || !selectedVisit) return
 
-        try {
-            await api.uploadPatientImage(selectedVisit.patient_id, uploadFile, selectedVisitId, uploadNotes)
-            toast.success("Image uploaded")
+        setUploading(true)
+        let successCount = 0
+        let failCount = 0
+        for (const { file } of uploadFiles) {
+            try {
+                await api.uploadPatientImage(selectedVisit.patient_id, file, selectedVisitId, uploadNotes)
+                successCount++
+            } catch (error) {
+                console.error(error)
+                failCount++
+            }
+        }
+        setUploading(false)
 
-            // Refresh
+        if (successCount > 0) {
             const imgs = await api.getPatientImages(selectedVisit.patient_id)
             setPatientImages(imgs)
-
-            // Reset
-            clearUpload()
-        } catch (error) {
-            console.error(error)
-            toast.error("Failed to upload image")
         }
+
+        if (failCount === 0) {
+            toast.success(successCount === 1 ? "Image uploaded" : `${successCount} images uploaded`)
+        } else {
+            toast.error(`${successCount} uploaded, ${failCount} failed`)
+        }
+
+        clearUpload()
     }
 
     const clearUpload = () => {
-        setUploadPreview(null)
-        setUploadFile(null)
+        setUploadFiles([])
         setUploadNotes("")
-        // Reset input value if possible, but difficult with hidden input. 
+        // Reset input value if possible, but difficult with hidden input.
         // We can just rely on the key prop or replace input.
         const input = document.getElementById('image-upload-input') as HTMLInputElement
         if (input) input.value = ''
@@ -296,11 +314,27 @@ export default function DoctorDashboard() {
                 id="image-upload-input"
                 type="file"
                 accept="image/*"
+                multiple
                 style={{ display: 'none' }}
                 onChange={handleImageUpload}
             />
             {/* ── MOBILE LAYOUT (hidden md+) ── */}
             <div className="md:hidden flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-center gap-3 px-4 py-3 bg-card border-b">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
+                    <h1 className="text-xl font-bold tracking-tight truncate">
+                        {selectedVisit ? selectedVisit.patient_name : "Dashboard"}
+                    </h1>
+                </div>
 
                 {/* Stat strip */}
                 <div className="flex border-b bg-card">
@@ -462,17 +496,26 @@ export default function DoctorDashboard() {
                             orderedTodayVisits.map(visit => (
                                 <div
                                     key={visit.visit_id}
-                                    className={`flex items-center gap-2 px-4 py-3 border-b cursor-pointer transition-colors ${selectedVisitId === visit.visit_id ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted/40'} ${visit.status === 'done' ? 'opacity-50' : ''}`}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-3 border-b border-l-4 cursor-pointer transition-colors",
+                                        visit.status === 'done'
+                                            ? 'opacity-60 border-l-green-500'
+                                            : selectedVisitId === visit.visit_id
+                                                ? 'bg-primary/10 border-l-primary'
+                                                : 'border-l-transparent hover:bg-muted/40'
+                                    )}
                                     onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
                                 >
                                     <span className="font-bold text-sm min-w-[38px] flex-shrink-0">{visit.visit_time?.substring(0, 5) || 'ASAP'}</span>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-sm truncate">{visit.patient_name}</p>
-                                        <p className="text-xs text-muted-foreground truncate">{visit.reason || '—'}</p>
-                                    </div>
-                                    <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'} className="text-[10px] uppercase flex-shrink-0">
-                                        {visit.status}
-                                    </Badge>
+                                    <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
+                                        {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
+                                    </span>
+                                    <p className="flex-1 min-w-0 font-semibold text-sm truncate">{visit.patient_name}</p>
+                                    {visit.billed_amount != null && (
+                                        <span className="text-xs font-semibold tabular-nums text-green-700 dark:text-green-400 flex-shrink-0">
+                                            ₹{visit.billed_amount}
+                                        </span>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -489,46 +532,49 @@ export default function DoctorDashboard() {
             </div>
 
             {/* ── DESKTOP LAYOUT (hidden on mobile) ── */}
-            <div className="hidden md:flex h-[calc(100vh-60px)] bg-background overflow-hidden relative">
+            <div className="hidden md:flex md:flex-col h-[calc(100vh-100px)] bg-background overflow-hidden relative">
+            {/* Header */}
+            <div className="flex items-center justify-between shrink-0 px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={openMenu}
+                        className="shrink-0 rounded-md p-1 text-foreground hover:bg-accent transition-colors"
+                    >
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </button>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        {selectedVisit ? selectedVisit.patient_name : "Dashboard"}
+                    </h1>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/inventory">
+                            <Package className="mr-1.5 h-3.5 w-3.5" />
+                            Inventory
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/billing">
+                            <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                            Billing
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/patients">
+                            <Users className="mr-1.5 h-3.5 w-3.5" />
+                            Patients
+                        </Link>
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex-1 flex min-h-0">
             {/* MAIN CONTENT AREA (Left, ~75%) */}
-            <div className="flex-1 flex flex-col min-w-0 p-6 gap-6 overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 p-6 pt-0 gap-3 overflow-hidden">
                 {selectedVisit ? (
                     <>
-                        {/* Header */}
-                        <div className="flex justify-between items-start shrink-0">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight">{selectedVisit.patient_name}</h1>
-                                <p className="text-muted-foreground text-lg">{selectedVisit.reason || "No reason specified"}</p>
-                            </div>
-                        </div>
-
-                        {/* Patient Details Banner */}
-                        <div className="shrink-0 bg-transparent py-3 px-1 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Patient ID</span>
-                                <span className="font-mono text-foreground/90">{selectedVisit.patient_id}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Phone</span>
-                                <span className="font-medium text-foreground/90">{selectedVisit.phone_number || "—"}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Date of Birth</span>
-                                <span className="font-medium text-foreground/90">{selectedVisit.dob || "—"}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Age</span>
-                                <span className="font-medium text-foreground/90">
-                                    {selectedVisit.dob ? (() => {
-                                        const birthDate = new Date(selectedVisit.dob);
-                                        const ageDifMs = Date.now() - birthDate.getTime();
-                                        const ageDate = new Date(ageDifMs);
-                                        return Math.abs(ageDate.getUTCFullYear() - 1970) + " yrs";
-                                    })() : "—"}
-                                </span>
-                            </div>
-                        </div>
-
                         {/* Content Grid */}
                         <div className="flex-1 flex flex-col gap-6 min-h-0">
 
@@ -836,16 +882,36 @@ export default function DoctorDashboard() {
                                 </Card>
 
                                 {/* Upload Preview Dialog */}
-                                <Dialog open={!!uploadPreview} onOpenChange={(open) => !open && clearUpload()}>
+                                <Dialog open={uploadFiles.length > 0} onOpenChange={(open) => !open && clearUpload()}>
                                     <DialogContent className="max-w-md">
                                         <DialogHeader>
-                                            <DialogTitle>Upload Patient Image</DialogTitle>
+                                            <DialogTitle>
+                                                Upload Patient Image{uploadFiles.length > 1 ? `s (${uploadFiles.length})` : ''}
+                                            </DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
-                                            <div className="aspect-square relative rounded-md overflow-hidden bg-muted border">
-                                                {uploadPreview && (
-                                                    <img src={uploadPreview} alt="Preview" className="w-full h-full object-contain" />
-                                                )}
+                                            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                                                {uploadFiles.map((entry, i) => (
+                                                    <div key={i} className="group aspect-square relative rounded-md overflow-hidden bg-muted border">
+                                                        <img src={entry.preview} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeUploadFile(i)}
+                                                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            title="Remove"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => document.getElementById('image-upload-input')?.click()}
+                                                    className="aspect-square rounded-md border border-dashed flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                                                    title="Add more images"
+                                                >
+                                                    <Plus className="h-5 w-5" />
+                                                </button>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-sm font-medium">Notes (Optional)</label>
@@ -856,8 +922,12 @@ export default function DoctorDashboard() {
                                                 />
                                             </div>
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="outline" onClick={clearUpload}>Cancel</Button>
-                                                <Button onClick={confirmUpload}>Upload Image</Button>
+                                                <Button variant="outline" onClick={clearUpload} disabled={uploading}>Cancel</Button>
+                                                <Button onClick={confirmUpload} disabled={uploading}>
+                                                    {uploading
+                                                        ? "Uploading..."
+                                                        : uploadFiles.length > 1 ? `Upload ${uploadFiles.length} Images` : "Upload Image"}
+                                                </Button>
                                             </div>
                                         </div>
                                     </DialogContent>
@@ -965,34 +1035,33 @@ export default function DoctorDashboard() {
                                 <div
                                     key={visit.visit_id}
                                     onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
-                                    className={`p-3 rounded-md border transition-all duration-200 cursor-pointer flex justify-between items-center
-                                ${selectedVisitId === visit.visit_id
-                                            ? 'bg-primary/10 border-primary shadow-sm'
-                                            : 'bg-transparent border-transparent hover:bg-muted/50 hover:border-border/50'}`}
+                                    className={cn(
+                                        "p-3 rounded-md border transition-all duration-200 cursor-pointer flex items-center gap-2",
+                                        visit.status === 'done'
+                                            ? 'opacity-60 border-green-500 bg-green-500/5 hover:bg-green-500/10'
+                                            : selectedVisitId === visit.visit_id
+                                                ? 'bg-primary/10 border-primary shadow-sm'
+                                                : 'bg-transparent border-transparent hover:bg-muted/50 hover:border-border/50'
+                                    )}
                                 >
-                                    <div className="min-w-0 flex-1 mr-3">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-sm block min-w-[3rem]">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
-                                            <div className="font-medium text-sm truncate">{visit.patient_name}</div>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground flex items-center gap-2 ml-[3.5rem]">
-                                            <span className="truncate max-w-[120px]">{visit.reason}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                        <Badge variant={visit.status === 'done' ? 'secondary' : 'outline'} className="text-[10px] h-5 px-1.5 font-normal uppercase">
-                                            {visit.status}
-                                        </Badge>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
-                                            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                            title={`Delete visit ${visit.visit_id}`}
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
+                                    <span className="font-bold text-sm min-w-[3rem] flex-shrink-0">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
+                                    <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
+                                        {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
+                                    </span>
+                                    <div className="font-medium text-sm truncate flex-1 min-w-0">{visit.patient_name}</div>
+                                    {visit.billed_amount != null && (
+                                        <span className="text-xs font-semibold tabular-nums text-green-700 dark:text-green-400 flex-shrink-0">
+                                            ₹{visit.billed_amount}
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
+                                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
+                                        title={`Delete visit ${visit.visit_id}`}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
                                 </div>
                             ))
                         )}
@@ -1001,6 +1070,7 @@ export default function DoctorDashboard() {
 
             </div >
 
+            </div>
             </div>
         </div>
     )
