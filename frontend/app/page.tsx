@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu, Plus, X, Image as ImageIcon } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu, Plus, X, Image as ImageIcon, Smartphone } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
+import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
 import { api, type Visit } from "@/lib/api"
@@ -65,6 +66,7 @@ export default function Dashboard() {
     const [uploadFiles, setUploadFiles] = useState<{ file: File, preview: string }[]>([])
     const [uploadNotes, setUploadNotes] = useState("")
     const [uploading, setUploading] = useState(false)
+    const [showQR, setShowQR] = useState(false)
 
     const { role, isLoading } = useAuth()
     const router = useRouter()
@@ -145,6 +147,7 @@ export default function Dashboard() {
         setUploadTargetVisit(null)
         setUploadFiles([])
         setUploadNotes("")
+        setShowQR(false)
     }
 
     const confirmUpload = async () => {
@@ -359,6 +362,10 @@ export default function Dashboard() {
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setShowQR(true)}>
+                            <Smartphone className="mr-2 h-3.5 w-3.5" />
+                            Upload via QR
+                        </Button>
                         <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                             {uploadFiles.map((entry, i) => (
                                 <div key={i} className="group aspect-square relative rounded-md overflow-hidden bg-muted border">
@@ -401,6 +408,16 @@ export default function Dashboard() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {uploadTargetVisit && (
+                <QRCodeUpload
+                    open={showQR}
+                    onOpenChange={setShowQR}
+                    contextType="patient"
+                    contextId={uploadTargetVisit.patient_id}
+                    onSuccess={() => toast.success("Images uploaded via QR")}
+                />
+            )}
         </div>
     )
 }
