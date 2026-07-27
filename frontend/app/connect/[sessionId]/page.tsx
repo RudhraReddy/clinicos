@@ -22,8 +22,7 @@ export default function MobileUploadPage() {
     const [contextType, setContextType] = useState<string>("")
 
     // Form State
-    const [frontFile, setFrontFile] = useState<File | null>(null)
-    const [backFile, setBackFile] = useState<File | null>(null)
+    const [files, setFiles] = useState<File[]>([])
     const [notes, setNotes] = useState("")
 
     useEffect(() => {
@@ -45,40 +44,26 @@ export default function MobileUploadPage() {
         }
     }
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]
-            if (side === 'front') setFrontFile(file)
-            else setBackFile(file)
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const picked = Array.from(e.target.files)
+            setFiles(prev => [...prev, ...picked])
         }
+        e.target.value = ''
     }
 
-    const removeFile = (side: 'front' | 'back') => {
-        if (side === 'front') setFrontFile(null)
-        else setBackFile(null)
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleSubmit = async () => {
-        if (!frontFile && !backFile) return
+        if (files.length === 0) return
 
         setSubmitting(true)
         try {
-            const filesToUpload: File[] = []
-            const tagsToUpload: string[] = []
-
-            if (frontFile) {
-                filesToUpload.push(frontFile)
-                tagsToUpload.push("Image - Front")
-            }
-            if (backFile) {
-                filesToUpload.push(backFile)
-                tagsToUpload.push("Image - Back")
-            }
-
-            await api.uploadMobileFiles(sessionId, filesToUpload, tagsToUpload, notes)
+            await api.uploadMobileFiles(sessionId, files, [], notes)
             setSuccess(true)
-            setFrontFile(null)
-            setBackFile(null)
+            setFiles([])
             setNotes("")
         } catch (e) {
             console.error(e)
@@ -124,99 +109,49 @@ export default function MobileUploadPage() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-                {/* Image 1 Card */}
-                <Card className={frontFile ? "border-green-500/50 bg-green-50/10" : ""}>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex justify-between items-center">
-                            <span>Image 1</span>
-                            {frontFile && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {!frontFile ? (
-                            <div>
-                                <Label htmlFor="front-upload" className="cursor-pointer block">
-                                    <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
-                                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                        <span className="text-sm font-medium text-muted-foreground">Tap to Select Image</span>
-                                    </div>
-                                </Label>
-                                <Input
-                                    id="front-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="hidden"
-                                    onChange={(e) => handleFileSelect(e, 'front')}
-                                />
+            <Card className={files.length > 0 ? "border-green-500/50 bg-green-50/10" : ""}>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex justify-between items-center">
+                        <span>Images{files.length > 0 ? ` (${files.length})` : ''}</span>
+                        {files.length > 0 && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {files.map((file, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 border rounded-md bg-background">
+                            <div className="w-10 h-10 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
                             </div>
-                        ) : (
-                            <div className="relative">
-                                <div className="flex items-center gap-3 p-3 border rounded-md bg-background">
-                                    <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{frontFile.name}</p>
-                                        <p className="text-xs text-muted-foreground">{(frontFile.size / 1024).toFixed(1)} KB</p>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeFile('front')}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{file.name}</p>
+                                <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive flex-shrink-0" onClick={() => removeFile(i)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
 
-                {/* Image 2 Card (Hidden for inventory) */}
-                {contextType !== 'inventory' && (
-                <Card className={backFile ? "border-green-500/50 bg-green-50/10" : ""}>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex justify-between items-center">
-                            <span>Image 2</span>
-                            {backFile && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {!backFile ? (
-                            <div>
-                                <Label htmlFor="back-upload" className="cursor-pointer block">
-                                    <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
-                                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                        <span className="text-sm font-medium text-muted-foreground">Tap to Select Image</span>
-                                    </div>
-                                </Label>
-                                <Input
-                                    id="back-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="hidden"
-                                    onChange={(e) => handleFileSelect(e, 'back')}
-                                />
+                    <div>
+                        <Label htmlFor="image-upload" className="cursor-pointer block">
+                            <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
+                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    {files.length > 0 ? 'Tap to Add More' : 'Tap to Select Images'}
+                                </span>
                             </div>
-                        ) : (
-                            <div className="relative">
-                                <div className="flex items-center gap-3 p-3 border rounded-md bg-background">
-                                    <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{backFile.name}</p>
-                                        <p className="text-xs text-muted-foreground">{(backFile.size / 1024).toFixed(1)} KB</p>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeFile('back')}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                )}
-            </div>
+                        </Label>
+                        <Input
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleFileSelect}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader className="pb-3">
@@ -235,10 +170,10 @@ export default function MobileUploadPage() {
                 size="lg"
                 className="w-full font-bold text-lg h-12"
                 onClick={handleSubmit}
-                disabled={(!frontFile && !backFile) || submitting}
+                disabled={files.length === 0 || submitting}
             >
                 {submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                Upload {frontFile && backFile ? 'Both Images' : 'Selected Image'}
+                Upload {files.length > 1 ? `${files.length} Images` : 'Image'}
             </Button>
         </div>
     )
