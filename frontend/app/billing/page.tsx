@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback, Suspense } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
@@ -34,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 import { useSettings } from "@/lib/settings_context"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
@@ -44,7 +46,7 @@ export interface BillItem {
     item_id: string;
     item_name: string;
     batch_number: string;
-    qty: number;
+    qty: number | '';
     mrp: number;
     gst: number;
     total: number;
@@ -90,6 +92,9 @@ function BillingContent() {
     // Item search
     const [itemQuery, setItemQuery] = useState("")
     const [searchResults, setSearchResults] = useState<InventorySearchResult[]>([])
+    const [highlightedIndex, setHighlightedIndex] = useState(0)
+    const itemSearchInputRef = useRef<HTMLInputElement>(null)
+    const highlightedItemRef = useRef<HTMLDivElement>(null)
 
     // Bill items
     const [billItems, setBillItems] = useState<BillItem[]>([])
@@ -159,7 +164,10 @@ function BillingContent() {
         const timer = setTimeout(() => {
             if (itemQuery.length > 2) {
                 api.searchInventory(itemQuery)
-                    .then(data => setSearchResults(data))
+                    .then(data => {
+                        setSearchResults(data)
+                        setHighlightedIndex(0)
+                    })
                     .catch(console.error)
             } else {
                 setSearchResults([])
@@ -168,6 +176,28 @@ function BillingContent() {
         return () => clearTimeout(timer)
     }, [itemQuery])
 
+    // Keep the highlighted result scrolled into view as arrow keys move it
+    useEffect(() => {
+        highlightedItemRef.current?.scrollIntoView({ block: 'nearest' })
+    }, [highlightedIndex])
+
+    const handleItemSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (searchResults.length === 0) return
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setHighlightedIndex(i => Math.min(i + 1, searchResults.length - 1))
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setHighlightedIndex(i => Math.max(i - 1, 0))
+        } else if (e.key === 'Enter') {
+            e.preventDefault()
+            const item = searchResults[highlightedIndex]
+            if (item) addToBill(item)
+        } else if (e.key === 'Escape') {
+            setSearchResults([])
+        }
+    }
+
     const addToBill = (item: InventorySearchResult) => {
         const multiplier = getPackMultiplier(item.pack_size)
         const unitMRP = (item.price || 0) / multiplier
@@ -175,24 +205,26 @@ function BillingContent() {
             item_id: item.id.toString(),
             item_name: item.item_name,
             batch_number: "Auto-FIFO",
-            qty: 1,
+            qty: '',
             mrp: unitMRP,
             gst: item.gst_rate || 0,
-            total: unitMRP,
+            total: 0,
             pack_size: item.pack_size,
             unit: 'ea',
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
         setSearchResults([])
+        itemSearchInputRef.current?.focus()
     }
 
-    const updateQty = (index: number, newQty: number) => {
+    const updateQty = (index: number, newQty: number | '') => {
         const newItems = [...billItems]
         const item = newItems[index]
         item.qty = newQty
         const multiplier = getPackMultiplier(item.pack_size)
-        const count = item.unit === 'packs' ? newQty * multiplier : newQty
+        const numericQty = newQty === '' ? 0 : newQty
+        const count = item.unit === 'packs' ? numericQty * multiplier : numericQty
         item.total = item.mrp * count
         setBillItems(newItems)
     }
@@ -202,7 +234,8 @@ function BillingContent() {
         const item = newItems[index]
         item.unit = newUnit
         const multiplier = getPackMultiplier(item.pack_size)
-        const count = newUnit === 'packs' ? item.qty * multiplier : item.qty
+        const numericQty = item.qty === '' ? 0 : item.qty
+        const count = newUnit === 'packs' ? numericQty * multiplier : numericQty
         item.total = item.mrp * count
         setBillItems(newItems)
     }
@@ -213,6 +246,10 @@ function BillingContent() {
 
     const handleCreateBill = async () => {
         if (!patientId || billItems.length === 0) return
+        if (hasInvalidQty) {
+            toast.error("Enter a quantity for every item before creating the bill")
+            return
+        }
 
         setSubmitting(true)
         try {
@@ -221,12 +258,13 @@ function BillingContent() {
                 visit_id: visitId || undefined,
                 payment_type: paymentType,
                 items_used: billItems.map(i => {
+                    const qty = i.qty === '' ? 0 : i.qty
                     const multiplier = getPackMultiplier(i.pack_size)
-                    const count = i.unit === 'packs' ? i.qty * multiplier : i.qty
+                    const count = i.unit === 'packs' ? qty * multiplier : qty
                     return {
                         item_id: i.item_id,
                         quantity: count / multiplier,
-                        qty: i.qty,
+                        qty,
                         unit: i.unit,
                         mrp: i.unit === 'packs' ? i.mrp * multiplier : i.mrp,
                         total_value: i.total,
@@ -261,10 +299,12 @@ function BillingContent() {
         return billItems.reduce((acc, item) => acc + (item.total || 0), 0)
     }
 
+    const hasInvalidQty = billItems.some(i => i.qty === '' || i.qty <= 0)
+
     return (
-        <div className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden gap-4 min-h-0">
+                <div className="flex items-center gap-3 flex-wrap shrink-0">
                     <button
                         type="button"
                         onClick={openMenu}
@@ -273,40 +313,40 @@ function BillingContent() {
                         <Menu className="h-6 w-6" />
                         <span className="sr-only">Toggle Menu</span>
                     </button>
-                    <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-                    {role !== 'doctor' && (
-                        <TabsList>
-                            <TabsTrigger value="new">New Bill</TabsTrigger>
-                            <TabsTrigger value="history">History</TabsTrigger>
-                        </TabsList>
-                    )}
+                    <h1 className="text-3xl font-bold tracking-tight w-44 shrink-0">Billing</h1>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/inventory">
                                 <Package className="mr-1.5 h-3.5 w-3.5" />
                                 Inventory
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/">
                                 <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
                                 Dashboard
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/patients">
                                 <Users className="mr-1.5 h-3.5 w-3.5" />
                                 Patients
                             </Link>
                         </Button>
                     </div>
+                    {role !== 'doctor' && (
+                        <TabsList>
+                            <TabsTrigger value="new">New Bill</TabsTrigger>
+                            <TabsTrigger value="history">History</TabsTrigger>
+                        </TabsList>
+                    )}
                 </div>
 
-                <TabsContent value="new" className="space-y-6 m-0">
-                    <Card>
-                        <CardContent className="p-6 flex flex-col gap-6">
+                <TabsContent value="new" className="flex-1 overflow-hidden m-0 flex flex-col gap-6 min-h-0">
+                    <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
+                        <CardContent className="p-6 flex flex-col gap-6 flex-1 overflow-hidden min-h-0">
                             {/* Patient & Actions Row */}
-                            <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
+                            <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between shrink-0">
                                 <div className="flex-1 max-w-xl">
                                     <PatientSearch
                                         selectedPatient={patient}
@@ -333,7 +373,7 @@ function BillingContent() {
                                             <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0} onClick={handleCreateBill}>
+                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0 || hasInvalidQty} onClick={handleCreateBill}>
                                         {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Bill
                                     </Button>
@@ -341,51 +381,64 @@ function BillingContent() {
                             </div>
 
                             {/* Items */}
-                            <div>
-                                <h3 className="font-semibold text-base mb-3">Items</h3>
-                                <div className="overflow-x-auto">
-                                <div className="border rounded-md">
+                            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                                <h3 className="font-semibold text-base mb-3 shrink-0">Items</h3>
+                                <div className="flex-1 overflow-auto border rounded-md min-h-0">
                                     <Table>
-                                        <TableHeader>
+                                        <TableHeader className="sticky top-0 bg-background z-10">
                                             <TableRow>
                                                 <TableHead className="w-[50px]">No.</TableHead>
                                                 <TableHead>
-                                                    <div className="relative">
-                                                        <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                                                        <Input
-                                                            className="h-8 pl-8 font-normal"
-                                                            placeholder="Search by Product ID, Name, or Generic..."
-                                                            value={itemQuery}
-                                                            onChange={(e) => setItemQuery(e.target.value)}
-                                                        />
-                                                        {searchResults.length > 0 && (
-                                                            <div className="absolute z-10 w-full bg-popover border rounded-md shadow-md mt-1 max-h-60 overflow-y-auto">
-                                                                {searchResults.map((item) => (
-                                                                    <div
-                                                                        key={item.id}
-                                                                        className="p-2 hover:bg-accent cursor-pointer border-b last:border-0"
-                                                                        onClick={() => addToBill(item)}
-                                                                    >
-                                                                        <div className="flex justify-between">
-                                                                            <span className="font-medium">{item.item_name}</span>
-                                                                            <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
-                                                                                {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="text-xs text-muted-foreground">
-                                                                            {item.manufacturer} | GST: {item.gst_rate || 0}%
-                                                                        </div>
-                                                                        {item.substitutes && item.substitutes.length > 0 && (
-                                                                            <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
-                                                                                <span className="font-semibold text-yellow-700">Substitutes: </span>
-                                                                                {item.substitutes.map((s: { name: string; qty: number }) => `${s.name} (${s.qty})`).join(', ')}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
+                                                    <Popover open={searchResults.length > 0} onOpenChange={(o) => { if (!o) setSearchResults([]) }}>
+                                                        <PopoverTrigger asChild>
+                                                            <div className="relative">
+                                                                <Search className="absolute left-2.5 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                                                <Input
+                                                                    ref={itemSearchInputRef}
+                                                                    className="h-8 pl-8 font-normal"
+                                                                    placeholder="Search by Product ID, Name, or Generic..."
+                                                                    value={itemQuery}
+                                                                    onChange={(e) => setItemQuery(e.target.value)}
+                                                                    onKeyDown={handleItemSearchKeyDown}
+                                                                />
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent
+                                                            className="p-0 w-[var(--radix-popover-trigger-width)] max-h-72 overflow-y-auto"
+                                                            align="start"
+                                                            onOpenAutoFocus={(e) => e.preventDefault()}
+                                                            onCloseAutoFocus={(e) => e.preventDefault()}
+                                                        >
+                                                            {searchResults.map((item, idx) => (
+                                                                <div
+                                                                    key={item.id}
+                                                                    ref={idx === highlightedIndex ? highlightedItemRef : undefined}
+                                                                    className={cn(
+                                                                        "p-2 cursor-pointer border-b last:border-0",
+                                                                        idx === highlightedIndex ? "bg-accent" : "hover:bg-accent"
+                                                                    )}
+                                                                    onMouseEnter={() => setHighlightedIndex(idx)}
+                                                                    onClick={() => addToBill(item)}
+                                                                >
+                                                                    <div className="flex justify-between">
+                                                                        <span className="font-medium">{item.item_name}</span>
+                                                                        <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
+                                                                            {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground">
+                                                                        {item.manufacturer} | GST: {item.gst_rate || 0}%
+                                                                    </div>
+                                                                    {item.substitutes && item.substitutes.length > 0 && (
+                                                                        <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
+                                                                            <span className="font-semibold text-yellow-700">Substitutes: </span>
+                                                                            {item.substitutes.map((s: { name: string; qty: number }) => `${s.name} (${s.qty})`).join(', ')}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </PopoverContent>
+                                                    </Popover>
                                                 </TableHead>
                                                 <TableHead>Batch</TableHead>
                                                 <TableHead className="w-[100px]">Qty</TableHead>
@@ -405,9 +458,13 @@ function BillingContent() {
                                                     <Input
                                                         type="number"
                                                         min="1"
+                                                        placeholder="Qty"
                                                         className="h-8 w-20"
                                                         value={item.qty}
-                                                        onChange={(e) => updateQty(idx, parseInt(e.target.value) || 1)}
+                                                        onChange={(e) => {
+                                                            const raw = e.target.value
+                                                            updateQty(idx, raw === '' ? '' : parseInt(raw) || 0)
+                                                        }}
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -446,17 +503,16 @@ function BillingContent() {
                                         )}
                                     </TableBody>
                                 </Table>
-                            </div>
+                                </div>
                             </div>
 
                             {billItems.length > 0 && (
-                                <div className="flex justify-end mt-4">
+                                <div className="flex justify-end mt-4 shrink-0">
                                     <span className="text-lg font-bold">
                                         Total: ₹{calculateTotal().toFixed(2)}
                                     </span>
                                 </div>
                             )}
-                            </div>
                         </CardContent>
                     </Card>
                     <QRCodeUpload
