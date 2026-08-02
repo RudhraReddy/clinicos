@@ -110,8 +110,8 @@ export default function PatientsPage() {
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-                <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between shrink-0 gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
                     <button
                         type="button"
                         onClick={openMenu}
@@ -120,21 +120,21 @@ export default function PatientsPage() {
                         <Menu className="h-6 w-6" />
                         <span className="sr-only">Toggle Menu</span>
                     </button>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Patients</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground w-44 shrink-0">Patients</h1>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/inventory">
                                 <Package className="mr-1.5 h-3.5 w-3.5" />
                                 Inventory
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/billing">
                                 <CreditCard className="mr-1.5 h-3.5 w-3.5" />
                                 Billing
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/">
                                 <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
                                 Dashboard
@@ -143,7 +143,7 @@ export default function PatientsPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm h-9">
                         <Download className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                         Export Registry

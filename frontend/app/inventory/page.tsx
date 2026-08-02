@@ -518,31 +518,31 @@ export default function InventoryPage() {
                             <Menu className="h-6 w-6" />
                             <span className="sr-only">Toggle Menu</span>
                         </button>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Inventory</h1>
-                        <TabsList className="shrink-0">
-                            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                            <TabsTrigger value="all-changes">All Changes</TabsTrigger>
-                        </TabsList>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground w-44 shrink-0">Inventory</h1>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" asChild>
+                            <Button variant="outline" size="sm" asChild className="w-32">
                                 <Link href="/">
                                     <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
                                     Dashboard
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button variant="outline" size="sm" asChild className="w-32">
                                 <Link href="/billing">
                                     <CreditCard className="mr-1.5 h-3.5 w-3.5" />
                                     Billing
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
+                            <Button variant="outline" size="sm" asChild className="w-32">
                                 <Link href="/patients">
                                     <Users className="mr-1.5 h-3.5 w-3.5" />
                                     Patients
                                 </Link>
                             </Button>
                         </div>
+                        <TabsList className="shrink-0">
+                            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                            <TabsTrigger value="all-changes">All Changes</TabsTrigger>
+                        </TabsList>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>

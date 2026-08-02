@@ -292,31 +292,31 @@ export default function Dashboard() {
                         <Menu className="h-6 w-6" />
                         <span className="sr-only">Toggle Menu</span>
                     </button>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-                    <TabsList>
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="visits">All Visits</TabsTrigger>
-                    </TabsList>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground w-44 shrink-0">Dashboard</h1>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/inventory">
                                 <Package className="mr-1.5 h-3.5 w-3.5" />
                                 Inventory
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/billing">
                                 <CreditCard className="mr-1.5 h-3.5 w-3.5" />
                                 Billing
                             </Link>
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="w-32">
                             <Link href="/patients">
                                 <Users className="mr-1.5 h-3.5 w-3.5" />
                                 Patients
                             </Link>
                         </Button>
                     </div>
+                    <TabsList>
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="visits">All Visits</TabsTrigger>
+                    </TabsList>
                 </div>
 
                 <TabsContent value="overview" className="flex-1 overflow-hidden m-0">
