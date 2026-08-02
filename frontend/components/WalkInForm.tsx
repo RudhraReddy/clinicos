@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, UserPlus, AlertCircle, Users, Check } from "lucide-react"
+import { Loader2, UserPlus, AlertCircle, Users, Check, Pencil, Save } from "lucide-react"
 import { api, type Patient, type Visit } from "@/lib/api"
 import { getTodayIST, cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -42,6 +42,11 @@ const emptyVisit = () => ({
     payment_status: 'unpaid',
 })
 
+function looksLikePhone(s: string) {
+    const trimmed = s.trim()
+    return trimmed.length > 0 && /^[\d\s+()-]+$/.test(trimmed)
+}
+
 export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [phone, setPhone] = useState('')
     const [formState, setFormState] = useState<FormState>('idle')
@@ -54,23 +59,43 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [age, setAge] = useState('')
     const [sex, setSex] = useState('')
     const [address, setAddress] = useState('')
+    const [phoneNumber, setPhoneNumber] = useState('')
     const [visit, setVisit] = useState(emptyVisit())
     const [submitting, setSubmitting] = useState(false)
     const [patientVisits, setPatientVisits] = useState<Visit[]>([])
+    const [editMode, setEditMode] = useState(false)
+    const [savingInfo, setSavingInfo] = useState(false)
+    const skipSearchRef = useRef(false)
 
     const selectPatient = (patient: Patient) => {
         setMatchedPatient(patient)
         setName(patient.name)
         setAge(patient.age?.toString() ?? '')
         setSex(patient.sex ?? '')
+        setAddress(patient.address ?? '')
+        setPhoneNumber(patient.phone_number ?? '')
+        setEditMode(false)
         api.getVisits(patient.patient_id)
             .then(vs => setPatientVisits(vs.filter(v => v.status !== 'deleted')))
             .catch(() => setPatientVisits([]))
     }
 
+    // Once a patient is picked, complete the search box to the full matched value
+    // instead of leaving whatever partial text the user was typing.
+    const completeSearchBox = (patient: Patient, query: string) => {
+        const completed = looksLikePhone(query) ? patient.phone_number : patient.name
+        if (completed !== query) {
+            skipSearchRef.current = true
+            setPhone(completed)
+        }
+    }
+
     const handleSelectMatch = (patientId: string) => {
         const patient = matches.find(m => m.patient_id === patientId)
-        if (patient) selectPatient(patient)
+        if (patient) {
+            selectPatient(patient)
+            completeSearchBox(patient, phone)
+        }
         setPickerOpen(false)
     }
 
@@ -86,7 +111,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     }, [])
 
     useEffect(() => {
-        if (phone.length < 4) {
+        if (skipSearchRef.current) {
+            skipSearchRef.current = false
+            return
+        }
+
+        if (phone.trim().length < 2) {
             if (formState !== 'idle') {
                 setFormState('idle')
                 setMatchedPatient(null)
@@ -95,6 +125,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 setName('')
                 setAge('')
                 setSex('')
+                setAddress('')
+                setPhoneNumber('')
+                setEditMode(false)
                 setPatientVisits([])
             }
             return
@@ -103,20 +136,39 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setFormState('searching')
         const timer = setTimeout(async () => {
             try {
-                const data = await api.getPatientsByPhone(phone)
+                const data = await api.searchPatients(phone)
                 if (data.length > 0) {
                     setMatches(data)
                     setFormState('found')
-                    setPickerOpen(data.length > 1)
-                    selectPatient(data[0])
+                    if (data.length > 1) {
+                        setPickerOpen(true)
+                        setMatchedPatient(null)
+                        setName('')
+                        setAge('')
+                        setSex('')
+                        setAddress('')
+                        setPhoneNumber('')
+                        setPatientVisits([])
+                    } else {
+                        setPickerOpen(false)
+                        selectPatient(data[0])
+                        completeSearchBox(data[0], phone)
+                    }
                 } else {
                     setMatchedPatient(null)
                     setMatches([])
                     setPickerOpen(false)
                     setFormState('not_found')
-                    setName('')
+                    if (looksLikePhone(phone)) {
+                        setName('')
+                        setPhoneNumber(phone)
+                    } else {
+                        setName(phone)
+                        setPhoneNumber('')
+                    }
                     setAge('')
                     setSex('')
+                    setAddress('')
                     setPatientVisits([])
                 }
             } catch {
@@ -136,6 +188,8 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setAge('')
         setSex('')
         setAddress('')
+        setPhoneNumber('')
+        setEditMode(false)
         setFormState('new_patient')
     }
 
@@ -150,8 +204,44 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setAge('')
         setSex('')
         setAddress('')
+        setPhoneNumber('')
+        setEditMode(false)
         setVisit(emptyVisit())
         setPatientVisits([])
+    }
+
+    const computePatientChanges = (): Partial<Patient> => {
+        if (!matchedPatient) return {}
+        const changes: Partial<Patient> = {}
+        if (name.trim() !== matchedPatient.name) changes.name = name.trim()
+        if (phoneNumber.trim() !== matchedPatient.phone_number) changes.phone_number = phoneNumber.trim()
+        const newAge = age ? parseInt(age) : undefined
+        if ((newAge ?? null) !== (matchedPatient.age ?? null)) changes.age = newAge
+        if (sex !== (matchedPatient.sex ?? '')) changes.sex = sex || undefined
+        if (address !== (matchedPatient.address ?? '')) changes.address = address || undefined
+        return changes
+    }
+
+    const handleSaveInfo = async () => {
+        if (!matchedPatient) return
+        const changes = computePatientChanges()
+        if (Object.keys(changes).length === 0) {
+            setEditMode(false)
+            return
+        }
+        setSavingInfo(true)
+        try {
+            await api.updatePatient(matchedPatient.patient_id, changes)
+            const updated: Patient = { ...matchedPatient, ...changes }
+            setMatchedPatient(updated)
+            setMatches(prev => prev.map(m => m.patient_id === updated.patient_id ? updated : m))
+            toast.success('Patient info updated')
+            setEditMode(false)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to update patient')
+        } finally {
+            setSavingInfo(false)
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -164,10 +254,15 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
             if (formState === 'found' && matchedPatient) {
                 patientId = matchedPatient.patient_id
+
+                const changes = computePatientChanges()
+                if (Object.keys(changes).length > 0) {
+                    await api.updatePatient(patientId, changes)
+                }
             } else {
                 const created = await api.createPatient({
                     name,
-                    phone_number: phone,
+                    phone_number: phoneNumber,
                     age: age ? parseInt(age) : undefined,
                     sex: sex || undefined,
                     address: address || undefined,
@@ -190,7 +285,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
             toast.success(
                 formState === 'found'
-                    ? `Appointment booked for ${matchedPatient!.name}`
+                    ? `Appointment booked for ${name.trim() || matchedPatient!.name}`
                     : 'Patient created and appointment booked'
             )
             resetForm()
@@ -202,12 +297,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         }
     }
 
-    const patientLocked = formState === 'found'
     const patientBlank = formState === 'idle' || formState === 'searching'
     const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
+    const fieldsLocked = formState === 'found' && !editMode
     const canSubmit = !submitting && (
         formState === 'found' ||
-        ((formState === 'not_found' || formState === 'new_patient') && name.trim() !== '')
+        (isNewPatientMode && name.trim() !== '' && phoneNumber.trim() !== '')
     )
 
     return (
@@ -229,7 +324,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         <div className="flex-1 overflow-y-auto min-h-0">
                             {formState !== 'found' ? (
                                 <p className="text-xs text-muted-foreground text-center py-6 px-3">
-                                    Search a phone number to view past visits
+                                    Search a name or phone number to view past visits
                                 </p>
                             ) : patientVisits.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-6">No past visits</p>
@@ -260,21 +355,25 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     {/* RIGHT: Patient + Appointment details */}
                     <div className="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0">
 
-                    {/* Phone */}
+                    {/* Search */}
                     <div>
                         <div className="flex items-center gap-2">
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone</label>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Search</label>
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-medium ${formState !== 'not_found' ? 'invisible' : ''}`}>
                                 <AlertCircle className="h-3 w-3 shrink-0" />
                                 Patient not found
                             </span>
                         </div>
-                        <div className="relative mt-1" ref={phoneFieldRef}>
+                        <div className="flex items-start gap-2 mt-1">
+                        <div className="relative flex-1" ref={phoneFieldRef}>
                             <Input
                                 value={phone}
-                                onChange={e => setPhone(e.target.value)}
+                                onChange={e => {
+                                    const raw = e.target.value
+                                    setPhone(/^\d+$/.test(raw) ? raw.slice(0, 10) : raw)
+                                }}
                                 onFocus={() => { if (matches.length > 1) setPickerOpen(true) }}
-                                placeholder="Search by phone number..."
+                                placeholder="Search by name or phone number..."
                                 className="pr-8"
                                 autoComplete="off"
                                 readOnly={formState === 'new_patient'}
@@ -304,7 +403,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                         >
                                             <span className="truncate">
                                                 <span className="font-medium">{m.name}</span>
-                                                <span className="text-muted-foreground"> · {m.age ?? '—'}y · {m.sex ?? '—'}</span>
+                                                <span className="text-muted-foreground"> · {m.phone_number}</span>
                                             </span>
                                             {matchedPatient?.patient_id === m.patient_id && (
                                                 <Check className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -314,10 +413,31 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 </div>
                             )}
                         </div>
+                        {formState === 'found' && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={editMode ? "default" : "outline"}
+                                onClick={() => editMode ? handleSaveInfo() : setEditMode(true)}
+                                disabled={savingInfo}
+                                className="shrink-0 w-24 h-9"
+                            >
+                                {editMode ? (
+                                    savingInfo ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                        <><Save className="mr-1.5 h-3.5 w-3.5" /> Save</>
+                                    )
+                                ) : (
+                                    <><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</>
+                                )}
+                            </Button>
+                        )}
+                        </div>
                     </div>
 
-                    {/* Patient fields — always visible */}
-                    <div className="grid grid-cols-[1fr_72px_96px] gap-2">
+                    {/* Patient fields — always visible; locked to read-only once a patient is found, until Edit is clicked */}
+                    <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                                 Name{isNewPatientMode && <span className="text-destructive ml-0.5">*</span>}
@@ -326,9 +446,36 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 placeholder="Patient name"
-                                readOnly={patientLocked}
                                 disabled={patientBlank}
-                                className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                                readOnly={fieldsLocked}
+                                className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Phone{isNewPatientMode && <span className="text-destructive ml-0.5">*</span>}
+                            </label>
+                            <Input
+                                value={phoneNumber}
+                                onChange={e => setPhoneNumber(e.target.value)}
+                                placeholder="Phone number"
+                                disabled={patientBlank}
+                                readOnly={fieldsLocked}
+                                className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_72px_96px] gap-2">
+                        <div>
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Address</label>
+                            <Input
+                                value={address}
+                                onChange={e => setAddress(e.target.value)}
+                                placeholder="Optional"
+                                disabled={patientBlank}
+                                readOnly={fieldsLocked}
+                                className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
                             />
                         </div>
                         <div>
@@ -340,24 +487,24 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 value={age}
                                 onChange={e => setAge(e.target.value)}
                                 placeholder="—"
-                                readOnly={patientLocked}
                                 disabled={patientBlank}
-                                className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                                readOnly={fieldsLocked}
+                                className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
                             />
                         </div>
                         <div>
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sex</label>
-                            {patientLocked || patientBlank ? (
+                            {(patientBlank || fieldsLocked) ? (
                                 <Input
                                     value={sex}
                                     readOnly
                                     disabled={patientBlank}
                                     placeholder="—"
-                                    className={`mt-1 ${patientLocked ? 'bg-muted/60' : ''}`}
+                                    className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
                                 />
                             ) : (
                                 <Select value={sex} onValueChange={setSex}>
-                                    <SelectTrigger className="mt-1">
+                                    <SelectTrigger className="mt-1 h-9">
                                         <SelectValue placeholder="—" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -369,16 +516,6 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             )}
                         </div>
                     </div>
-
-                    {/* Address — always visible */}
-                    <Input
-                        value={address}
-                        onChange={e => setAddress(e.target.value)}
-                        placeholder="Address (optional)"
-                        readOnly={patientLocked}
-                        disabled={patientBlank}
-                        className={patientLocked ? 'bg-muted/60' : ''}
-                    />
 
                     {/* Action row for found state */}
                     {formState === 'found' && (

@@ -189,6 +189,10 @@ export const api = {
         return fetchApi<Patient[]>(`/api/patients?phone_number=${encodeURIComponent(phone)}`)
     },
 
+    async searchPatients(query: string): Promise<Patient[]> {
+        return fetchApi<Patient[]>(`/api/patients?q=${encodeURIComponent(query)}`)
+    },
+
     async getPatient(id: string): Promise<Patient> {
         return fetchApi(`/api/patients/${id}`);
     },
