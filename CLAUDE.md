@@ -94,11 +94,12 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 | `/inventory/invoice_edit` | `app/inventory/invoice_edit/page.tsx` | frontdesk |
 | `/gallery` | `app/gallery/page.tsx` | doctor |
 | `/status` | `app/status/page.tsx` | doctor |
+| `/daily-summary` | `app/daily-summary/page.tsx` | all |
 | `/connect/[sessionId]` | `app/connect/[sessionId]/page.tsx` | public (mobile upload) |
 
 The sidebar (`Sidebar.tsx`) uses two separate nav lists keyed on role:
-- **frontdesk**: Dashboard (`/`), Patients, Inventory, Billing — no Gallery
-- **doctor**: Dashboard (`/doctor`), Patients, Inventory, Gallery, Status
+- **frontdesk**: Dashboard (`/`), Patients, Inventory, Billing, Daily Summary — no Gallery
+- **doctor**: Dashboard (`/doctor`), Patients, Inventory, Billing, Daily Summary, Gallery, Status
 
 The `/` root page redirects `doctor` role to `/doctor` on load.
 
@@ -275,6 +276,23 @@ These three strings are passed as props at two call sites and are currently hard
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **New Daily Summary Page (2026-08-08):** Added `/daily-summary`, visible to all three roles
+  (frontdesk, doctor, admin) — a read-only daily money ledger, distinct from the doctor-only
+  `/status` analytics dashboard. Header has prev/next day arrows + a date input (defaults to
+  today) and a location filter (same dropdown pattern as `/status`). A summary card at the top
+  shows a Cash/UPI/Total cross-tab split by Visit Fee vs Billing Fee. Below it, one row per
+  visit that day plus one row per walk-in bill (Patient name | Cell number | Visit fee |
+  Billing fee | Reason), each fee amount tagged with a green (Cash) or blue (UPI) badge. Visit
+  Fee is `visit.amount_paid` (money actually collected, not the billed `visiting_fee`); Billing
+  Fee is the linked bill's `total_amount`. Backed by `GET /api/daily_summary?date=&location_id=`
+  (`routes/daily_summary.py`), which does all the aggregation server-side. As part of this,
+  `Bill.visit_id` — previously never populated by any frontend flow — now actually gets set:
+  the Dashboard's "Go to Billing" visit-card action passes `visit_id` through to
+  `/billing`, which was already wired to forward it to `createBill`. Bills created before this
+  fix stay unlinked and show a blank Billing Fee on their visit's row. Design/plan docs:
+  `docs/superpowers/specs/2026-08-08-daily-summary-page-design.md` and
+  `docs/superpowers/plans/2026-08-08-daily-summary-page.md`.
 
 - **`/visits` and `/inventory/history` Routes Removed, Dashboard Cleanup (2026-08-08):** Both list pages were fully superseded by earlier integrations (the "All Visits" tab in the Dashboard, and the "Invoices" tab in `/inventory`) and are now deleted: `app/visits/page.tsx`, `app/visits/[id]/page.tsx` (entire route), and `app/inventory/history/page.tsx` (list only — `app/inventory/history/[id]/page.tsx` is kept, still linked from Inventory's "Invoices" tab "View" button). Removed their `Sidebar.tsx` nav entries and `AppShell.tsx` inline-trigger route entries. Dashboard's "All Visits" tab (`VisitsTab.tsx`) had its redundant search box and "New Visit" button stripped (row click still opens `EditVisitDialog`). Dashboard header gained a right-aligned `DatePickerWithRange` date filter (single day or range) that scopes the "All Visits" tab only — the Overview tab's "Today's Visits" card always shows literally today, independent of the header filter. Backed by `GET /api/visits?date_from=&date_to=` (`get_all_visits` in `routes/visits.py`), which also raises its row cap from 50 → 1000 when a date filter is active.
 
