@@ -8,13 +8,12 @@ import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Trash2, Printer, Smartphone, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
+import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import Link from "next/link"
 import { PatientSearch } from "@/components/PatientSearch"
 import { useAuth } from "@/lib/auth_context"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
-import { QRCodeUpload } from "@/components/QRCodeUpload"
 import {
     Table,
     TableBody,
@@ -72,7 +71,6 @@ function BillingContent() {
     const searchParams = useSearchParams()
     const { role } = useAuth()
     const { openMenu } = useMenu()
-    const [showQR, setShowQR] = useState(false)
 
     // Tab
     const [activeTab, setActiveTab] = useState("new")
@@ -88,6 +86,10 @@ function BillingContent() {
     const [patientId, setPatientId] = useState(searchParams.get("patient_id") || "")
     const [visitId] = useState(searchParams.get("visit_id") || "")
     const [patient, setPatient] = useState<Patient | null>(null)
+
+    // Walk-in bill (no patient/visit link)
+    const [walkInMode, setWalkInMode] = useState(false)
+    const [walkInName, setWalkInName] = useState("")
 
     // Item search
     const [itemQuery, setItemQuery] = useState("")
@@ -112,6 +114,7 @@ function BillingContent() {
     const filterDateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
     const filterDateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
     const [filterPaymentType, setFilterPaymentType] = useState('')
+    const [filterIsWalkIn, setFilterIsWalkIn] = useState<'' | 'true' | 'false'>('')
     const [historyPage, setHistoryPage] = useState(1)
     const [historyTotal, setHistoryTotal] = useState(0)
     const [historyTotalPages, setHistoryTotalPages] = useState(1)
@@ -138,6 +141,7 @@ function BillingContent() {
                 date_from: filterDateFrom || undefined,
                 date_to: filterDateTo || undefined,
                 payment_type: filterPaymentType || undefined,
+                is_walk_in: filterIsWalkIn || undefined,
                 page,
                 limit: 25,
             })
@@ -150,7 +154,7 @@ function BillingContent() {
         } finally {
             setLoadingHistory(false)
         }
-    }, [filterDateFrom, filterDateTo, filterPaymentType])
+    }, [filterDateFrom, filterDateTo, filterPaymentType, filterIsWalkIn])
 
     // Load history when tab changes
     useEffect(() => {
@@ -245,7 +249,8 @@ function BillingContent() {
     }
 
     const handleCreateBill = async () => {
-        if (!patientId || billItems.length === 0) return
+        if (walkInMode ? !walkInName.trim() : !patientId) return
+        if (billItems.length === 0) return
         if (hasInvalidQty) {
             toast.error("Enter a quantity for every item before creating the bill")
             return
@@ -254,8 +259,9 @@ function BillingContent() {
         setSubmitting(true)
         try {
             const payload = {
-                patient_id: patientId,
-                visit_id: visitId || undefined,
+                patient_id: walkInMode ? undefined : patientId,
+                walk_in_name: walkInMode ? walkInName.trim() : undefined,
+                visit_id: walkInMode ? undefined : (visitId || undefined),
                 payment_type: paymentType,
                 items_used: billItems.map(i => {
                     const qty = i.qty === '' ? 0 : i.qty
@@ -274,6 +280,10 @@ function BillingContent() {
 
             const data = await api.createBill(payload)
             setBillItems([])
+            if (walkInMode) {
+                setWalkInMode(false)
+                setWalkInName("")
+            }
             toast.success(`Bill created! Invoice #${data.invoice_id}`)
             setActiveTab('history')
             setPrintInvoiceId(data.invoice_id)
@@ -347,21 +357,41 @@ function BillingContent() {
                         <CardContent className="p-6 flex flex-col gap-6 flex-1 overflow-hidden min-h-0">
                             {/* Patient & Actions Row */}
                             <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between shrink-0">
-                                <div className="flex-1 max-w-xl">
-                                    <PatientSearch
-                                        selectedPatient={patient}
-                                        onSelect={(p) => {
-                                            setPatient(p)
-                                            setPatientId(p?.patient_id || "")
+                                <div className="flex-1 max-w-xl flex items-start gap-2">
+                                    {walkInMode ? (
+                                        <Input
+                                            autoFocus
+                                            placeholder="Walk-in customer name"
+                                            value={walkInName}
+                                            onChange={(e) => setWalkInName(e.target.value)}
+                                            maxLength={100}
+                                        />
+                                    ) : (
+                                        <div className="flex-1">
+                                            <PatientSearch
+                                                selectedPatient={patient}
+                                                onSelect={(p) => {
+                                                    setPatient(p)
+                                                    setPatientId(p?.patient_id || "")
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant={walkInMode ? "default" : "outline"}
+                                        size="sm"
+                                        className="shrink-0"
+                                        onClick={() => {
+                                            setWalkInMode(m => !m)
+                                            setPatient(null)
+                                            setPatientId("")
+                                            setWalkInName("")
                                         }}
-                                    />
-                                </div>
-                                {patient && (
-                                    <Button variant="secondary" size="sm" onClick={() => setShowQR(true)} className="shrink-0">
-                                        <Smartphone className="mr-2 h-4 w-4" />
-                                        Upload via QR
+                                    >
+                                        Walk-in Bill
                                     </Button>
-                                )}
+                                </div>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
                                         <SelectTrigger id="payment-type" className="w-[140px]">
@@ -373,7 +403,11 @@ function BillingContent() {
                                             <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <Button size="lg" disabled={submitting || !patientId || billItems.length === 0 || hasInvalidQty} onClick={handleCreateBill}>
+                                    <Button
+                                        size="lg"
+                                        disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty}
+                                        onClick={handleCreateBill}
+                                    >
                                         {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Bill
                                     </Button>
@@ -520,13 +554,6 @@ function BillingContent() {
                             )}
                         </CardContent>
                     </Card>
-                    <QRCodeUpload
-                        open={showQR}
-                        onOpenChange={setShowQR}
-                        contextType="patient"
-                        contextId={patientId}
-                        onSuccess={() => toast.success("Images uploaded! Check gallery.")}
-                    />
                 </TabsContent>
 
                 <TabsContent value="history">
@@ -555,17 +582,31 @@ function BillingContent() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Patient Type</Label>
+                                    <Select value={filterIsWalkIn || "ALL"} onValueChange={(val) => setFilterIsWalkIn(val === "ALL" ? "" : val as 'true' | 'false')}>
+                                        <SelectTrigger className="w-[170px]">
+                                            <SelectValue placeholder="All" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ALL">All</SelectItem>
+                                            <SelectItem value="false">Registered Patients</SelectItem>
+                                            <SelectItem value="true">Walk-in Only</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                                 <Button onClick={() => { setHistoryPage(1); loadHistory(1) }}>
                                     <Search className="h-4 w-4 mr-2" />
                                     Search
                                 </Button>
-                                {(filterDateFrom || filterDateTo || filterPaymentType) && (
+                                {(filterDateFrom || filterDateTo || filterPaymentType || filterIsWalkIn) && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => {
                                             setDateRange(undefined)
                                             setFilterPaymentType('')
+                                            setFilterIsWalkIn('')
                                             setHistoryPage(1)
                                             loadHistory(1)
                                         }}
@@ -600,7 +641,14 @@ function BillingContent() {
                                                     <TableRow key={bill.invoice_id}>
                                                         <TableCell className="font-mono">{bill.invoice_id}</TableCell>
                                                         <TableCell>{bill.date}</TableCell>
-                                                        <TableCell>{bill.patient_name}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                {bill.patient_name}
+                                                                {bill.is_walk_in && (
+                                                                    <Badge variant="outline" className="text-[10px]">Walk-in</Badge>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
                                                         <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
                                                         <TableCell>{bill.payment_type}</TableCell>
                                                         <TableCell>
@@ -662,7 +710,11 @@ function BillingContent() {
                                                     <span className="font-bold text-sm">₹{bill.total_amount.toFixed(2)}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="flex-1 text-xs text-muted-foreground">{bill.patient_name} · {bill.date}</span>
+                                                    <span className="flex-1 text-xs text-muted-foreground">
+                                                        {bill.patient_name}
+                                                        {bill.is_walk_in && <Badge variant="outline" className="text-[10px] ml-1">Walk-in</Badge>}
+                                                        {' · '}{bill.date}
+                                                    </span>
                                                     <Badge variant="outline" className="text-[10px]">{bill.payment_type}</Badge>
                                                     <Button
                                                         variant="ghost"
