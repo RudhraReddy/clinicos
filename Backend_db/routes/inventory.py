@@ -167,6 +167,7 @@ def get_inventory():
             'hsn_code': item.hsn_code,
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0.0,
             'formula': item.formula,
+            'rack_location': item.rack_location,
             'min_stock_override': item.min_stock_override if item.min_stock_override is not None else False,
         })
 
@@ -593,6 +594,11 @@ def update_inventory_item(id):
         if item.manufacturer != data['manufacturer']:
             changed_fields.append('manufacturer')
         item.manufacturer = data['manufacturer']
+    if 'rack_location' in data:
+        new_rack = data['rack_location']
+        if item.rack_location != new_rack:
+            changed_fields.append('rack_location')
+        item.rack_location = new_rack
     if 'gst_rate' in data:
         new_gst = float(data['gst_rate']) if data['gst_rate'] is not None else 0.0
         if item.gst_rate != new_gst:
@@ -816,6 +822,7 @@ def search_inventory():
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0,
             'vendors': vendors_map.get(item.id, []),
             'formula': item.formula,
+            'rack_location': item.rack_location,
             'total_qty': total_qty,
             'price': float(max_mrp),
             'pack_size': item.pack_size,
@@ -1728,6 +1735,7 @@ def save_invoice():
             p_batch  = (p.get('batch') or p.get('batch_number') or '').strip() or None
             p_hsn    = p.get('hsn') or p.get('hsn_code') or ''
             p_formula = (p.get('formula') or '').strip()
+            p_rack   = (p.get('rack_location') or '').strip()
 
             try:
                 p_gst = float(str(p.get('gst', 0) or 0))
@@ -1756,6 +1764,7 @@ def save_invoice():
                     pack_size=str(p_pack),
                     hsn_code=str(p_hsn),
                     formula=p_formula if p_formula else None,
+                    rack_location=p_rack if p_rack else None,
                     min_stock_override=False,
                 )
                 db.session.add(item)
@@ -1767,6 +1776,8 @@ def save_invoice():
                     item.hsn_code = p_hsn
                 if p_formula:
                     item.formula = p_formula
+                if p_rack:
+                    item.rack_location = p_rack
 
             qty = 0
             try: qty = int(float(str(p.get('qty', 0))))
