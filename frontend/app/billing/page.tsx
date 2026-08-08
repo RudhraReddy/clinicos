@@ -94,6 +94,8 @@ function BillingContent() {
     // Walk-in bill (no patient/visit link)
     const [walkInMode, setWalkInMode] = useState(false)
     const [walkInName, setWalkInName] = useState("")
+    const [walkInAge, setWalkInAge] = useState("")
+    const [walkInSex, setWalkInSex] = useState("")
 
     // Item search
     const [itemQuery, setItemQuery] = useState("")
@@ -266,6 +268,8 @@ function BillingContent() {
             const payload = {
                 patient_id: walkInMode ? undefined : patientId,
                 walk_in_name: walkInMode ? walkInName.trim() : undefined,
+                walk_in_age: walkInMode && walkInAge ? walkInAge : undefined,
+                walk_in_sex: walkInMode && walkInSex ? walkInSex : undefined,
                 visit_id: walkInMode ? undefined : (visitId || undefined),
                 payment_type: paymentType,
                 items_used: billItems.map(i => {
@@ -288,6 +292,8 @@ function BillingContent() {
             if (walkInMode) {
                 setWalkInMode(false)
                 setWalkInName("")
+                setWalkInAge("")
+                setWalkInSex("")
             }
             toast.success(`Bill created! Invoice #${data.invoice_id}`)
             setActiveTab('history')
@@ -364,13 +370,34 @@ function BillingContent() {
                             <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between shrink-0">
                                 <div className="flex-1 max-w-xl flex items-start gap-2">
                                     {walkInMode ? (
-                                        <Input
-                                            autoFocus
-                                            placeholder="Walk-in customer name"
-                                            value={walkInName}
-                                            onChange={(e) => setWalkInName(e.target.value)}
-                                            maxLength={100}
-                                        />
+                                        <>
+                                            <Input
+                                                autoFocus
+                                                placeholder="Walk-in customer name"
+                                                value={walkInName}
+                                                onChange={(e) => setWalkInName(e.target.value)}
+                                                maxLength={100}
+                                            />
+                                            <Input
+                                                type="number"
+                                                placeholder="Age"
+                                                className="w-20 shrink-0"
+                                                min={0}
+                                                max={150}
+                                                value={walkInAge}
+                                                onChange={(e) => setWalkInAge(e.target.value)}
+                                            />
+                                            <Select value={walkInSex} onValueChange={setWalkInSex}>
+                                                <SelectTrigger className="w-28 shrink-0">
+                                                    <SelectValue placeholder="Sex" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Male">Male</SelectItem>
+                                                    <SelectItem value="Female">Female</SelectItem>
+                                                    <SelectItem value="Other">Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </>
                                     ) : (
                                         <div className="flex-1">
                                             <PatientSearch
@@ -392,6 +419,8 @@ function BillingContent() {
                                             setPatient(null)
                                             setPatientId("")
                                             setWalkInName("")
+                                            setWalkInAge("")
+                                            setWalkInSex("")
                                         }}
                                     >
                                         Walk-in Bill

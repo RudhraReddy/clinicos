@@ -63,6 +63,10 @@ export function InvoicePrint({
     const printTime = format(date, "HH:mm")
     const printDate = format(date, "dd/MM/yyyy")
 
+    // Show whichever of age/sex is present, e.g. "(32 / Male)", "(32)", "(Male)" — nothing if neither.
+    const ageSexParts = [patient.age, patient.sex].filter((v): v is number | string => v !== null && v !== undefined && v !== '')
+    const ageSexLabel = ageSexParts.length > 0 ? ` (${ageSexParts.join(' / ')})` : ''
+
     const cellStyle: React.CSSProperties = {
         borderLeft: "1px solid black",
         borderRight: "1px solid black",
@@ -128,7 +132,7 @@ export function InvoicePrint({
                 marginBottom: "8px",
             }}>
                 <div style={{ lineHeight: "1.8" }}>
-                    <div><strong>Name:</strong>&nbsp;&nbsp;{patient.name}</div>
+                    <div><strong>Name:</strong>&nbsp;&nbsp;{patient.name}{ageSexLabel}</div>
                     {(referenceDoctor || patient.reference) && (
                         <div><strong>Ref. Doc Name:</strong>&nbsp;&nbsp;{referenceDoctor || patient.reference}</div>
                     )}
