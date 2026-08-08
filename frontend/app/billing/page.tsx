@@ -51,6 +51,10 @@ export interface BillItem {
     total: number;
     pack_size?: string;
     unit: 'packs' | 'ea';
+    // Display-only — where to physically find the item while building the bill.
+    // Deliberately never sent to the backend: see handleCreateBill's payload, which
+    // maps billItems to an explicit field list that excludes it.
+    rack_location?: string;
 }
 
 const getPackMultiplier = (packSize?: string) => {
@@ -215,6 +219,7 @@ function BillingContent() {
             total: 0,
             pack_size: item.pack_size,
             unit: 'ea',
+            rack_location: item.rack_location || undefined,
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
@@ -468,13 +473,6 @@ function BillingContent() {
                                                                     <div className="text-xs text-muted-foreground">
                                                                         {item.vendors && item.vendors.length > 0 ? item.vendors.join(', ') : 'No vendor'} | {item.formula || 'No formula'}
                                                                     </div>
-                                                                    {item.rack_location && (
-                                                                        <div className="mt-1">
-                                                                            <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 rounded px-1.5 py-0.5">
-                                                                                📍 {item.rack_location}
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
                                                                     {item.substitutes && item.substitutes.length > 0 && (
                                                                         <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
                                                                             <span className="font-semibold text-yellow-700">Substitutes: </span>
@@ -498,7 +496,16 @@ function BillingContent() {
                                             {billItems.map((item, idx) => (
                                             <TableRow key={idx}>
                                                 <TableCell>{idx + 1}</TableCell>
-                                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {item.item_name}
+                                                    {item.rack_location && (
+                                                        <div className="mt-0.5">
+                                                            <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 rounded px-1.5 py-0.5">
+                                                                📍 {item.rack_location}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-xs text-muted-foreground">{item.batch_number}</TableCell>
                                                 <TableCell>
                                                     <Input
