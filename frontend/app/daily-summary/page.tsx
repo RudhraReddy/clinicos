@@ -19,6 +19,12 @@ import { api, type DailySummaryResponse, type Location } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
 import { format, addDays, subDays, parseISO } from "date-fns"
 import { ResponsiveContainer, PieChart as RePie, Pie, Cell, Tooltip as ReTooltip } from "recharts"
+import { useAuth } from "@/lib/auth_context"
+
+// Rendered locally (never fetched) when a frontdesk user has no clinic assigned —
+// keeps every summary section showing its normal "no data" appearance instead of
+// spinning forever or accidentally showing another clinic's numbers.
+const EMPTY_SUMMARY_BUCKET = { cash: 0, upi: 0, total: 0 }
 
 function FeeCell({ amount, mode }: { amount: number | null; mode: string | null }) {
     if (amount === null || amount === undefined) {
@@ -39,11 +45,19 @@ function FeeCell({ amount, mode }: { amount: number | null; mode: string | null 
 
 export default function DailySummaryPage() {
     const { openMenu } = useMenu()
+    const { role, user } = useAuth()
     const [dateStr, setDateStr] = useState(getTodayIST())
     const [locationId, setLocationId] = useState<number | 'all'>('all')
     const [locations, setLocations] = useState<Location[]>([])
     const [data, setData] = useState<DailySummaryResponse | null>(null)
     const [loading, setLoading] = useState(true)
+
+    // Clinic-view lock: frontdesk always sees only their own clinic, with no switcher.
+    // Doctor and admin keep the full dropdown (including "All Locations") unchanged.
+    const isFrontdesk = role === 'frontdesk'
+    const frontdeskLocationId = user?.location_id ?? null
+    const noClinicAssigned = isFrontdesk && !frontdeskLocationId
+    const frontdeskLocationName = locations.find(l => l.id === frontdeskLocationId)?.name
 
     useEffect(() => {
         api.getLocations()
@@ -52,9 +66,19 @@ export default function DailySummaryPage() {
     }, [])
 
     const fetchData = useCallback(async () => {
+        if (noClinicAssigned) {
+            setData({
+                date: dateStr,
+                rows: [],
+                summary: { visit_fee: { ...EMPTY_SUMMARY_BUCKET }, billing_fee: { ...EMPTY_SUMMARY_BUCKET }, total: { ...EMPTY_SUMMARY_BUCKET } },
+            })
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
-            const res = await api.getDailySummary(dateStr, locationId)
+            const effectiveLocationId = isFrontdesk ? (frontdeskLocationId as number) : locationId
+            const res = await api.getDailySummary(dateStr, effectiveLocationId)
             setData(res)
         } catch (err) {
             console.error("Failed to fetch daily summary", err)
@@ -62,7 +86,7 @@ export default function DailySummaryPage() {
         } finally {
             setLoading(false)
         }
-    }, [dateStr, locationId])
+    }, [dateStr, locationId, isFrontdesk, frontdeskLocationId, noClinicAssigned])
 
     useEffect(() => { fetchData() }, [fetchData])
 
@@ -114,23 +138,36 @@ export default function DailySummaryPage() {
                 </div>
 
                 <div className="ml-auto">
-                    <Select
-                        value={locationId === 'all' ? 'all' : locationId.toString()}
-                        onValueChange={val => setLocationId(val === 'all' ? 'all' : parseInt(val))}
-                    >
-                        <SelectTrigger className="h-8 w-44">
-                            <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Locations</SelectItem>
-                            {locations.map(l => (
-                                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    {isFrontdesk ? (
+                        <div className="h-8 px-3 flex items-center gap-1.5 text-sm rounded-md border border-input bg-muted/40 text-muted-foreground w-44">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{frontdeskLocationName || 'No clinic assigned'}</span>
+                        </div>
+                    ) : (
+                        <Select
+                            value={locationId === 'all' ? 'all' : locationId.toString()}
+                            onValueChange={val => setLocationId(val === 'all' ? 'all' : parseInt(val))}
+                        >
+                            <SelectTrigger className="h-8 w-44">
+                                <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Locations</SelectItem>
+                                {locations.map(l => (
+                                    <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
                 </div>
             </div>
+
+            {noClinicAssigned && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-400 shrink-0">
+                    No clinic is assigned to your account — contact an admin to get one assigned. Showing an empty summary until then.
+                </div>
+            )}
 
             {/* Summary cross-tab + payment split chart */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
