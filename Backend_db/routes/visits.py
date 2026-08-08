@@ -27,6 +27,7 @@ def create_visit():
         visiting_fee=data.get('visiting_fee', 0),
         amount_paid=data.get('amount_paid', 0),
         payment_status=data.get('payment_status', 'unpaid'),
+        payment_mode=data.get('payment_mode'),
         created_by_user_id=g.current_user.get('user_id')
     )
     creator = db.session.get(User, g.current_user.get('user_id'))
@@ -91,6 +92,7 @@ def get_all_visits():
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'payment_status': v.payment_status,
+            'payment_mode': v.payment_mode,
             'billed_amount': bills_map.get(v.invoice_id),
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
@@ -114,6 +116,7 @@ def get_patient_visits(patient_id):
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'payment_status': v.payment_status,
+            'payment_mode': v.payment_mode,
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })
@@ -137,6 +140,7 @@ def get_visit(visit_id):
         'visiting_fee': visit.visiting_fee,
         'amount_paid': visit.amount_paid,
         'payment_status': visit.payment_status,
+        'payment_mode': visit.payment_mode,
         'created_at': visit.created_at.isoformat() if visit.created_at else None,
         'updated_at': visit.updated_at.isoformat() if hasattr(visit, 'updated_at') and visit.updated_at else None
     }), 200
@@ -157,6 +161,8 @@ def update_visit(visit_id):
         visit.amount_paid = data['amount_paid']
     if 'payment_status' in data:
         visit.payment_status = data['payment_status']
+    if 'payment_mode' in data:
+        visit.payment_mode = data['payment_mode']
     if 'visit_date' in data:
         visit.visit_date = datetime.strptime(data['visit_date'], '%Y-%m-%d').date() if data['visit_date'] else None
     if 'visit_time' in data:

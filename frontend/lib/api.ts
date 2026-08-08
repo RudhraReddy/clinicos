@@ -31,6 +31,7 @@ export interface Visit {
     visiting_fee?: number;
     amount_paid?: number;
     payment_status?: string;
+    payment_mode?: string;
     billed_amount?: number | null;
 }
 
@@ -79,6 +80,7 @@ export interface CreateVisitData {
     visiting_fee?: number;
     amount_paid?: number;
     payment_status?: string;
+    payment_mode?: string;
 }
 
 export interface InventorySearchResult {

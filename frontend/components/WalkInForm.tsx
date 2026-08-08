@@ -39,7 +39,8 @@ const emptyVisit = () => ({
     visit_date: getTodayIST(),
     visit_time: getCurrentTimeStr(),
     visiting_fee: '',
-    payment_status: 'unpaid',
+    payment_status: 'full',
+    payment_mode: 'cash' as 'cash' | 'upi',
 })
 
 function looksLikePhone(s: string) {
@@ -188,7 +189,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setAge('')
         setSex('')
         setAddress('')
-        setPhoneNumber('')
+        setPhoneNumber(matchedPatient?.phone_number ?? '')
         setEditMode(false)
         setFormState('new_patient')
     }
@@ -279,8 +280,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 status: 'in_progress',
                 reason: visit.reason || undefined,
                 visiting_fee: visit.visiting_fee ? parseFloat(visit.visiting_fee) : 0,
-                amount_paid: 0,
-                payment_status: visit.payment_status,
+                amount_paid: visit.visiting_fee ? parseFloat(visit.visiting_fee) : 0,
+                payment_status: 'full',
+                payment_mode: visit.payment_mode,
             })
 
             toast.success(
@@ -300,7 +302,8 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const patientBlank = formState === 'idle' || formState === 'searching'
     const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
     const fieldsLocked = formState === 'found' && !editMode
-    const canSubmit = !submitting && (
+    const feeValid = visit.visiting_fee.trim() !== '' && parseFloat(visit.visiting_fee) > 0
+    const canSubmit = !submitting && feeValid && (
         formState === 'found' ||
         (isNewPatientMode && name.trim() !== '' && phoneNumber.trim() !== '')
     )
@@ -404,6 +407,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                             <span className="truncate">
                                                 <span className="font-medium">{m.name}</span>
                                                 <span className="text-muted-foreground"> · {m.phone_number}</span>
+                                                {m.age != null && (
+                                                    <span className="text-muted-foreground"> · {m.age}y</span>
+                                                )}
                                             </span>
                                             {matchedPatient?.patient_id === m.patient_id && (
                                                 <Check className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -457,10 +463,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             </label>
                             <Input
                                 value={phoneNumber}
-                                onChange={e => setPhoneNumber(e.target.value)}
+                                onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                                 placeholder="Phone number"
                                 disabled={patientBlank}
                                 readOnly={fieldsLocked}
+                                maxLength={10}
+                                inputMode="numeric"
                                 className={`mt-1 ${fieldsLocked ? 'bg-muted/60' : ''}`}
                             />
                         </div>
@@ -558,29 +566,39 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    value={visit.visiting_fee}
-                                    onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
-                                    placeholder="Fee (₹)"
-                                />
-                                <div className="inline-flex items-center rounded-md border bg-muted p-0.5 h-9 w-full">
-                                    {(['full', 'partial', 'unpaid'] as const).map(status => (
-                                        <button
-                                            key={status}
-                                            type="button"
-                                            onClick={() => setVisit(v => ({ ...v, payment_status: status }))}
-                                            className={cn(
-                                                "flex-1 h-full rounded-sm text-xs font-medium transition-colors",
-                                                visit.payment_status === status
-                                                    ? "bg-background text-foreground shadow-sm"
-                                                    : "text-muted-foreground hover:text-foreground"
-                                            )}
-                                        >
-                                            {status === 'full' ? 'Full Paid' : status === 'partial' ? 'Partial Pay' : 'Unpaid'}
-                                        </button>
-                                    ))}
+                                <div>
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                        Fee (₹)<span className="text-destructive ml-0.5">*</span>
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={visit.visiting_fee}
+                                        onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
+                                        placeholder="0"
+                                        className="mt-1"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</label>
+                                    <div className="inline-flex items-center rounded-md border bg-muted p-0.5 h-9 w-full mt-1">
+                                        {(['cash', 'upi'] as const).map(mode => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => setVisit(v => ({ ...v, payment_mode: mode }))}
+                                                className={cn(
+                                                    "flex-1 h-full rounded-sm text-xs font-medium transition-colors",
+                                                    visit.payment_mode === mode
+                                                        ? "bg-background text-foreground shadow-sm"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                {mode === 'cash' ? 'Cash' : 'UPI'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -158,6 +158,7 @@ class Visit(db.Model):
     visiting_fee = db.Column(db.Integer, default=0)
     amount_paid = db.Column(db.Integer, default=0)
     payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid
+    payment_mode = db.Column(db.String(20), nullable=True) # cash, upi
     
     location = db.Column(db.String(50), nullable=True, default='Main')
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)

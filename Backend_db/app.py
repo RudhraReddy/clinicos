@@ -54,6 +54,8 @@ def _apply_migrations(db):
         # Task 1: replace free-text reference string with FK to self
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS reference_patient_id VARCHAR(8) REFERENCES patients(patient_id) ON DELETE SET NULL",
         "ALTER TABLE patients DROP COLUMN IF EXISTS reference",
+        # 2026-08-06: cash/UPI payment mode on visits (replaces full/partial/unpaid picker on booking)
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
