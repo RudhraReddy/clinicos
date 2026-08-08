@@ -13,7 +13,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert, Menu, LayoutDashboard, CreditCard, Users } from "lucide-react"
+import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, ShieldAlert, Menu, LayoutDashboard, CreditCard, Users, Eye } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
 import { ImportInventoryDialog } from "@/components/ImportInventoryDialog"
 import { ViewBatchesDialog } from "@/components/ViewBatchesDialog"
+import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -32,9 +34,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from 'next/link'
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
-import { format } from "date-fns"
+import { format, startOfDay, endOfDay } from "date-fns"
 import { useSettings, ALL_INVENTORY_COLUMNS } from "@/lib/settings_context"
 import { toast } from "sonner"
+
+// Date-only strings ("YYYY-MM-DD") parse as UTC midnight — appending a local
+// time avoids the off-by-one-day shift that causes in negative-UTC timezones.
+const parseDateOnly = (dateStr?: string | null) => {
+    if (!dateStr) return null
+    return new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`)
+}
 
 const getDisplayQuantity = (quantity: number, pack_size?: string) => {
     const pack = pack_size?.toLowerCase() || ''
@@ -267,11 +276,343 @@ function AllChangesPanel() {
     )
 }
 
+function InvoiceHistoryPanel() {
+    const router = useRouter()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [invoices, setInvoices] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [date, setDate] = useState<DateRange | undefined>()
+    const [searchQuery, setSearchQuery] = useState("")
+
+    // Table filters
+    const [filterVendor, setFilterVendor] = useState<Set<string>>(new Set())
+    const [filterSource, setFilterSource] = useState<Set<string>>(new Set())
+    const [filterAmount, setFilterAmount] = useState<[number, number] | null>(null)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [previewInvoice, setPreviewInvoice] = useState<any>(null)
+
+    // Optional columns, off by default — toggled via the Columns button
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set())
+    const toggleColumn = (id: string) => {
+        setVisibleColumns(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+    const OPTIONAL_COLUMNS = [
+        { id: 'source', label: 'Source' },
+        { id: 'date_added', label: 'Date Added' },
+        { id: 'gst_number', label: 'GST Number' },
+    ]
+
+    // Clinic switcher
+    const [locations, setLocations] = useState<Location[]>([])
+    const [activeLocationId, setActiveLocationId] = useState<number | 'all'>('all')
+
+    useEffect(() => {
+        api.getLocations().then(locs => setLocations(locs.filter(l => l.is_active))).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        loadInvoices()
+    }, [activeLocationId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadInvoices = async () => {
+        setLoading(true)
+        try {
+            const data = await api.getInvoices(activeLocationId === 'all' ? undefined : activeLocationId)
+            setInvoices(data)
+        } catch (error) {
+            console.error("Failed to load invoices", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const invoiceAgeDays = (invoiceDateStr: string | null | undefined) => {
+        const parsed = parseDateOnly(invoiceDateStr)
+        if (!parsed) return null
+        const diffMs = Date.now() - parsed.getTime()
+        return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+    }
+
+    const filteredInvoices = invoices.filter(inv => {
+        let matchesDate = true;
+        if (date?.from) {
+            const invDate = parseDateOnly(inv.invoice_date) || new Date(inv.upload_date);
+            const start = startOfDay(date.from);
+            const end = date.to ? endOfDay(date.to) : endOfDay(date.from);
+            matchesDate = invDate >= start && invDate <= end;
+        }
+
+        const matchesSearch = inv.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (inv.vendor_name || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+        const matchesVendor = filterVendor.size === 0 || filterVendor.has(inv.vendor_name || 'N/A');
+        const matchesSource = filterSource.size === 0 || filterSource.has(inv.source || 'UNKNOWN');
+        const matchesAmount = filterAmount === null || ((inv.total_amount || 0) >= filterAmount[0] && (inv.total_amount || 0) <= filterAmount[1]);
+
+        return matchesDate && matchesSearch && matchesVendor && matchesSource && matchesAmount;
+    });
+
+    const optionsVendor = Array.from(new Set(invoices.map(i => i.vendor_name || 'N/A'))).sort();
+    const optionsSource = Array.from(new Set(invoices.map(i => i.source || 'UNKNOWN'))).sort();
+
+    const amountValues = invoices.map(i => i.total_amount || 0);
+    const minAmount = Math.min(...(amountValues.length ? amountValues : [0]));
+    const maxAmount = Math.max(...(amountValues.length ? amountValues : [100]));
+
+    const columnCount = 9 + visibleColumns.size
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pb-4">
+                <CardTitle>Uploaded Invoices ({filteredInvoices.length})</CardTitle>
+                <div className="flex flex-wrap items-center gap-3">
+                    {locations.length > 0 && (
+                        <div className="flex gap-2 flex-wrap">
+                            <button
+                                onClick={() => setActiveLocationId('all')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                    activeLocationId === 'all'
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                )}
+                            >
+                                All Locations
+                            </button>
+                            {locations.map(loc => (
+                                <button
+                                    key={loc.id}
+                                    onClick={() => setActiveLocationId(loc.id)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                        activeLocationId === loc.id
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                    )}
+                                >
+                                    {loc.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <div className="relative w-64">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search invoice # or vendor..."
+                            className="pl-9 h-9"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <DatePickerWithRange date={date} setDate={setDate} className="w-[260px]" placeholder="Filter by date..." />
+                    </div>
+                    {(searchQuery || date || filterVendor.size > 0 || filterSource.size > 0 || filterAmount !== null) && (
+                        <Button variant="ghost" size="icon" onClick={() => {
+                            setSearchQuery("");
+                            setDate(undefined);
+                            setFilterVendor(new Set());
+                            setFilterSource(new Set());
+                            setFilterAmount(null);
+                        }} title="Reset Filters">
+                            <RotateCcw className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-9">
+                                <Columns className="mr-1.5 h-3.5 w-3.5" />
+                                Columns
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2" align="end">
+                            <h4 className="font-medium leading-none mb-2 px-2 text-sm">Toggle Columns</h4>
+                            {OPTIONAL_COLUMNS.map(col => (
+                                <label
+                                    key={col.id}
+                                    className="flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors cursor-pointer"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={visibleColumns.has(col.id)}
+                                        onChange={() => toggleColumn(col.id)}
+                                        className="h-4 w-4 rounded border-gray-300"
+                                    />
+                                    {col.label}
+                                </label>
+                            ))}
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Invoice Date</TableHead>
+                            <TableHead>Invoice Number</TableHead>
+                            <TableHead>
+                                <DataTableColumnFilter
+                                    title="Vendor"
+                                    options={optionsVendor}
+                                    selectedValues={filterVendor}
+                                    onChange={setFilterVendor}
+                                />
+                            </TableHead>
+                            <TableHead>
+                                <DataTableRangeFilter
+                                    title="Total Amount"
+                                    min={minAmount}
+                                    max={maxAmount}
+                                    selectedRange={filterAmount}
+                                    onChange={setFilterAmount}
+                                />
+                            </TableHead>
+                            <TableHead>Clinic</TableHead>
+                            <TableHead>Age</TableHead>
+                            <TableHead>Paid Date</TableHead>
+                            <TableHead>Pay Type</TableHead>
+                            {visibleColumns.has('source') && (
+                                <TableHead>
+                                    <DataTableColumnFilter
+                                        title="Source"
+                                        options={optionsSource}
+                                        selectedValues={filterSource}
+                                        onChange={setFilterSource}
+                                    />
+                                </TableHead>
+                            )}
+                            {visibleColumns.has('date_added') && <TableHead>Date Added</TableHead>}
+                            {visibleColumns.has('gst_number') && <TableHead>GST Number</TableHead>}
+                            <TableHead className="text-right">
+                                {(filterVendor.size > 0 || filterSource.size > 0 || filterAmount !== null) && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground mr-2"
+                                        onClick={() => {
+                                            setFilterVendor(new Set())
+                                            setFilterSource(new Set())
+                                            setFilterAmount(null)
+                                        }}
+                                        title="Reset table filters"
+                                    >
+                                        <RotateCcw className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                Action
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            <TableRow>
+                                <TableCell colSpan={columnCount} className="text-center py-4">Loading...</TableCell>
+                            </TableRow>
+                        ) : filteredInvoices.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={columnCount} className="text-center py-4 text-muted-foreground">
+                                    No invoices found.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filteredInvoices.map((inv) => {
+                                const age = invoiceAgeDays(inv.invoice_date)
+                                return (
+                                <TableRow key={inv.invoice_number}>
+                                    <TableCell>{parseDateOnly(inv.invoice_date)?.toLocaleDateString() ?? '—'}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {inv.has_image ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewInvoice(inv)}
+                                                className="flex items-center gap-2 hover:underline decoration-blue-500 underline-offset-2"
+                                                title="View attached invoice image"
+                                            >
+                                                <FileText className="h-4 w-4 text-blue-500" />
+                                                {inv.invoice_number}
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <FileText className="h-4 w-4" />
+                                                {inv.invoice_number}
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span>{inv.vendor_name || 'N/A'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>₹{inv.total_amount.toFixed(2)}</TableCell>
+                                    <TableCell>{inv.location_name || '—'}</TableCell>
+                                    <TableCell className="text-muted-foreground">{age != null ? `${age}d` : '—'}</TableCell>
+                                    <TableCell>{parseDateOnly(inv.paid_date)?.toLocaleDateString() ?? '—'}</TableCell>
+                                    <TableCell>
+                                        {inv.payment_mode ? (
+                                            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-900/20 dark:text-green-400">
+                                                {inv.payment_mode.toUpperCase()}
+                                            </span>
+                                        ) : '—'}
+                                    </TableCell>
+                                    {visibleColumns.has('source') && (
+                                        <TableCell>
+                                            <span className={cn(
+                                                "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset",
+                                                inv.source === 'OCR' ? "bg-blue-50 text-blue-700 ring-blue-600/20" :
+                                                    inv.source === 'MANUAL' ? "bg-yellow-50 text-yellow-700 ring-yellow-600/20" :
+                                                        "bg-purple-50 text-purple-700 ring-purple-600/20"
+                                            )}>
+                                                {inv.source || 'UNKNOWN'}
+                                            </span>
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.has('date_added') && (
+                                        <TableCell>{new Date(inv.upload_date).toLocaleDateString()}</TableCell>
+                                    )}
+                                    {visibleColumns.has('gst_number') && (
+                                        <TableCell>{inv.gst_number || '—'}</TableCell>
+                                    )}
+                                    <TableCell className="text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => router.push(`/inventory/history/${inv.invoice_number}`)}
+                                        >
+                                            <Eye className="h-4 w-4 mr-2" />
+                                            View
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                                )
+                            })
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+
+            <ImagePreviewDialog
+                image={previewInvoice}
+                isOpen={!!previewInvoice}
+                onClose={() => setPreviewInvoice(null)}
+                title={previewInvoice ? `Invoice ${previewInvoice.invoice_number}` : undefined}
+                subtitle={previewInvoice?.vendor_name || undefined}
+            />
+        </Card>
+    )
+}
+
 export default function InventoryPage() {
     const { appFontSize, expiryReminderMonths, defaultInventoryColumns } = useSettings()
     const { role } = useAuth()
     const { openMenu } = useMenu()
-    const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes'>('inventory')
+    const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes' | 'history'>('inventory')
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -507,7 +848,7 @@ export default function InventoryPage() {
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
-            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes')} className="flex-1 flex flex-col overflow-hidden gap-4">
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes' | 'history')} className="flex-1 flex flex-col overflow-hidden gap-4">
                 <div className="flex items-center justify-between shrink-0 gap-3 flex-wrap">
                     <div className="flex items-center gap-3 flex-wrap">
                         <button
@@ -542,6 +883,7 @@ export default function InventoryPage() {
                         <TabsList className="shrink-0">
                             <TabsTrigger value="inventory">Inventory</TabsTrigger>
                             <TabsTrigger value="all-changes">All Changes</TabsTrigger>
+                            <TabsTrigger value="history">Invoices</TabsTrigger>
                         </TabsList>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -555,10 +897,6 @@ export default function InventoryPage() {
                                 Import
                             </Button>
                         } onSuccess={loadData} />
-                        <Button variant="outline" size="sm" onClick={() => window.location.href = '/inventory/history'}>
-                            <FileText className="mr-1.5 h-3.5 w-3.5" />
-                            History
-                        </Button>
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm">
@@ -611,6 +949,10 @@ export default function InventoryPage() {
 
                 <TabsContent value="all-changes" className="flex-1 overflow-y-auto m-0">
                     <AllChangesPanel />
+                </TabsContent>
+
+                <TabsContent value="history" className="flex-1 overflow-y-auto m-0">
+                    <InvoiceHistoryPanel />
                 </TabsContent>
 
                 <TabsContent value="inventory" className="flex-1 flex flex-col overflow-hidden gap-6 m-0">
