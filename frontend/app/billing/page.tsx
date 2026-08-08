@@ -468,6 +468,13 @@ function BillingContent() {
                                                                     <div className="text-xs text-muted-foreground">
                                                                         {item.vendors && item.vendors.length > 0 ? item.vendors.join(', ') : 'No vendor'} | {item.formula || 'No formula'}
                                                                     </div>
+                                                                    {item.rack_location && (
+                                                                        <div className="mt-1">
+                                                                            <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 rounded px-1.5 py-0.5">
+                                                                                📍 {item.rack_location}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
                                                                     {item.substitutes && item.substitutes.length > 0 && (
                                                                         <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
                                                                             <span className="font-semibold text-yellow-700">Substitutes: </span>
