@@ -37,10 +37,22 @@ def create_bill():
 
     invoice_id = generate_invoice_id()
 
+    walk_in_age = None
+    walk_in_sex = None
+    if not patient:
+        try:
+            raw_age = data.get('walk_in_age')
+            walk_in_age = int(raw_age) if raw_age not in (None, '') else None
+        except (ValueError, TypeError):
+            walk_in_age = None
+        walk_in_sex = (data.get('walk_in_sex') or '').strip() or None
+
     new_bill = Bill(
         invoice_id=invoice_id,
         patient_id=patient.patient_id if patient else None,
         walk_in_name=walk_in_name if not patient else None,
+        walk_in_age=walk_in_age,
+        walk_in_sex=walk_in_sex,
         visit_id=visit_id,
         payment_type=data.get('payment_type', 'CASH'),
         total_amount=0,
@@ -281,8 +293,8 @@ def get_bill_details(invoice_id):
             'name': patient.name if patient else (bill.walk_in_name or 'Walk-in Customer'),
             'phone': patient.phone_number if patient else '',
             'id': bill.patient_id,
-            'age': patient.age if patient else None,
-            'sex': patient.sex if patient else None,
+            'age': patient.age if patient else bill.walk_in_age,
+            'sex': patient.sex if patient else bill.walk_in_sex,
             'reference': reference_name,
         },
         'is_walk_in': bill.patient_id is None,

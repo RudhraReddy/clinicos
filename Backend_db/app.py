@@ -64,6 +64,9 @@ def _apply_migrations(db):
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_name VARCHAR(100)",
         # 2026-08-08: rack/shelf location string on product_master (distinct from clinic Location)
         "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS rack_location VARCHAR(50)",
+        # 2026-08-08: optional age/sex on walk-in bills, printed on the invoice when present
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_age INTEGER",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_sex VARCHAR(10)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

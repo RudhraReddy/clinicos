@@ -175,6 +175,8 @@ class Bill(db.Model):
     invoice_id = db.Column(db.String(50), primary_key=True) # format: DDMMYY-XXX-XXX
     patient_id = db.Column(db.String(10), db.ForeignKey('patients.patient_id'), nullable=True)
     walk_in_name = db.Column(db.String(100), nullable=True) # set instead of patient_id for standalone walk-in bills
+    walk_in_age = db.Column(db.Integer, nullable=True)
+    walk_in_sex = db.Column(db.String(10), nullable=True)
     visit_id = db.Column(db.String(50), db.ForeignKey('visits.visit_id'), nullable=True)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
     payment_type = db.Column(db.String(50)) # CASH, CARD, INSURANCE
