@@ -303,7 +303,7 @@ export default function Dashboard() {
                     </div>
                 </TabsContent>
 
-                <TabsContent value="visits" className="h-[calc(100%-40px)] m-0">
+                <TabsContent value="visits" className="flex-1 overflow-hidden m-0">
                     <VisitsTab visits={filteredVisits} loading={filteredLoading} onRefresh={refreshAll} />
                 </TabsContent>
             </Tabs>

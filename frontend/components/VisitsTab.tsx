@@ -62,9 +62,9 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
     }
 
     return (
-        <div className="space-y-4">
-            <Card>
-                <CardContent className="p-0">
+        <div className="h-full flex flex-col">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardContent className="flex-1 overflow-y-auto min-h-0 p-0">
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -76,7 +76,7 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
                         </div>
                     ) : (
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
                                 <TableRow>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Time</TableHead>
