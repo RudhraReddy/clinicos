@@ -144,7 +144,7 @@ export default function Dashboard() {
     }
 
     const handleGoToBilling = (visit: Visit) => {
-        router.push(`/billing?patient_id=${visit.patient_id}`)
+        router.push(`/billing?patient_id=${visit.patient_id}&visit_id=${visit.visit_id}`)
     }
 
     const renderVisitCard = (visit: Visit) => (
