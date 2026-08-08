@@ -59,6 +59,9 @@ def _apply_migrations(db):
         # 2026-08-08: paid_date/payment_mode on purchase invoices (vendor payment tracking)
         "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS paid_date DATE",
         "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20)",
+        # 2026-08-08: standalone walk-in bills — not linked to any patient/visit
+        "ALTER TABLE bills ALTER COLUMN patient_id DROP NOT NULL",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_name VARCHAR(100)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

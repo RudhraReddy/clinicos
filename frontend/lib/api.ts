@@ -116,7 +116,8 @@ export interface BillingHistoryEntry {
     invoice_id: string;
     date: string;
     patient_name: string;
-    patient_id: string;
+    patient_id: string | null;
+    is_walk_in?: boolean;
     total_amount: number;
     payment_type: string;
     visit_id?: string;
@@ -126,6 +127,7 @@ export interface BillingHistoryFilters {
     date_from?: string;
     date_to?: string;
     payment_type?: string;
+    is_walk_in?: 'true' | 'false';
     page?: number;
     limit?: number;
 }
@@ -432,6 +434,7 @@ export const api = {
         if (filters?.date_from) params.set('date_from', filters.date_from)
         if (filters?.date_to) params.set('date_to', filters.date_to)
         if (filters?.payment_type) params.set('payment_type', filters.payment_type)
+        if (filters?.is_walk_in) params.set('is_walk_in', filters.is_walk_in)
         if (filters?.page != null) params.set('page', String(filters.page))
         if (filters?.limit != null) params.set('limit', String(filters.limit))
         const qs = params.toString()

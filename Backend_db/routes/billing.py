@@ -14,29 +14,33 @@ billing = Blueprint('billing', __name__)
 @require_auth
 def create_bill():
     data = request.get_json()
-    
-    if not data.get('patient_id'):
-         return jsonify({'error': 'Patient ID is required'}), 400
-         
+
+    walk_in_name = (data.get('walk_in_name') or '').strip()
+    patient = None
+
+    if data.get('patient_id'):
+        patient = Patient.query.filter_by(patient_id=data['patient_id']).first()
+        if not patient:
+            return jsonify({'error': 'Patient not found'}), 404
+    elif not walk_in_name:
+        return jsonify({'error': 'Patient ID or a walk-in name is required'}), 400
+
     items_used = data.get('items_used', [])
     if not items_used:
         return jsonify({'error': 'No items in bill'}), 400
 
-    patient = Patient.query.filter_by(patient_id=data['patient_id']).first()
-    if not patient:
-        return jsonify({'error': 'Patient not found'}), 404
-
-    visit_id = data.get('visit_id')
+    visit_id = data.get('visit_id') if patient else None
     if visit_id:
         existing_bill = Bill.query.filter_by(visit_id=visit_id).first()
         if existing_bill:
             return jsonify({'error': 'A bill already exists for this visit'}), 400
 
     invoice_id = generate_invoice_id()
-    
+
     new_bill = Bill(
         invoice_id=invoice_id,
-        patient_id=patient.patient_id,
+        patient_id=patient.patient_id if patient else None,
+        walk_in_name=walk_in_name if not patient else None,
         visit_id=visit_id,
         payment_type=data.get('payment_type', 'CASH'),
         total_amount=0,
@@ -132,7 +136,7 @@ def create_bill():
         action='CREATE',
         resource_type='bill',
         resource_id=invoice_id,
-        resource_label=f"{patient.name} — ₹{total_calc_amount:.2f}",
+        resource_label=f"{patient.name if patient else (walk_in_name or 'Walk-in')} — ₹{total_calc_amount:.2f}",
         user_id=g.current_user.get('user_id'),
         username=g.current_user.get('username'),
         ip_address=request.remote_addr,
@@ -147,6 +151,7 @@ def get_billing_history():
     date_to      = request.args.get('date_to')
     payment_type = request.args.get('payment_type')
     patient_id   = request.args.get('patient_id')
+    is_walk_in   = request.args.get('is_walk_in')
 
     try:
         page  = max(1, int(request.args.get('page', 1)))
@@ -178,6 +183,11 @@ def get_billing_history():
     if patient_id:
         query = query.filter(Bill.patient_id == patient_id)
 
+    if is_walk_in == 'true':
+        query = query.filter(Bill.patient_id.is_(None))
+    elif is_walk_in == 'false':
+        query = query.filter(Bill.patient_id.isnot(None))
+
     created_by = request.args.get('created_by')
     if created_by and created_by != 'all':
         if g.current_user.get('role') == 'doctor':
@@ -198,8 +208,9 @@ def get_billing_history():
         bills.append({
             'invoice_id':   b.invoice_id,
             'date':         b.created_at.strftime('%Y-%m-%d %H:%M'),
-            'patient_name': p.name if p else 'Unknown',
+            'patient_name': p.name if p else (b.walk_in_name or 'Walk-in'),
             'patient_id':   b.patient_id,
+            'is_walk_in':   b.patient_id is None,
             'total_amount': float(b.total_amount),
             'payment_type': b.payment_type,
             'visit_id':     b.visit_id,
@@ -232,7 +243,7 @@ def get_patient_billing_history(patient_id):
 @require_auth
 def get_bill_details(invoice_id):
     bill = Bill.query.get_or_404(invoice_id)
-    patient = Patient.query.get(bill.patient_id)
+    patient = Patient.query.get(bill.patient_id) if bill.patient_id else None
     items = BillItem.query.filter_by(bill_id=invoice_id).all()
 
     reference_name = None
@@ -267,13 +278,14 @@ def get_bill_details(invoice_id):
         'invoice_id': bill.invoice_id,
         'created_at': bill.created_at.strftime('%Y-%m-%d %H:%M'),
         'patient': {
-            'name': patient.name if patient else 'Unknown',
+            'name': patient.name if patient else (bill.walk_in_name or 'Walk-in Customer'),
             'phone': patient.phone_number if patient else '',
             'id': bill.patient_id,
             'age': patient.age if patient else None,
             'sex': patient.sex if patient else None,
             'reference': reference_name,
         },
+        'is_walk_in': bill.patient_id is None,
         'payment_type': bill.payment_type,
         'total_amount': float(bill.total_amount),
         'items': item_list
