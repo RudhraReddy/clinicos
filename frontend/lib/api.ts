@@ -89,6 +89,8 @@ export interface InventorySearchResult {
     manufacturer?: string;
     dosage: string;
     gst_rate: number;
+    vendors?: string[];
+    formula?: string | null;
     total_qty: number;
     price: number;
     pack_size?: string;

@@ -396,7 +396,7 @@ function BillingContent() {
                                                                 <Input
                                                                     ref={itemSearchInputRef}
                                                                     className="h-8 pl-8 font-normal"
-                                                                    placeholder="Search by Product ID, Name, or Generic..."
+                                                                    placeholder="Search by Product ID or Formula..."
                                                                     value={itemQuery}
                                                                     onChange={(e) => setItemQuery(e.target.value)}
                                                                     onKeyDown={handleItemSearchKeyDown}
@@ -422,12 +422,17 @@ function BillingContent() {
                                                                 >
                                                                     <div className="flex justify-between">
                                                                         <span className="font-medium">{item.item_name}</span>
-                                                                        <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
-                                                                            {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
+                                                                        <span className="flex flex-col items-end">
+                                                                            <span className={item.total_qty && item.total_qty > 0 ? "text-green-600 text-xs" : "text-red-500 text-xs"}>
+                                                                                {item.total_qty && item.total_qty > 0 ? `${Math.round(item.total_qty * getPackMultiplier(item.pack_size))} in stock` : "Out of Stock"}
+                                                                            </span>
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                ₹{((item.price || 0) / getPackMultiplier(item.pack_size)).toFixed(2)}/ea
+                                                                            </span>
                                                                         </span>
                                                                     </div>
                                                                     <div className="text-xs text-muted-foreground">
-                                                                        {item.manufacturer} | GST: {item.gst_rate || 0}%
+                                                                        {item.vendors && item.vendors.length > 0 ? item.vendors.join(', ') : 'No vendor'} | {item.formula || 'No formula'}
                                                                     </div>
                                                                     {item.substitutes && item.substitutes.length > 0 && (
                                                                         <div className="mt-1 bg-yellow-50 dark:bg-yellow-900/10 p-1 rounded text-xs">
@@ -443,7 +448,7 @@ function BillingContent() {
                                                 <TableHead>Batch</TableHead>
                                                 <TableHead className="w-[100px]">Qty</TableHead>
                                                 <TableHead className="w-[100px]">Unit</TableHead>
-                                                <TableHead className="w-[100px]">Price (Est)</TableHead>
+                                                <TableHead className="w-[100px]">Price</TableHead>
                                                 <TableHead className="w-[100px]">Total</TableHead>
                                                 <TableHead className="w-[50px]"></TableHead>
                                             </TableRow>

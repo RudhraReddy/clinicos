@@ -773,31 +773,55 @@ def search_inventory():
         (func.lower(ProductMaster.item_name).contains(query)) |
         (func.lower(ProductMaster.manufacturer).contains(query)) |
         (func.lower(ProductMaster.generic_tags).contains(query)) |
+        (func.lower(ProductMaster.formula).contains(query)) |
         (func.lower(ProductMaster.id).contains(query))
     ).limit(20).all()
-    
+
+    # Vendor names for active stock, scoped to just the matched products
+    product_ids = [item.id for item in found_items]
+    vendors_map: dict = {}
+    if product_ids:
+        vendor_rows = db.session.query(
+            InventoryBatch.product_id,
+            PurchaseInvoice.vendor_name
+        ).join(
+            PurchaseInvoice,
+            InventoryBatch.purchase_invoice_number == PurchaseInvoice.invoice_number
+        ).filter(
+            InventoryBatch.product_id.in_(product_ids),
+            InventoryBatch.quantity > 0,
+            PurchaseInvoice.vendor_name.isnot(None),
+        ).distinct().all()
+        for pid, vname in vendor_rows:
+            if pid not in vendors_map:
+                vendors_map[pid] = []
+            if vname and vname not in vendors_map[pid]:
+                vendors_map[pid].append(vname)
+
     results = []
     for item in found_items:
         total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(
             InventoryBatch.product_id == item.id,
             InventoryBatch.quantity > 0
         ).scalar() or 0
-        
+
         max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(
             InventoryBatch.product_id == item.id
         ).scalar() or 0.0
-        
+
         results.append({
             'id': item.id,
             'item_name': item.item_name,
             'manufacturer': item.manufacturer,
             'gst_rate': float(item.gst_rate) if item.gst_rate else 0,
+            'vendors': vendors_map.get(item.id, []),
+            'formula': item.formula,
             'total_qty': total_qty,
             'price': float(max_mrp),
             'pack_size': item.pack_size,
             'substitutes': []
         })
-        
+
     return jsonify(results), 200
 
 @inventory.route('/inventory/export', methods=['GET'])
