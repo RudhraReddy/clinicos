@@ -13,17 +13,16 @@ import {
 } from "@/components/ui/table"
 import { Calendar, Loader2 } from "lucide-react"
 import { type Visit } from "@/lib/api"
-import { EditVisitDialog } from "@/components/EditVisitDialog"
+import { VisitDetailsDialog } from "@/components/VisitDetailsDialog"
 
 interface VisitsTabProps {
     visits: Visit[]
     loading: boolean
-    onRefresh: () => void
 }
 
-export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
+export function VisitsTab({ visits, loading }: VisitsTabProps) {
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
-    const [editDialogOpen, setEditDialogOpen] = useState(false)
+    const [detailsOpen, setDetailsOpen] = useState(false)
 
     const formatTime = (timeStr: string | null | undefined, createdAt?: string | null) => {
         if (!timeStr) {
@@ -50,15 +49,9 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
         }
     }
 
-    const handleVisitUpdated = () => {
-        setEditDialogOpen(false)
-        setSelectedVisit(null)
-        onRefresh()
-    }
-
     const handleRowClick = (visit: Visit) => {
         setSelectedVisit(visit)
-        setEditDialogOpen(true)
+        setDetailsOpen(true)
     }
 
     return (
@@ -133,11 +126,10 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
                 </CardContent>
             </Card>
 
-            <EditVisitDialog
-                open={editDialogOpen}
-                onOpenChange={setEditDialogOpen}
+            <VisitDetailsDialog
+                open={detailsOpen}
+                onOpenChange={setDetailsOpen}
                 visit={selectedVisit}
-                onSuccess={handleVisitUpdated}
             />
         </div>
     )

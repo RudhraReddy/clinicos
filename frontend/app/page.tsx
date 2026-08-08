@@ -304,7 +304,7 @@ export default function Dashboard() {
                 </TabsContent>
 
                 <TabsContent value="visits" className="flex-1 overflow-hidden m-0">
-                    <VisitsTab visits={filteredVisits} loading={filteredLoading} onRefresh={refreshAll} />
+                    <VisitsTab visits={filteredVisits} loading={filteredLoading} />
                 </TabsContent>
             </Tabs>
 
