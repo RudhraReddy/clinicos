@@ -131,13 +131,13 @@ export function InvoicePrint({
                 marginBottom: "8px",
             }}>
                 <div style={{ lineHeight: "1.8" }}>
-                    <div>
-                        <strong>Name:</strong>&nbsp;&nbsp;{patient.name}
-                        {hasAge && <>&nbsp;&nbsp;&nbsp;<strong>Age:</strong>&nbsp;&nbsp;{patient.age}</>}
-                        {hasSex && <>&nbsp;&nbsp;&nbsp;<strong>Gender:</strong>&nbsp;&nbsp;{patient.sex}</>}
-                    </div>
-                    {(referenceDoctor || patient.reference) && (
-                        <div><strong>Ref. Doc Name:</strong>&nbsp;&nbsp;{referenceDoctor || patient.reference}</div>
+                    <div><strong>Name:</strong>&nbsp;&nbsp;{patient.name}</div>
+                    {(hasAge || hasSex) && (
+                        <div>
+                            {hasAge && <><strong>Age:</strong>&nbsp;&nbsp;{patient.age}</>}
+                            {hasAge && hasSex && <>&nbsp;&nbsp;&nbsp;</>}
+                            {hasSex && <><strong>Gender:</strong>&nbsp;&nbsp;{patient.sex}</>}
+                        </div>
                     )}
                 </div>
                 <div style={{ textAlign: "center" }}>
