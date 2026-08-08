@@ -277,6 +277,16 @@ These three strings are passed as props at two call sites and are currently hard
 
 ## Recent Changes / Notes
 
+- **Inventory Rack Location Field (2026-08-08):** Added `rack_location` (nullable `VARCHAR(50)`) to
+  `ProductMaster` — a free-text physical rack/shelf position (e.g. "C2", "H1"), distinct from the
+  clinic-branch `Location` model. Editable in the Edit Item dialog (`EditInventoryDialog.tsx`) and
+  per-row during invoice creation (`/inventory/invoice_edit`, always overwrites the saved value when
+  a non-empty value is provided, mirroring the existing `formula` field's behavior). Shown read-only
+  as a badge in the billing page's item search dropdown so frontdesk can locate stock while building
+  a bill. Deliberately excluded from CSV export/import, bill printing (`InvoicePrint.tsx`), invoice
+  history (`/inventory/history/[id]`), and the main Inventory table's visible-columns list. Design
+  doc: `docs/superpowers/specs/2026-08-08-inventory-rack-location-design.md`.
+
 - **New Daily Summary Page (2026-08-08):** Added `/daily-summary`, visible to all three roles
   (frontdesk, doctor, admin) — a read-only daily money ledger, distinct from the doctor-only
   `/status` analytics dashboard. Header has prev/next day arrows + a date input (defaults to
