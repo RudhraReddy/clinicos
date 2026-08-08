@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield, ClipboardList, History, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -28,8 +28,12 @@ const doctorNavItems = [
 
 const adminNavItems = [
     { title: "Dashboard", href: "/", icon: LayoutDashboard },
+    { title: "Doctor View", href: "/doctor", icon: Stethoscope },
     { title: "Patients", href: "/patients", icon: Users },
+    { title: "Visits", href: "/visits", icon: ClipboardList },
     { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Invoice History", href: "/inventory/history", icon: History },
+    { title: "Add Invoice", href: "/inventory/invoice_edit?manual=true", icon: FileText },
     { title: "Billing", href: "/billing", icon: CreditCard },
     { title: "Gallery", href: "/gallery", icon: ImageIcon },
     { title: "Status", href: "/status", icon: BarChart2 },
