@@ -283,9 +283,12 @@ These three strings are passed as props at two call sites and are currently hard
   per-row during invoice creation (`/inventory/invoice_edit`, always overwrites the saved value when
   a non-empty value is provided, mirroring the existing `formula` field's behavior). Shown read-only
   as a badge in the billing page's item search dropdown so frontdesk can locate stock while building
-  a bill. Deliberately excluded from CSV export/import, bill printing (`InvoicePrint.tsx`), invoice
-  history (`/inventory/history/[id]`), and the main Inventory table's visible-columns list. Design
-  doc: `docs/superpowers/specs/2026-08-08-inventory-rack-location-design.md`.
+  a bill. Also a toggleable, filterable column ("Rack") in the main Inventory table's Columns picker
+  (off by default, same as Category/HSN), and a "Rack Location" column on both CSV exports (Total
+  Inventory and Edit Inventory) — recognized on re-import too, so it can be bulk-populated via
+  spreadsheet instead of one row at a time. Still deliberately excluded from bill printing
+  (`InvoicePrint.tsx`) and invoice history (`/inventory/history/[id]`). Design doc:
+  `docs/superpowers/specs/2026-08-08-inventory-rack-location-design.md`.
 
 - **New Daily Summary Page (2026-08-08):** Added `/daily-summary`, visible to all three roles
   (frontdesk, doctor, admin) — a read-only daily money ledger, distinct from the doctor-only
