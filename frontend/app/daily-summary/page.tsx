@@ -13,11 +13,12 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, Loader2, Menu, Calendar as CalendarIcon, MapPin, Receipt } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Menu, Calendar as CalendarIcon, MapPin, Receipt, PieChart as PieChartIcon } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import { api, type DailySummaryResponse, type Location } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
 import { format, addDays, subDays, parseISO } from "date-fns"
+import { ResponsiveContainer, PieChart as RePie, Pie, Cell, Tooltip as ReTooltip } from "recharts"
 
 function FeeCell({ amount, mode }: { amount: number | null; mode: string | null }) {
     if (amount === null || amount === undefined) {
@@ -73,6 +74,14 @@ export default function DailySummaryPage() {
     const summary = data?.summary
     const rows = data?.rows ?? []
 
+    // Payment-mode split for the pie chart — includes an "Other" slice for any amount in
+    // summary.total.total not accounted for by cash/upi (e.g. a stray CARD-mode bill).
+    const paymentSplitData = summary ? [
+        { name: 'Cash', value: summary.total.cash, fill: '#22c55e' },
+        { name: 'UPI', value: summary.total.upi, fill: '#3b82f6' },
+        { name: 'Other', value: Math.max(0, Math.round((summary.total.total - summary.total.cash - summary.total.upi) * 100) / 100), fill: '#94a3b8' },
+    ].filter(d => d.value > 0) : []
+
     return (
         <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
             <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
@@ -123,47 +132,101 @@ export default function DailySummaryPage() {
                 </div>
             </div>
 
-            {/* Summary cross-tab */}
-            <Card className="shrink-0">
-                <CardContent className="p-4">
-                    {loading || !summary ? (
-                        <div className="flex items-center justify-center py-6">
+            {/* Summary cross-tab + payment split chart */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+                <Card>
+                    <CardContent className="p-4">
+                        {loading || !summary ? (
+                            <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead></TableHead>
+                                        <TableHead className="text-right">Cash</TableHead>
+                                        <TableHead className="text-right">UPI</TableHead>
+                                        <TableHead className="text-right">Total</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell className="font-medium">Visit Fee</TableCell>
+                                        <TableCell className="text-right tabular-nums">₹{summary.visit_fee.cash}</TableCell>
+                                        <TableCell className="text-right tabular-nums">₹{summary.visit_fee.upi}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-semibold">₹{summary.visit_fee.total}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium">Billing Fee</TableCell>
+                                        <TableCell className="text-right tabular-nums">₹{summary.billing_fee.cash}</TableCell>
+                                        <TableCell className="text-right tabular-nums">₹{summary.billing_fee.upi}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-semibold">₹{summary.billing_fee.total}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="border-t-2">
+                                        <TableCell className="font-bold">Total</TableCell>
+                                        <TableCell className="text-right tabular-nums font-bold">₹{summary.total.cash}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-bold">₹{summary.total.upi}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-bold">₹{summary.total.total}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="p-4 h-full flex flex-col items-center justify-center min-h-[180px]">
+                        {loading || !summary ? (
                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead></TableHead>
-                                    <TableHead className="text-right">Cash</TableHead>
-                                    <TableHead className="text-right">UPI</TableHead>
-                                    <TableHead className="text-right">Total</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell className="font-medium">Visit Fee</TableCell>
-                                    <TableCell className="text-right tabular-nums">₹{summary.visit_fee.cash}</TableCell>
-                                    <TableCell className="text-right tabular-nums">₹{summary.visit_fee.upi}</TableCell>
-                                    <TableCell className="text-right tabular-nums font-semibold">₹{summary.visit_fee.total}</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">Billing Fee</TableCell>
-                                    <TableCell className="text-right tabular-nums">₹{summary.billing_fee.cash}</TableCell>
-                                    <TableCell className="text-right tabular-nums">₹{summary.billing_fee.upi}</TableCell>
-                                    <TableCell className="text-right tabular-nums font-semibold">₹{summary.billing_fee.total}</TableCell>
-                                </TableRow>
-                                <TableRow className="border-t-2">
-                                    <TableCell className="font-bold">Total</TableCell>
-                                    <TableCell className="text-right tabular-nums font-bold">₹{summary.total.cash}</TableCell>
-                                    <TableCell className="text-right tabular-nums font-bold">₹{summary.total.upi}</TableCell>
-                                    <TableCell className="text-right tabular-nums font-bold">₹{summary.total.total}</TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+                        ) : summary.total.total === 0 ? (
+                            <div className="text-center text-muted-foreground text-sm">
+                                <PieChartIcon className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                No income to chart for this day
+                            </div>
+                        ) : (
+                            <div className="w-full flex items-center gap-4">
+                                <div className="w-32 h-32 shrink-0">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <RePie>
+                                            <Pie
+                                                data={paymentSplitData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={35}
+                                                outerRadius={55}
+                                                paddingAngle={2}
+                                                dataKey="value"
+                                                animationDuration={600}
+                                            >
+                                                {paymentSplitData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
+                                                ))}
+                                            </Pie>
+                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                            <ReTooltip formatter={(value: any, name: any) => [`₹${value}`, name]} />
+                                        </RePie>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="space-y-2">
+                                    {paymentSplitData.map(entry => (
+                                        <div key={entry.name} className="flex items-center gap-2 text-sm">
+                                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
+                                            <span className="text-muted-foreground">{entry.name}</span>
+                                            <span className="font-semibold tabular-nums">₹{entry.value}</span>
+                                        </div>
+                                    ))}
+                                    <div className="flex items-center gap-2 text-sm pt-1 border-t">
+                                        <span className="h-2.5 w-2.5 shrink-0" />
+                                        <span className="text-muted-foreground">Total</span>
+                                        <span className="font-bold tabular-nums">₹{summary.total.total}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Row table */}
             <Card className="flex-1 flex flex-col overflow-hidden">
