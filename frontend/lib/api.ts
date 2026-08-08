@@ -145,6 +145,37 @@ export interface UploadInventoryResponse {
     path: string;
 }
 
+export interface DailySummaryRow {
+    type: 'visit' | 'walkin';
+    visit_id?: string;
+    invoice_id?: string;
+    patient_id: string | null;
+    patient_name: string;
+    phone_number: string | null;
+    reason: string | null;
+    time: string;
+    visit_fee: number | null;
+    visit_fee_mode: 'cash' | 'upi' | 'other' | null;
+    billing_fee: number | null;
+    billing_fee_mode: 'cash' | 'upi' | 'other' | null;
+}
+
+export interface DailySummaryBucket {
+    cash: number;
+    upi: number;
+    total: number;
+}
+
+export interface DailySummaryResponse {
+    date: string;
+    rows: DailySummaryRow[];
+    summary: {
+        visit_fee: DailySummaryBucket;
+        billing_fee: DailySummaryBucket;
+        total: DailySummaryBucket;
+    };
+}
+
 class ApiError extends Error {
     constructor(public status: number, message: string) {
         super(message);
@@ -607,6 +638,12 @@ export const api = {
         const res = await fetch(`${API_BASE_URL}/api/ledger?${params}`, { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to fetch ledger')
         return res.json()
+    },
+
+    async getDailySummary(date: string, locationId?: number | 'all'): Promise<DailySummaryResponse> {
+        const params = new URLSearchParams({ date })
+        if (locationId && locationId !== 'all') params.set('location_id', locationId.toString())
+        return fetchApi(`/api/daily_summary?${params.toString()}`)
     },
 
     async createLedgerItem(data: { title: string, amount: number, category: string, frequency: string, location: string, notes?: string }): Promise<{ id: number }> {
