@@ -35,7 +35,7 @@ export default function AppShell({
     // Pages that render their own inline trigger via useMenu() instead of the fixed fallback below
     const INLINE_TRIGGER_ROUTES = [
         '/', '/patients', '/inventory', '/billing', '/doctor',
-        '/inventory/invoice_edit', '/gallery', '/status', '/admin',
+        '/inventory/invoice_edit', '/gallery', '/status', '/admin', '/daily-summary',
     ]
     const hasInlineTrigger = INLINE_TRIGGER_ROUTES.includes(pathname) || pathname.startsWith('/inventory/history/')
 

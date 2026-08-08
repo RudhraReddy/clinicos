@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield, FileText } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield, FileText, Receipt } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -15,6 +15,7 @@ const staffNavItems = [
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
     { title: "Billing", href: "/billing", icon: CreditCard },
+    { title: "Daily Summary", href: "/daily-summary", icon: Receipt },
 ]
 
 const doctorNavItems = [
@@ -22,6 +23,7 @@ const doctorNavItems = [
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
     { title: "Billing", href: "/billing", icon: CreditCard },
+    { title: "Daily Summary", href: "/daily-summary", icon: Receipt },
     { title: "Gallery", href: "/gallery", icon: ImageIcon },
     { title: "Status", href: "/status", icon: BarChart2 },
 ]
@@ -33,6 +35,7 @@ const adminNavItems = [
     { title: "Inventory", href: "/inventory", icon: Package },
     { title: "Add Invoice", href: "/inventory/invoice_edit?manual=true", icon: FileText },
     { title: "Billing", href: "/billing", icon: CreditCard },
+    { title: "Daily Summary", href: "/daily-summary", icon: Receipt },
     { title: "Gallery", href: "/gallery", icon: ImageIcon },
     { title: "Status", href: "/status", icon: BarChart2 },
     { title: "Admin", href: "/admin", icon: Shield },
