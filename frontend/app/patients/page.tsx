@@ -53,7 +53,7 @@ export default function PatientsPage() {
     const [dialogOpen, setDialogOpen] = useState(false)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<'full' | 'visits-only'>('full')
+    const [viewMode, setViewMode] = useState<'full' | 'clinic'>('full')
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
     const [importing, setImporting] = useState(false)
 
@@ -323,7 +323,7 @@ export default function PatientsPage() {
                                                     )}
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-2">
-                                                            {role === 'doctor' ? (
+                                                            {role === 'doctor' || role === 'admin' ? (
                                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                                                     setSelectedPatient(patient)
                                                                     setViewMode('full')
@@ -335,7 +335,7 @@ export default function PatientsPage() {
                                                             ) : (
                                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                                                     setSelectedPatient(patient)
-                                                                    setViewMode('visits-only')
+                                                                    setViewMode('clinic')
                                                                     setViewDialogOpen(true)
                                                                 }} title="View Visit Logs">
                                                                     <FileText className="h-4 w-4" />
@@ -380,7 +380,7 @@ export default function PatientsPage() {
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-1 ml-2 shrink-0">
-                                                    {role === 'doctor' ? (
+                                                    {role === 'doctor' || role === 'admin' ? (
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                                             setSelectedPatient(patient)
                                                             setViewMode('full')
@@ -392,7 +392,7 @@ export default function PatientsPage() {
                                                     ) : (
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                                             setSelectedPatient(patient)
-                                                            setViewMode('visits-only')
+                                                            setViewMode('clinic')
                                                             setViewDialogOpen(true)
                                                         }} title="View Visit Logs">
                                                             <FileText className="h-4 w-4" />

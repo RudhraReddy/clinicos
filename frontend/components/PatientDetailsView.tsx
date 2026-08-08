@@ -9,16 +9,8 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { api, Patient, API_BASE_URL, Visit } from "@/lib/api"
-import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2, ChevronDown, ChevronUp } from "lucide-react"
+import { api, Patient, API_BASE_URL } from "@/lib/api"
+import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
@@ -29,7 +21,7 @@ interface PatientDetailsViewProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     trigger?: React.ReactNode
-    viewMode?: 'full' | 'visits-only'
+    viewMode?: 'full' | 'clinic'
 }
 
 export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewMode = 'full' }: PatientDetailsViewProps) {
@@ -40,54 +32,26 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
     const [lightboxState, setLightboxState] = useState<{ image: any; context: any[] } | null>(null)
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
+    const [invoicePhotos, setInvoicePhotos] = useState<any[]>([]) // eslint-disable-line @typescript-eslint/no-explicit-any
     const { clinicName, clinicAddress, clinicPhone, referenceDoctor, appFontSize } = useSettings()
-
-    // Visit History collapsible state
-    const [visitHistoryOpen, setVisitHistoryOpen] = useState(false)
-    const [visits, setVisits] = useState<Visit[]>([])
-    const [visitsLoading, setVisitsLoading] = useState(false)
-    const [visitsLoaded, setVisitsLoaded] = useState(false)
 
     useEffect(() => {
         if (open && patient) {
             loadAllData()
-            // Reset visit history when dialog opens with a new patient
-            setVisitHistoryOpen(false)
-            setVisits([])
-            setVisitsLoaded(false)
         }
     }, [open, patient]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    const loadVisitHistory = async () => {
-        if (visitsLoaded) return
-        setVisitsLoading(true)
-        try {
-            const data = await api.getVisits(patient.patient_id)
-            setVisits(data)
-            setVisitsLoaded(true)
-        } catch (err) {
-            console.error("Failed to load visit history", err)
-        } finally {
-            setVisitsLoading(false)
-        }
-    }
-
-    const toggleVisitHistory = () => {
-        const next = !visitHistoryOpen
-        setVisitHistoryOpen(next)
-        if (next) {
-            loadVisitHistory()
-        }
-    }
 
     const loadAllData = async () => {
         setLoading(true)
         try {
-            const [visitsData, imagesData, billsData] = await Promise.all([
+            const [visitsData, imagesDataRaw, billsData] = await Promise.all([
                 api.getVisits(patient.patient_id),
-                viewMode === 'full' ? api.getPatientImages(patient.patient_id) : Promise.resolve([]),
+                api.getPatientImages(patient.patient_id),
                 viewMode === 'full' ? api.getPatientBillingHistory(patient.patient_id) : Promise.resolve([])
             ])
+            // Clinic view only ever sees Prescription-tagged images, never any other tag
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const imagesData = viewMode === 'full' ? imagesDataRaw : imagesDataRaw.filter((img: any) => img.tag === 'Prescription')
 
             // Group everything by Date (YYYY-MM-DD)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,78 +144,6 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
 
                 {/* Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto p-6 bg-muted/10">
-                    {/* Visit History collapsible section */}
-                    <div className="max-w-5xl mx-auto mb-6">
-                        <button
-                            onClick={toggleVisitHistory}
-                            className="w-full flex items-center justify-between px-4 py-3 bg-card border rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors"
-                        >
-                            <span className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                Visit History
-                            </span>
-                            {visitHistoryOpen ? (
-                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            )}
-                        </button>
-
-                        {visitHistoryOpen && (
-                            <div className="mt-2 bg-card border rounded-lg overflow-hidden">
-                                {visitsLoading ? (
-                                    <div className="flex items-center justify-center py-8">
-                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                    </div>
-                                ) : visits.length === 0 ? (
-                                    <div className="py-8 text-center text-sm text-muted-foreground">
-                                        No visits yet.
-                                    </div>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Reason</TableHead>
-                                                <TableHead>Payment Status</TableHead>
-                                                <TableHead className="text-right">Amount Paid</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visits.map((visit) => (
-                                                <TableRow key={visit.visit_id}>
-                                                    <TableCell className="text-sm">
-                                                        {visit.visit_date
-                                                            ? new Date(visit.visit_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-                                                            : "—"}
-                                                    </TableCell>
-                                                    <TableCell className="text-sm">{visit.reason || "—"}</TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                visit.payment_status === "full"
-                                                                    ? "border-green-500 text-green-600"
-                                                                    : visit.payment_status === "partial"
-                                                                    ? "border-yellow-500 text-yellow-600"
-                                                                    : "border-muted-foreground text-muted-foreground"
-                                                            }
-                                                        >
-                                                            {visit.payment_status ?? "unpaid"}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right text-sm">
-                                                        {visit.amount_paid != null ? `₹${visit.amount_paid.toFixed(2)}` : "—"}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
                     {loading ? (
                         <div className="h-full flex items-center justify-center">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -293,10 +185,17 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                                                     <div className="mb-6 space-y-4">
                                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                         {group.visits.map((visit: any) => (
-                                                            <div key={visit.visit_id} className="flex items-center gap-2">
-                                                                <span className="font-semibold text-lg">{visit.reason || "Visit"}</span>
-                                                                <Badge variant="outline" className="text-[10px] h-5">{visit.status}</Badge>
-                                                                <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                                                            <div key={visit.visit_id} className="flex items-center gap-3">
+                                                                <Badge variant="outline" className="text-[10px] h-5 capitalize shrink-0">{visit.status}</Badge>
+                                                                {viewMode === 'full' && (
+                                                                    <span className="text-sm font-semibold tabular-nums shrink-0">
+                                                                        ₹{visit.visiting_fee ?? 0}
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-sm text-muted-foreground truncate ml-auto">
+                                                                    {visit.reason || "—"}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground shrink-0">
                                                                     {visit.visit_time?.substring(0, 5)}
                                                                 </span>
                                                             </div>
@@ -347,7 +246,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                                                             <div className="space-y-2">
                                                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                                 {group.bills.map((bill: any) => (
-                                                                    <div key={bill.invoice_id} className="bg-card border rounded-md p-3 text-sm flex justify-between items-center shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors" onClick={() => { setInvoiceId(bill.invoice_id); setInvoiceOpen(true) }}>
+                                                                    <div key={bill.invoice_id} className="bg-card border rounded-md p-3 text-sm flex justify-between items-center shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors" onClick={() => { setInvoiceId(bill.invoice_id); setInvoicePhotos(group.images); setInvoiceOpen(true) }}>
                                                                         <div>
                                                                             <div className="font-mono text-xs text-muted-foreground">{bill.invoice_id}</div>
                                                                             <div className="font-medium">{bill.payment_type}</div>
@@ -398,13 +297,14 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
 
                 <PrintInvoiceDialog
                     open={invoiceOpen}
-                    onOpenChange={(v) => { setInvoiceOpen(v); if (!v) setInvoiceId(null) }}
+                    onOpenChange={(v) => { setInvoiceOpen(v); if (!v) { setInvoiceId(null); setInvoicePhotos([]) } }}
                     invoiceId={invoiceId}
                     clinicName={clinicName}
                     clinicAddress={clinicAddress}
                     clinicPhone={clinicPhone}
                     clinicLicense="TG/WLU/2025-140763"
                     referenceDoctor={referenceDoctor}
+                    photos={invoicePhotos}
                 />
             </DialogContent>
         </Dialog>

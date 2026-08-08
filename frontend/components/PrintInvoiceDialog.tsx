@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { api } from "@/lib/api"
+import { api, API_BASE_URL } from "@/lib/api"
 import { InvoicePrint } from "@/components/InvoicePrint"
 import {
     Dialog,
@@ -11,8 +11,9 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2, Printer } from "lucide-react"
+import { Loader2, Printer, Image as ImageIcon, Maximize2 } from "lucide-react"
 import { toast } from "sonner"
+import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 
 interface PrintBillItem {
     item_name: string
@@ -66,6 +67,8 @@ interface PrintInvoiceDialogProps {
     clinicPhone: string
     clinicLicense?: string
     referenceDoctor?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    photos?: any[]
 }
 
 function printElement(elementId: string) {
@@ -91,9 +94,12 @@ export function PrintInvoiceDialog({
     clinicPhone,
     clinicLicense = "",
     referenceDoctor = "",
+    photos = [],
 }: PrintInvoiceDialogProps) {
     const [loading, setLoading] = useState(false)
     const [invoiceData, setInvoiceData] = useState<PrintInvoiceData | null>(null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [lightboxImg, setLightboxImg] = useState<any>(null)
 
     useEffect(() => {
         if (!open || !invoiceId) {
@@ -179,6 +185,35 @@ export function PrintInvoiceDialog({
                     />
                 )}
 
+                {!loading && invoiceData && photos.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                            <ImageIcon className="h-3 w-3" /> Visit Photos
+                        </h4>
+                        <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                            {photos.map((img) => (
+                                <div
+                                    key={img.id}
+                                    className="aspect-square bg-black/5 rounded-md overflow-hidden border cursor-pointer hover:ring-2 ring-primary/50 transition-all relative group"
+                                    onClick={() => setLightboxImg(img)}
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
+                                        alt="Visit"
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Maximize2 className="h-4 w-4 text-white" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Close
@@ -192,6 +227,20 @@ export function PrintInvoiceDialog({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            <ImagePreviewDialog
+                image={lightboxImg}
+                isOpen={!!lightboxImg}
+                onClose={() => setLightboxImg(null)}
+                allImages={photos}
+                onNavigate={(dir) => {
+                    if (!lightboxImg) return
+                    const idx = photos.findIndex((i) => i.id === lightboxImg.id)
+                    if (dir === 'next' && idx < photos.length - 1) setLightboxImg(photos[idx + 1])
+                    if (dir === 'prev' && idx > 0) setLightboxImg(photos[idx - 1])
+                }}
+                fullScreen={true}
+            />
         </Dialog>
     )
 }
