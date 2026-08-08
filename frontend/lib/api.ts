@@ -399,9 +399,15 @@ export const api = {
     },
 
     // Visit APIs
-    async getVisits(patientId?: string): Promise<Visit[]> {
-        const endpoint = patientId ? `/api/visits/patient/${patientId}` : '/api/visits';
-        return fetchApi(endpoint);
+    async getVisits(patientId?: string, filters?: { date_from?: string; date_to?: string }): Promise<Visit[]> {
+        if (patientId) {
+            return fetchApi(`/api/visits/patient/${patientId}`);
+        }
+        const params = new URLSearchParams()
+        if (filters?.date_from) params.set('date_from', filters.date_from)
+        if (filters?.date_to) params.set('date_to', filters.date_to)
+        const qs = params.toString()
+        return fetchApi(`/api/visits${qs ? `?${qs}` : ''}`);
     },
 
     async getVisit(id: string): Promise<Visit> {

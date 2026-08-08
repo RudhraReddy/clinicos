@@ -88,10 +88,8 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 | `/` | `app/page.tsx` | frontdesk |
 | `/doctor` | `app/doctor/page.tsx` | doctor (auto-redirected from `/`) |
 | `/patients` | `app/patients/page.tsx` | all |
-| `/visits` | `app/visits/page.tsx` | frontdesk |
 | `/billing` | `app/billing/page.tsx` | frontdesk |
 | `/inventory` | `app/inventory/page.tsx` | all |
-| `/inventory/history` | `app/inventory/history/page.tsx` | frontdesk |
 | `/inventory/history/[id]` | `app/inventory/history/[id]/page.tsx` | frontdesk |
 | `/inventory/invoice_edit` | `app/inventory/invoice_edit/page.tsx` | frontdesk |
 | `/gallery` | `app/gallery/page.tsx` | doctor |
@@ -277,6 +275,8 @@ These three strings are passed as props at two call sites and are currently hard
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **`/visits` and `/inventory/history` Routes Removed, Dashboard Cleanup (2026-08-08):** Both list pages were fully superseded by earlier integrations (the "All Visits" tab in the Dashboard, and the "Invoices" tab in `/inventory`) and are now deleted: `app/visits/page.tsx`, `app/visits/[id]/page.tsx` (entire route), and `app/inventory/history/page.tsx` (list only — `app/inventory/history/[id]/page.tsx` is kept, still linked from Inventory's "Invoices" tab "View" button). Removed their `Sidebar.tsx` nav entries and `AppShell.tsx` inline-trigger route entries. Dashboard's "All Visits" tab (`VisitsTab.tsx`) had its redundant search box and "New Visit" button stripped (row click still opens `EditVisitDialog`). Dashboard header gained a right-aligned `DatePickerWithRange` date filter (single day or range) that scopes the "All Visits" tab only — the Overview tab's "Today's Visits" card always shows literally today, independent of the header filter. Backed by `GET /api/visits?date_from=&date_to=` (`get_all_visits` in `routes/visits.py`), which also raises its row cap from 50 → 1000 when a date filter is active.
 
 - **OCR Feature Removed (2026-07-25):** The Google Cloud Vision invoice-scanning feature has been fully removed. `UploadInventoryReportDialog.tsx`, the OCR helper functions in `routes/inventory.py`, and the legacy dead `ocr_cloud/`/`models/invoice_ocr.py`/`Backend_db/ocr_service.py` scanners have all been deleted. Manual entry (`/inventory/invoice_edit?manual=true`) is now the only way to add a purchase invoice; users can still attach a photo of the physical invoice via "Attach Image" or "Upload via QR" — the image is just stored, not parsed. `GOOGLE_CLOUD_API_KEY` should be removed from the Render dashboard manually (not tracked in `render.yaml`).
 

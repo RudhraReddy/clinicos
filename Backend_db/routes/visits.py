@@ -52,6 +52,8 @@ def create_visit():
 @require_auth
 def get_all_visits():
     created_by = request.args.get('created_by')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
 
     query = Visit.query.order_by(Visit.created_at.desc())
 
@@ -68,7 +70,27 @@ def get_all_visits():
                 return jsonify({'error': 'Staff not assigned to you'}), 403
         query = query.filter(Visit.created_by_user_id == created_by)
 
-    visits_list = query.limit(50).all()
+    if date_from:
+        try:
+            datetime.strptime(date_from, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date_from format, expected YYYY-MM-DD'}), 400
+        query = query.filter(func.date(Visit.visit_date) >= date_from)
+
+    if date_to:
+        try:
+            datetime.strptime(date_to, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date_to format, expected YYYY-MM-DD'}), 400
+        query = query.filter(func.date(Visit.visit_date) <= date_to)
+
+    # The default (unfiltered) list is capped to the 50 most recent visits;
+    # once a date filter is applied the caller wants that specific
+    # day/range in full, not just a recent slice of it.
+    if date_from or date_to:
+        visits_list = query.limit(1000).all()
+    else:
+        visits_list = query.limit(50).all()
 
     invoice_ids = [v.invoice_id for v in visits_list if v.invoice_id]
     bills_map = {}

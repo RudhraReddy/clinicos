@@ -14,6 +14,9 @@ import { WalkInForm } from "@/components/WalkInForm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
 import { api, type Visit } from "@/lib/api"
+import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
+import { format } from "date-fns"
 
 function formatTime(timeStr: string | null | undefined, createdAt?: string | null) {
     if (!timeStr) {
@@ -52,8 +55,16 @@ function formatUpdatedTime(updatedAtStr?: string, createdAtStr?: string) {
 
 
 export default function Dashboard() {
+    // Always-unfiltered, always-recent — feeds the Overview tab's "Today's Visits" card.
     const [visits, setVisits] = useState<Visit[]>([])
     const [loading, setLoading] = useState(true)
+
+    // Date-filterable — feeds the "All Visits" tab only. Defaults to the same
+    // unfiltered list until a date/range is picked in the header.
+    const [dateRange, setDateRange] = useState<DateRange | undefined>()
+    const [filteredVisits, setFilteredVisits] = useState<Visit[]>([])
+    const [filteredLoading, setFilteredLoading] = useState(true)
+
     const [editVisitOpen, setEditVisitOpen] = useState(false)
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
 
@@ -64,6 +75,9 @@ export default function Dashboard() {
     useEffect(() => {
         if (!isLoading && role === 'doctor') router.push('/doctor')
     }, [role, isLoading, router])
+
+    const filterDateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
+    const filterDateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
 
     const fetchVisits = async () => {
         try {
@@ -77,7 +91,27 @@ export default function Dashboard() {
         }
     }
 
+    const fetchFilteredVisits = async () => {
+        try {
+            setFilteredLoading(true)
+            const all = await api.getVisits(undefined, filterDateFrom || filterDateTo
+                ? { date_from: filterDateFrom || undefined, date_to: filterDateTo || undefined }
+                : undefined)
+            setFilteredVisits(all.filter(v => v.status !== 'deleted'))
+        } catch (err) {
+            console.error("Failed to fetch visits:", err)
+        } finally {
+            setFilteredLoading(false)
+        }
+    }
+
     useEffect(() => { fetchVisits() }, [])
+    useEffect(() => { fetchFilteredVisits() }, [filterDateFrom, filterDateTo])
+
+    const refreshAll = () => {
+        fetchVisits()
+        fetchFilteredVisits()
+    }
 
     if (isLoading || role === 'doctor') {
         return (
@@ -98,14 +132,14 @@ export default function Dashboard() {
         if (!confirm("Delete this visit?")) return
         try {
             await api.updateVisit(visitId, { status: 'deleted' })
-            fetchVisits()
+            refreshAll()
         } catch { /* silent */ }
     }
 
     const handleMarkDone = async (visitId: string) => {
         try {
             await api.updateVisit(visitId, { status: 'done' })
-            fetchVisits()
+            refreshAll()
         } catch { /* silent */ }
     }
 
@@ -246,13 +280,21 @@ export default function Dashboard() {
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="visits">All Visits</TabsTrigger>
                     </TabsList>
+                    <div className="ml-auto">
+                        <DatePickerWithRange
+                            date={dateRange}
+                            setDate={setDateRange}
+                            placeholder="Filter by date"
+                            className="w-auto"
+                        />
+                    </div>
                 </div>
 
                 <TabsContent value="overview" className="flex-1 overflow-hidden m-0">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                         {/* Left 2/3: Walk-in form */}
                         <div className="lg:col-span-2 h-full overflow-hidden">
-                            <WalkInForm onSuccess={fetchVisits} />
+                            <WalkInForm onSuccess={refreshAll} />
                         </div>
                         {/* Right 1/3: Today's list */}
                         <div className="lg:col-span-1 h-full flex flex-col gap-6 pr-1 overflow-hidden">
@@ -262,7 +304,7 @@ export default function Dashboard() {
                 </TabsContent>
 
                 <TabsContent value="visits" className="h-[calc(100%-40px)] m-0">
-                    <VisitsTab visits={visits} loading={loading} onRefresh={fetchVisits} />
+                    <VisitsTab visits={filteredVisits} loading={filteredLoading} onRefresh={refreshAll} />
                 </TabsContent>
             </Tabs>
 
@@ -270,7 +312,7 @@ export default function Dashboard() {
                 open={editVisitOpen}
                 onOpenChange={setEditVisitOpen}
                 visit={selectedVisit}
-                onSuccess={fetchVisits}
+                onSuccess={refreshAll}
             />
         </div>
     )

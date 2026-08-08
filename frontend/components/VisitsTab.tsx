@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
@@ -12,9 +11,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Calendar, Loader2, Search } from "lucide-react"
-import { type Visit, api } from "@/lib/api"
-import { AddVisitDialog } from "@/components/AddVisitDialog"
+import { Calendar, Loader2 } from "lucide-react"
+import { type Visit } from "@/lib/api"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
 
 interface VisitsTabProps {
@@ -24,24 +22,8 @@ interface VisitsTabProps {
 }
 
 export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
-    const [searchQuery, setSearchQuery] = useState("")
-    const [addDialogOpen, setAddDialogOpen] = useState(false)
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
-
-    // Derived state for filtered visits
-    const filteredVisits = useMemo(() => {
-        if (!searchQuery.trim()) return visits;
-
-        const query = searchQuery.toLowerCase();
-        return visits.filter(v =>
-            v.patient_name.toLowerCase().includes(query) ||
-            v.visit_id.toLowerCase().includes(query) ||
-            v.reason?.toLowerCase().includes(query) ||
-            v.status.toLowerCase().includes(query) ||
-            (v.phone_number && v.phone_number.includes(query))
-        );
-    }, [visits, searchQuery]);
 
     const formatTime = (timeStr: string | null | undefined, createdAt?: string | null) => {
         if (!timeStr) {
@@ -68,11 +50,6 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
         }
     }
 
-    const handleVisitCreated = () => {
-        setAddDialogOpen(false)
-        onRefresh()
-    }
-
     const handleVisitUpdated = () => {
         setEditDialogOpen(false)
         setSelectedVisit(null)
@@ -86,41 +63,16 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="relative w-72">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search visits..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8"
-                    />
-                </div>
-
-                <AddVisitDialog
-                    open={addDialogOpen}
-                    onOpenChange={setAddDialogOpen}
-                    onSuccess={handleVisitCreated}
-                    trigger={
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Visit
-                        </Button>
-                    }
-                />
-            </div>
-
             <Card>
                 <CardContent className="p-0">
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
-                    ) : filteredVisits.length === 0 ? (
+                    ) : visits.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                             <p>No visits found</p>
-                            {searchQuery && <p className="text-sm mt-1">Try adjusting your search</p>}
                         </div>
                     ) : (
                         <Table>
@@ -135,7 +87,7 @@ export function VisitsTab({ visits, loading, onRefresh }: VisitsTabProps) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredVisits.map((visit) => (
+                                {visits.map((visit) => (
                                     <TableRow
                                         key={visit.visit_id}
                                         className="cursor-pointer hover:bg-muted/50"
