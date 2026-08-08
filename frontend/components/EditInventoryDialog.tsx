@@ -77,7 +77,8 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
         gst_rate: item.gst_rate || 5,
         vendors: (item.vendors || []).join(', '),
         pack_size: item.pack_size || '',
-        formula: item.formula || ''
+        formula: item.formula || '',
+        rack_location: item.rack_location || ''
     })
 
     useEffect(() => {
@@ -91,7 +92,8 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                 gst_rate: item.gst_rate || 5,
                 vendors: (item.vendors || []).join(', '),
                 pack_size: item.pack_size || '',
-                formula: item.formula || ''
+                formula: item.formula || '',
+                rack_location: item.rack_location || ''
             })
             setIsCustomMinStock(item.min_stock_override ?? true)
         }
@@ -254,6 +256,16 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                     onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
                                     className="col-span-3"
                                     placeholder="Active chemical formula"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="rack_location" className="text-right">Rack Location</Label>
+                                <Input
+                                    id="rack_location"
+                                    value={formData.rack_location}
+                                    onChange={(e) => setFormData({ ...formData, rack_location: e.target.value })}
+                                    className="col-span-3"
+                                    placeholder="e.g. C2, H1"
                                 />
                             </div>
                         </div>
