@@ -235,6 +235,11 @@ def get_bill_details(invoice_id):
     patient = Patient.query.get(bill.patient_id)
     items = BillItem.query.filter_by(bill_id=invoice_id).all()
 
+    reference_name = None
+    if patient and patient.reference_patient_id:
+        ref_patient = Patient.query.get(patient.reference_patient_id)
+        reference_name = ref_patient.name if ref_patient else None
+
     # Bulk-load ProductMaster rows for O(1) lookup in the loop
     product_ids = [i.product_id for i in items if i.product_id]
     products_map = {}
@@ -267,7 +272,7 @@ def get_bill_details(invoice_id):
             'id': bill.patient_id,
             'age': patient.age if patient else None,
             'sex': patient.sex if patient else None,
-            'reference': patient.reference if patient else None,
+            'reference': reference_name,
         },
         'payment_type': bill.payment_type,
         'total_amount': float(bill.total_amount),
