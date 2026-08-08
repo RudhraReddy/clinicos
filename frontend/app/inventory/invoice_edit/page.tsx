@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Trash2, Plus, Save, ArrowLeft, Check, AlertCircle, Smartphone, Menu, Loader2 } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
-import { api, API_BASE_URL, InventoryItem } from "@/lib/api"
+import { api, API_BASE_URL, InventoryItem, type Location } from "@/lib/api"
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn, getTodayIST } from "@/lib/utils"
+import { useAuth } from "@/lib/auth_context"
 // import { ImagePreviewDialog } from "@/components/ImagePreviewDialog" // Actually I'll let the user add it or I add it separately to be safe with line numbers
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
@@ -39,6 +41,7 @@ interface ProductRow {
 
 export default function InvoiceEditPage() {
     const { openMenu } = useMenu()
+    const { user } = useAuth()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [viewImage, setViewImage] = useState(false)
@@ -50,6 +53,9 @@ export default function InvoiceEditPage() {
     const [gstNo, setGstNo] = useState("")
     const [totalAmount, setTotalAmount] = useState("")
     const [vendorName, setVendorName] = useState("")
+    const [invoiceDate, setInvoiceDate] = useState(getTodayIST())
+    const [locationId, setLocationId] = useState<string>("")
+    const [locations, setLocations] = useState<Location[]>([])
 
     // Rows
     const [rows, setRows] = useState<ProductRow[]>([])
@@ -58,6 +64,14 @@ export default function InvoiceEditPage() {
     const [inventory, setInventory] = useState<InventoryItem[]>([])
 
     const [imagePath, setImagePath] = useState("")
+
+    useEffect(() => {
+        api.getLocations().then(locs => setLocations(locs.filter(l => l.is_active))).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (user?.location_id) setLocationId(user.location_id.toString())
+    }, [user])
 
     useEffect(() => {
         const load = async () => {
@@ -179,6 +193,8 @@ export default function InvoiceEditPage() {
                 gst_number: gstNo,
                 total_amount: totalAmount,
                 vendor_name: vendorName,
+                invoice_date: invoiceDate,
+                location_id: locationId || undefined,
                 image_path: imagePath,
                 product_details: rows
             }
@@ -335,7 +351,7 @@ export default function InvoiceEditPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 border rounded-lg bg-card">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 p-6 border rounded-lg bg-card">
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Vendor Name</label>
                     <Input value={vendorName} onChange={e => setVendorName(e.target.value)} />
@@ -343,6 +359,23 @@ export default function InvoiceEditPage() {
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Invoice Number</label>
                     <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Invoice Date</label>
+                    <Input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Clinic</label>
+                    <Select value={locationId} onValueChange={setLocationId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select clinic..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {locations.map(loc => (
+                                <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium">GST Number</label>
