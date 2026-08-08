@@ -177,6 +177,7 @@ export default function InvoiceEditPage() {
                         mfg: match.item.manufacturer || row.mfg,
                         pack: match.item.pack_size || row.pack,
                         hsn: match.item.hsn_code || row.hsn,
+                        formula: match.item.formula || row.formula,
                         gst: match.item.gst_rate != null ? match.item.gst_rate.toString() : row.gst
                     }
                 }
@@ -222,8 +223,11 @@ export default function InvoiceEditPage() {
         const newRows = [...rows]
         newRows[index] = { ...newRows[index], [field]: value }
 
-        // If product name changes typing, clear matched_id unless user selects from dropdown
-        if (field === 'product_name') {
+        // If product name changes typing, clear matched_id unless user selects from dropdown.
+        // Same for pack size — a different pack on an otherwise-matched product is a
+        // different dose, i.e. a different item, so it needs its own catalog entry
+        // instead of silently reusing the originally-matched product's record.
+        if (field === 'product_name' || field === 'pack') {
             newRows[index].matched_id = undefined
             newRows[index].match_type = undefined
         }
@@ -241,6 +245,7 @@ export default function InvoiceEditPage() {
                 category: item.category || "Medicine",
                 pack: item.pack_size || "",
                 hsn: item.hsn_code || "",
+                formula: item.formula || "",
                 gst: item.gst_rate != null ? item.gst_rate.toString() : "",
                 mrp: item.price != null ? item.price.toString() : newRows[index].mrp,
                 matched_id: item.id,
