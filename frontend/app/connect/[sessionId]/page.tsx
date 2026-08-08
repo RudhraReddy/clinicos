@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, Upload, X, CheckCircle2, Image as ImageIcon } from "lucide-react"
@@ -24,6 +25,7 @@ export default function MobileUploadPage() {
     // Form State
     const [files, setFiles] = useState<File[]>([])
     const [notes, setNotes] = useState("")
+    const [tag, setTag] = useState<'Images' | 'Prescription'>('Prescription')
 
     useEffect(() => {
         checkSession()
@@ -61,7 +63,8 @@ export default function MobileUploadPage() {
 
         setSubmitting(true)
         try {
-            await api.uploadMobileFiles(sessionId, files, [], notes)
+            const tags = contextType === 'inventory' ? [] : files.map(() => tag)
+            await api.uploadMobileFiles(sessionId, files, tags, notes)
             setSuccess(true)
             setFiles([])
             setNotes("")
@@ -157,12 +160,26 @@ export default function MobileUploadPage() {
                 <CardHeader className="pb-3">
                     <CardTitle className="text-base">Additional Notes</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
                     <Textarea
                         placeholder="Add any notes for these files..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                     />
+                    {contextType !== 'inventory' && (
+                        <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Tag</Label>
+                            <Select value={tag} onValueChange={(val) => setTag(val as 'Images' | 'Prescription')}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Prescription">Prescription</SelectItem>
+                                    <SelectItem value="Images">Images</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

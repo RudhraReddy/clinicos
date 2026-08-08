@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone, Menu, Package, CreditCard, Users } from 'lucide-react'
+import { Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Trash2, X, Stethoscope, FileText, ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Download, Printer, Edit, ExternalLink, AlertCircle, CheckCircle2, XCircle, Loader2, Upload, Paperclip, Eye, Save, RotateCcw, ZoomIn, ZoomOut, Edit2, Columns, LayoutGrid, List as ListIcon, Maximize2, Minimize2, Calendar, Image as ImageIcon, User, Smartphone, Menu, Package, CreditCard, Users } from 'lucide-react'
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
@@ -9,12 +9,10 @@ import { getTodayIST, orderTodayVisits, cn } from "@/lib/utils"
 import { useState, useEffect, useMemo } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { useMenu } from "@/components/layout/AppShell"
 
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
 export default function DoctorDashboard() {
@@ -86,74 +84,8 @@ export default function DoctorDashboard() {
         }
     }, [selectedVisitId, selectedVisit?.visit_id, selectedVisit?.patient_id, refreshTrigger])
 
-    // Image Dialog State
-    const [uploadFiles, setUploadFiles] = useState<{ file: File, preview: string }[]>([])
-    const [uploadNotes, setUploadNotes] = useState("")
-    const [uploading, setUploading] = useState(false)
-
     // Lightbox State: holds the current image AND the list of images to navigate through
     const [lightboxState, setLightboxState] = useState<{ image: any, context: any[] } | null>(null)
-
-    // Handle File Selection -> Show Preview Dialog
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files
-        if (!files || files.length === 0) return
-
-        const fileArray = Array.from(files)
-        const readAsDataURL = (file: File) => new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.readAsDataURL(file)
-        })
-        const previews = await Promise.all(fileArray.map(readAsDataURL))
-        setUploadFiles(prev => [...prev, ...fileArray.map((file, i) => ({ file, preview: previews[i] }))])
-    }
-
-    const removeUploadFile = (index: number) => {
-        setUploadFiles(prev => prev.filter((_, i) => i !== index))
-    }
-
-    const confirmUpload = async () => {
-        if (uploadFiles.length === 0 || !selectedVisitId || !selectedVisit) return
-
-        setUploading(true)
-        let successCount = 0
-        let failCount = 0
-        for (const { file } of uploadFiles) {
-            try {
-                await api.uploadPatientImage(selectedVisit.patient_id, file, selectedVisitId, uploadNotes)
-                successCount++
-            } catch (error) {
-                console.error(error)
-                failCount++
-            }
-        }
-        setUploading(false)
-
-        if (successCount > 0) {
-            const imgs = await api.getPatientImages(selectedVisit.patient_id)
-            setPatientImages(imgs)
-        }
-
-        if (failCount === 0) {
-            toast.success(successCount === 1 ? "Image uploaded" : `${successCount} images uploaded`)
-        } else {
-            toast.error(`${successCount} uploaded, ${failCount} failed`)
-        }
-
-        clearUpload()
-    }
-
-    const clearUpload = () => {
-        setUploadFiles([])
-        setUploadNotes("")
-        // Reset input value if possible, but difficult with hidden input.
-        // We can just rely on the key prop or replace input.
-        const input = document.getElementById('image-upload-input') as HTMLInputElement
-        if (input) input.value = ''
-    }
-
-
 
     // QR Upload State
     const [showQR, setShowQR] = useState(false)
@@ -310,14 +242,6 @@ export default function DoctorDashboard() {
 
     return (
         <div>
-            <input
-                id="image-upload-input"
-                type="file"
-                accept="image/*"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleImageUpload}
-            />
             {/* ── MOBILE LAYOUT (hidden md+) ── */}
             <div className="md:hidden flex flex-col">
 
@@ -396,22 +320,13 @@ export default function DoctorDashboard() {
                             </span>
                             <div className="flex items-center gap-1">
                                 {!showTrash && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={() => document.getElementById('image-upload-input')?.click()}
-                                            className="text-[10px] font-semibold px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-                                        >
-                                            + Add
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowQR(true)}
-                                            className="text-[10px] font-semibold px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
-                                        >
-                                            QR
-                                        </button>
-                                    </>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowQR(true)}
+                                        className="text-[10px] font-semibold px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                                    >
+                                        QR
+                                    </button>
                                 )}
                                 <button
                                     type="button"
@@ -587,22 +502,13 @@ export default function DoctorDashboard() {
                                         </CardTitle>
                                         <div className="flex gap-2">
                                             {!showTrash && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => document.getElementById('image-upload-input')?.click()}
-                                                        className="cursor-pointer bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
-                                                    >
-                                                        <Plus className="h-3 w-3" /> Add Image
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowQR(true)}
-                                                        className="cursor-pointer bg-secondary/50 hover:bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
-                                                    >
-                                                        <Smartphone className="h-3 w-3" /> Upload via QR
-                                                    </button>
-                                                </>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowQR(true)}
+                                                    className="cursor-pointer bg-secondary/50 hover:bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
+                                                >
+                                                    <Smartphone className="h-3 w-3" /> Upload via QR
+                                                </button>
                                             )}
                                             <button
                                                 type="button"
@@ -880,58 +786,6 @@ export default function DoctorDashboard() {
                                         </div>
                                     </div>
                                 </Card>
-
-                                {/* Upload Preview Dialog */}
-                                <Dialog open={uploadFiles.length > 0} onOpenChange={(open) => !open && clearUpload()}>
-                                    <DialogContent className="max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                Upload Patient Image{uploadFiles.length > 1 ? `s (${uploadFiles.length})` : ''}
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                                                {uploadFiles.map((entry, i) => (
-                                                    <div key={i} className="group aspect-square relative rounded-md overflow-hidden bg-muted border">
-                                                        <img src={entry.preview} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeUploadFile(i)}
-                                                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            title="Remove"
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => document.getElementById('image-upload-input')?.click()}
-                                                    className="aspect-square rounded-md border border-dashed flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-                                                    title="Add more images"
-                                                >
-                                                    <Plus className="h-5 w-5" />
-                                                </button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Notes (Optional)</label>
-                                                <Textarea
-                                                    placeholder="Add clinical notes about this image..."
-                                                    value={uploadNotes}
-                                                    onChange={(e) => setUploadNotes(e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="outline" onClick={clearUpload} disabled={uploading}>Cancel</Button>
-                                                <Button onClick={confirmUpload} disabled={uploading}>
-                                                    {uploading
-                                                        ? "Uploading..."
-                                                        : uploadFiles.length > 1 ? `Upload ${uploadFiles.length} Images` : "Upload Image"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
 
                                 {/* QR Upload Dialog */}
                                 {selectedVisit && (

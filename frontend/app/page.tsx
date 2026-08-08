@@ -1,10 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu, Plus, X, Image as ImageIcon, Smartphone } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { getTodayIST, orderTodayVisits } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -13,11 +11,9 @@ import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
-import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
 import { api, type Visit } from "@/lib/api"
-import { toast } from "sonner"
 
 function formatTime(timeStr: string | null | undefined, createdAt?: string | null) {
     if (!timeStr) {
@@ -60,13 +56,6 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true)
     const [editVisitOpen, setEditVisitOpen] = useState(false)
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
-
-    // Image upload dialog state
-    const [uploadTargetVisit, setUploadTargetVisit] = useState<Visit | null>(null)
-    const [uploadFiles, setUploadFiles] = useState<{ file: File, preview: string }[]>([])
-    const [uploadNotes, setUploadNotes] = useState("")
-    const [uploading, setUploading] = useState(false)
-    const [showQR, setShowQR] = useState(false)
 
     const { role, isLoading } = useAuth()
     const router = useRouter()
@@ -124,58 +113,6 @@ export default function Dashboard() {
         router.push(`/billing?patient_id=${visit.patient_id}`)
     }
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files
-        if (!files || files.length === 0) return
-
-        const fileArray = Array.from(files)
-        const readAsDataURL = (file: File) => new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.readAsDataURL(file)
-        })
-        const previews = await Promise.all(fileArray.map(readAsDataURL))
-        setUploadFiles(prev => [...prev, ...fileArray.map((file, i) => ({ file, preview: previews[i] }))])
-        e.target.value = ''
-    }
-
-    const removeUploadFile = (index: number) => {
-        setUploadFiles(prev => prev.filter((_, i) => i !== index))
-    }
-
-    const clearUpload = () => {
-        setUploadTargetVisit(null)
-        setUploadFiles([])
-        setUploadNotes("")
-        setShowQR(false)
-    }
-
-    const confirmUpload = async () => {
-        if (uploadFiles.length === 0 || !uploadTargetVisit) return
-
-        setUploading(true)
-        let successCount = 0
-        let failCount = 0
-        for (const { file } of uploadFiles) {
-            try {
-                await api.uploadPatientImage(uploadTargetVisit.patient_id, file, uploadTargetVisit.visit_id, uploadNotes)
-                successCount++
-            } catch (error) {
-                console.error(error)
-                failCount++
-            }
-        }
-        setUploading(false)
-
-        if (failCount === 0) {
-            toast.success(successCount === 1 ? "Image uploaded" : `${successCount} images uploaded`)
-        } else {
-            toast.error(`${successCount} uploaded, ${failCount} failed`)
-        }
-
-        clearUpload()
-    }
-
     const renderVisitCard = (visit: Visit) => (
         <div
             key={visit.visit_id}
@@ -220,14 +157,6 @@ export default function Dashboard() {
                         title="Go to Billing"
                     >
                         <CreditCard className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                        variant="ghost" size="icon"
-                        className="h-7 w-7 rounded-md hover:bg-purple-100 hover:text-purple-600 dark:hover:bg-purple-500/20"
-                        onClick={() => setUploadTargetVisit(visit)}
-                        title="Add images"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                         variant="ghost" size="icon"
@@ -343,81 +272,6 @@ export default function Dashboard() {
                 visit={selectedVisit}
                 onSuccess={fetchVisits}
             />
-
-            <input
-                id="dashboard-image-upload-input"
-                type="file"
-                accept="image/*"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleImageUpload}
-            />
-
-            <Dialog open={!!uploadTargetVisit} onOpenChange={(open) => !open && clearUpload()}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Upload Images{uploadFiles.length > 1 ? ` (${uploadFiles.length})` : ''}
-                            {uploadTargetVisit ? ` — ${uploadTargetVisit.patient_name}` : ''}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => setShowQR(true)}>
-                            <Smartphone className="mr-2 h-3.5 w-3.5" />
-                            Upload via QR
-                        </Button>
-                        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
-                            {uploadFiles.map((entry, i) => (
-                                <div key={i} className="group aspect-square relative rounded-md overflow-hidden bg-muted border">
-                                    <img src={entry.preview} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeUploadFile(i)}
-                                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Remove"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() => document.getElementById('dashboard-image-upload-input')?.click()}
-                                className="aspect-square rounded-md border border-dashed flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-                                title="Add more images"
-                            >
-                                {uploadFiles.length === 0 ? <ImageIcon className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                            </button>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Notes (Optional)</label>
-                            <Textarea
-                                placeholder="Add clinical notes about this image..."
-                                value={uploadNotes}
-                                onChange={(e) => setUploadNotes(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={clearUpload} disabled={uploading}>Cancel</Button>
-                            <Button onClick={confirmUpload} disabled={uploading || uploadFiles.length === 0}>
-                                {uploading
-                                    ? "Uploading..."
-                                    : uploadFiles.length > 1 ? `Upload ${uploadFiles.length} Images` : "Upload Image"}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {uploadTargetVisit && (
-                <QRCodeUpload
-                    open={showQR}
-                    onOpenChange={setShowQR}
-                    contextType="patient"
-                    contextId={uploadTargetVisit.patient_id}
-                    onSuccess={() => toast.success("Images uploaded via QR")}
-                />
-            )}
         </div>
     )
 }
