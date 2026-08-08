@@ -36,6 +36,7 @@ interface ProductRow {
     gst: string // New (was missing in interface but used in backend?)
     category: string
     formula: string
+    rack_location: string
     match_type?: 'exact' | 'partial'
 }
 
@@ -89,7 +90,7 @@ export default function InvoiceEditPage() {
 
             if (isManual) {
                 // Initialize with one empty row
-                setRows([{ product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "" }])
+                setRows([{ product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "", rack_location: "" }])
                 setLoading(false)
                 return
             }
@@ -119,7 +120,8 @@ export default function InvoiceEditPage() {
                         hsn: p.hsn || "",
                         gst: p.gst || "",
                         category: p.category || "Medicine",
-                        formula: p.formula || ""
+                        formula: p.formula || "",
+                        rack_location: p.rack_location || ""
                     }))
 
                     setRows(products)
@@ -178,6 +180,7 @@ export default function InvoiceEditPage() {
                         pack: match.item.pack_size || row.pack,
                         hsn: match.item.hsn_code || row.hsn,
                         formula: match.item.formula || row.formula,
+                        rack_location: match.item.rack_location || row.rack_location,
                         gst: match.item.gst_rate != null ? match.item.gst_rate.toString() : row.gst
                     }
                 }
@@ -246,6 +249,7 @@ export default function InvoiceEditPage() {
                 pack: item.pack_size || "",
                 hsn: item.hsn_code || "",
                 formula: item.formula || "",
+                rack_location: item.rack_location || "",
                 gst: item.gst_rate != null ? item.gst_rate.toString() : "",
                 mrp: item.price != null ? item.price.toString() : newRows[index].mrp,
                 matched_id: item.id,
@@ -270,7 +274,7 @@ export default function InvoiceEditPage() {
     }
 
     const addRow = () => {
-        setRows([...rows, { product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "" }])
+        setRows([...rows, { product_name: "", batch: "", expiry: "", mrp: "", rate: "", qty: "", free: "0", mfg: "", pack: "", hsn: "", gst: "", category: "Medicine", formula: "", rack_location: "" }])
     }
 
     const deleteRow = (index: number) => {
@@ -424,6 +428,7 @@ export default function InvoiceEditPage() {
                                 <TableHead className="px-2 py-1.5">Qty</TableHead>
                                 <TableHead className="px-2 py-1.5">Free</TableHead>
                                 <TableHead className="px-2 py-1.5">Formula</TableHead>
+                                <TableHead className="px-2 py-1.5">Rack</TableHead>
                                 {/* <TableHead className="px-2 py-1.5">Amount</TableHead> */}
                                 <TableHead className="w-[50px] px-2 py-1.5"></TableHead>
                             </TableRow>
@@ -456,6 +461,7 @@ export default function InvoiceEditPage() {
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.qty} onChange={e => updateRow(i, 'qty', e.target.value)} /></TableCell>
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.free} onChange={e => updateRow(i, 'free', e.target.value)} /></TableCell>
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. Tab 500mg" value={row.formula} onChange={e => updateRow(i, 'formula', e.target.value)} /></TableCell>
+                                    <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. C2, H1" value={row.rack_location} onChange={e => updateRow(i, 'rack_location', e.target.value)} /></TableCell>
                                     {/* <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.amount} onChange={e => updateRow(i, 'amount', e.target.value)} /></TableCell> */}
                                     <TableCell className="text-center">
                                         <Button variant="ghost" size="sm" onClick={() => deleteRow(i)}>
@@ -538,6 +544,12 @@ export default function InvoiceEditPage() {
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Formula</label>
                                     <Input className="h-9" placeholder="e.g. Tab 500mg" value={row.formula} onChange={e => updateRow(i, 'formula', e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-muted-foreground">Rack Location</label>
+                                    <Input className="h-9" placeholder="e.g. C2, H1" value={row.rack_location} onChange={e => updateRow(i, 'rack_location', e.target.value)} />
                                 </div>
                             </div>
                         </div>
