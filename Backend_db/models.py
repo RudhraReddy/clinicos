@@ -76,6 +76,8 @@ class ProductMaster(db.Model):
     generic_tags = db.Column(db.Text) # Comma Separated
     # NOTE: New column — run ALTER TABLE product_master ADD COLUMN formula TEXT; in production
     formula = db.Column(db.Text, nullable=True)
+    # Physical rack/shelf position (e.g. "C2", "H1") — NOT the clinic-branch Location.
+    rack_location = db.Column(db.String(50), nullable=True)
     created_by_user_id = db.Column(db.String(36), nullable=True)
 
     # Relationships

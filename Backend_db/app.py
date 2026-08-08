@@ -62,6 +62,8 @@ def _apply_migrations(db):
         # 2026-08-08: standalone walk-in bills — not linked to any patient/visit
         "ALTER TABLE bills ALTER COLUMN patient_id DROP NOT NULL",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_name VARCHAR(100)",
+        # 2026-08-08: rack/shelf location string on product_master (distinct from clinic Location)
+        "ALTER TABLE product_master ADD COLUMN IF NOT EXISTS rack_location VARCHAR(50)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
