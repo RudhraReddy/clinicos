@@ -1,0 +1,20 @@
+Header,Section,Description,Required for Import,Default if Blank,Notes
+Product ID,Product,Unique 6-character hex code identifying the product (e.g. A1B2C3),Optional,Auto-generated,Leave blank for new products. Fill only to update an existing product or preserve a specific ID on re-import.
+Item Name,Product,Name of the drug or product,MANDATORY,—,Row is silently skipped if this is missing.
+Pack Size,Product,"How the product is packaged (e.g. 10s, 1x10, 100ml)",Recommended,blank,Drives the unit/pack price split in billing. Also used to distinguish two products with the same name.
+Category,Product,"Grouping label (e.g. Tablet, Syrup, Injection)",Optional,blank,
+HSN Code,Product,Harmonised System of Nomenclature code used for GST invoicing,Optional,blank,Required if you need GST-compliant purchase invoices.
+Min Stock,Product,Qty threshold below which the product is flagged as LOW STOCK,Optional,10,
+Manufacturer,Product,Name of the drug manufacturer,Optional,blank,
+Product GST Rate,Product,GST percentage defined at the product catalog level (e.g. 12.00),Optional,0,
+Generic Tags,Product,Comma-separated generic names or search aliases for the product,Optional,blank,
+Formula,Product,Active ingredient or chemical composition,Optional,blank,
+Batch Number,Batch,Vendor batch number printed on the physical box,Recommended,blank,Without this re-importing later cannot match the batch in place and will create a duplicate.
+Expiry Date,Batch,Expiry date of this specific batch in MM/YY format (e.g. 06/27),Recommended,null (no expiry),Without this expiry alerts and FIFO stock deduction ordering will not work correctly.
+MRP,Batch,Maximum Retail Price per pack — what the patient is charged,Recommended,0,Billing will show 0 if left blank. For ea (per-unit) billing this is divided by the pack multiplier.
+Purchase Rate,Batch,Cost price paid to the supplier per unit,Optional,0,Used for profit/margin tracking. Not shown to patients.
+Batch GST Rate,Batch,GST percentage actually applied on this batch at time of purchase,Optional,0,May differ from Product GST Rate if the supplier invoice used a different rate.
+GST Amount,Batch,Total tax amount paid for the full batch quantity,IGNORED ON IMPORT,—,Export-only field. The system does not read this back. You can leave it blank or delete the column entirely.
+Quantity,Batch,Current stock available for this batch,MANDATORY,—,"In update mode rows with qty 0 or blank are skipped. In overwrite mode qty 0 creates no stock. For new products, this becomes the opening stock."
+Initial Quantity,Batch,Stock count at the time this batch was first received,Optional,Same as Quantity,Only differs from Quantity if some stock has already been consumed.
+Free Quantity,Batch,"Bonus/free units included in this batch (e.g. buy 100 get 10 free)",Optional,0,
