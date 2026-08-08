@@ -144,7 +144,7 @@ export default function PatientsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm h-9">
+                    <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm">
                         <Download className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                         Export Registry
                     </Button>
@@ -158,7 +158,7 @@ export default function PatientsPage() {
                             onChange={handleImport}
                             disabled={importing}
                         />
-                        <Button variant="outline" size="sm" asChild className="shadow-sm h-9" disabled={importing}>
+                        <Button variant="outline" size="sm" asChild className="shadow-sm" disabled={importing}>
                             <label htmlFor="bulk-import-csv" className="cursor-pointer flex items-center text-sm">
                                 {importing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5 text-muted-foreground" />}
                                 {importing ? 'Loading...' : 'Import List'}
@@ -168,7 +168,7 @@ export default function PatientsPage() {
 
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="shadow-sm h-9">
+                            <Button variant="outline" size="sm" className="shadow-sm">
                                 <Columns className="mr-1.5 h-3.5 w-3.5" />
                                 Columns
                             </Button>
@@ -202,7 +202,7 @@ export default function PatientsPage() {
                             loadData()
                         }}
                         trigger={
-                            <Button className="shadow-sm h-9" size="sm">
+                            <Button className="shadow-sm" size="sm">
                                 <UserPlus className="mr-2 h-4 w-4" />
                                 New Patient
                             </Button>

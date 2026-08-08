@@ -609,36 +609,6 @@ export default function InventoryPage() {
                     </div>
                 </div>
 
-                {locations.length > 0 && (
-                    <div className="flex gap-2 flex-wrap shrink-0">
-                        <button
-                            onClick={() => setActiveLocationId('all')}
-                            className={cn(
-                                "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                                activeLocationId === 'all'
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            )}
-                        >
-                            All Locations
-                        </button>
-                        {locations.map(loc => (
-                            <button
-                                key={loc.id}
-                                onClick={() => setActiveLocationId(loc.id)}
-                                className={cn(
-                                    "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
-                                    activeLocationId === loc.id
-                                        ? "bg-primary text-primary-foreground"
-                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                )}
-                            >
-                                {loc.name}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
                 <TabsContent value="all-changes" className="flex-1 overflow-y-auto m-0">
                     <AllChangesPanel />
                 </TabsContent>
@@ -681,7 +651,37 @@ export default function InventoryPage() {
             <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between space-y-0 pb-4 shrink-0">
                     <CardTitle className="text-lg font-medium">Inventory List ({filteredInventory.length})</CardTitle>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Location switcher */}
+                        {locations.length > 0 && (
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={() => setActiveLocationId('all')}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                        activeLocationId === 'all'
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                    )}
+                                >
+                                    All Locations
+                                </button>
+                                {locations.map(loc => (
+                                    <button
+                                        key={loc.id}
+                                        onClick={() => setActiveLocationId(loc.id)}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                                            activeLocationId === loc.id
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                        )}
+                                    >
+                                        {loc.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         {/* Quick Search */}
                         <div className="relative w-64">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
