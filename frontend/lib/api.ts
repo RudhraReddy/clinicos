@@ -69,6 +69,7 @@ export interface InventoryItem {
     hsn_code?: string;
     gst_rate?: number;
     formula?: string;
+    rack_location?: string;
 }
 
 export interface CreateVisitData {
@@ -91,6 +92,7 @@ export interface InventorySearchResult {
     gst_rate: number;
     vendors?: string[];
     formula?: string | null;
+    rack_location?: string | null;
     total_qty: number;
     price: number;
     pack_size?: string;
