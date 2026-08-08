@@ -12,6 +12,7 @@ export const ALL_INVENTORY_COLUMNS = [
     { id: 'vendor',          label: 'Vendor',       required: false },
     { id: 'pack_size',       label: 'Pack',         required: false },
     { id: 'category',        label: 'Category',     required: false },
+    { id: 'rack_location',   label: 'Rack',         required: false },
     { id: 'total_value',     label: 'Total Value',  required: false },
     { id: 'id',              label: 'ID',           required: false },
     { id: 'hsn_code',        label: 'HSN',          required: false },

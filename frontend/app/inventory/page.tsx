@@ -621,6 +621,7 @@ export default function InventoryPage() {
     const [filterMfg, setFilterMfg] = useState<Set<string>>(new Set())
     const [filterVendor, setFilterVendor] = useState<Set<string>>(new Set())
     const [filterCategory, setFilterCategory] = useState<Set<string>>(new Set())
+    const [filterRackLocation, setFilterRackLocation] = useState<Set<string>>(new Set())
     const [filterStatus, setFilterStatus] = useState<Set<string>>(new Set())
 
     // Additional Filters
@@ -736,6 +737,7 @@ export default function InventoryPage() {
     const optionsMfg = Array.from(new Set(inventory.map(i => i.manufacturer || "")) as Set<string>).filter(Boolean).sort()
     const optionsVendor = Array.from(new Set(inventory.flatMap(i => i.vendors || []))).filter(Boolean).sort()
     const optionsCategory = Array.from(new Set(inventory.map(i => i.category))).filter(Boolean).sort()
+    const optionsRackLocation = Array.from(new Set(inventory.map(i => i.rack_location || ""))).filter(Boolean).sort()
     const optionsStatus = Array.from(new Set(inventory.flatMap(i => i.status))).filter(Boolean).sort()
 
     // New Options
@@ -795,6 +797,7 @@ export default function InventoryPage() {
         const matchesMfg = filterMfg.size === 0 || (item.manufacturer && filterMfg.has(item.manufacturer))
         const matchesVendor = filterVendor.size === 0 || (item.vendors && item.vendors.some(v => filterVendor.has(v)))
         const matchesCategory = filterCategory.size === 0 || filterCategory.has(item.category)
+        const matchesRackLocation = filterRackLocation.size === 0 || filterRackLocation.has(item.rack_location || "")
         const matchesStatus = filterStatus.size === 0 || item.status.some(s => filterStatus.has(s))
 
         // New Matches
@@ -813,7 +816,7 @@ export default function InventoryPage() {
         const matchesFormula = filterFormula.size === 0 || filterFormula.has(item.formula || "")
         const matchesMinStock = filterMinStock === null || (item.min_stock_level >= filterMinStock[0] && item.min_stock_level <= filterMinStock[1])
 
-        return matchesSearch && matchesName && matchesMfg && matchesVendor && matchesCategory && matchesStatus &&
+        return matchesSearch && matchesName && matchesMfg && matchesVendor && matchesCategory && matchesRackLocation && matchesStatus &&
             matchesId && matchesQty && matchesPrice && matchesValue && matchesExpiry &&
             matchesPack && matchesGST && matchesHSN && matchesFormula && matchesMinStock
     })
@@ -1131,6 +1134,14 @@ export default function InventoryPage() {
                                                 onChange={setFilterCategory}
                                             />
                                         </TableHead>}
+                                        {visibleColumns.has('rack_location') && <TableHead>
+                                            <DataTableColumnFilter
+                                                title="Rack"
+                                                options={optionsRackLocation}
+                                                selectedValues={filterRackLocation}
+                                                onChange={setFilterRackLocation}
+                                            />
+                                        </TableHead>}
                                         {visibleColumns.has('hsn_code') && <TableHead>
                                             <DataTableColumnFilter
                                                 title="HSN"
@@ -1167,7 +1178,7 @@ export default function InventoryPage() {
                                         </TableHead>}
                                         <TableHead className="w-[50px]">
                                             {(filterName.size > 0 || filterMfg.size > 0 || filterVendor.size > 0 ||
-                                                filterCategory.size > 0 || filterStatus.size > 0 ||
+                                                filterCategory.size > 0 || filterRackLocation.size > 0 || filterStatus.size > 0 ||
                                                 filterId.size > 0 || filterQty !== null || filterPrice !== null || filterExpiry.size > 0 ||
                                                 filterPack.size > 0 || filterGST.size > 0 || filterHSN.size > 0 || filterFormula.size > 0 || filterMinStock !== null || filterValue !== null
                                             ) && (
@@ -1180,6 +1191,7 @@ export default function InventoryPage() {
                                                             setFilterMfg(new Set())
                                                             setFilterVendor(new Set())
                                                             setFilterCategory(new Set())
+                                                            setFilterRackLocation(new Set())
                                                             setFilterStatus(new Set())
                                                             setFilterId(new Set())
                                                             setFilterQty(null)
@@ -1240,6 +1252,7 @@ export default function InventoryPage() {
                                                     {item.total_value ? `₹${item.total_value.toLocaleString()}` : '-'}
                                                 </TableCell>}
                                                 {visibleColumns.has('category') && <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>}
+                                                {visibleColumns.has('rack_location') && <TableCell className="text-muted-foreground text-xs">{item.rack_location || '-'}</TableCell>}
                                                 {visibleColumns.has('hsn_code') && <TableCell className="text-muted-foreground text-xs">{item.hsn_code || '-'}</TableCell>}
                                                 {visibleColumns.has('min_stock_level') && <TableCell className="text-muted-foreground text-xs">{item.min_stock_level}</TableCell>}
                                                 {visibleColumns.has('expiry_date') && <TableCell>{item.expiry_date}</TableCell>}
