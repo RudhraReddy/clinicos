@@ -840,6 +840,7 @@ def export_inventory():
     writer.writerow([
         'Product ID', 'Item Name', 'Pack Size', 'Category', 'HSN Code',
         'Min Stock', 'Manufacturer', 'Product GST Rate', 'Generic Tags', 'Formula',
+        'Rack Location',
         'Batch Number', 'Expiry Date', 'MRP', 'Purchase Rate',
         'Batch GST Rate', 'GST Amount', 'Quantity', 'Initial Quantity', 'Free Quantity',
     ])
@@ -859,6 +860,7 @@ def export_inventory():
             f"{float(product.gst_rate or 0):.2f}",
             product.generic_tags or '',
             product.formula or '',
+            product.rack_location or '',
         ]
         if batches:
             for batch in batches:
@@ -907,7 +909,7 @@ def export_inventory_edit():
 
     loc_headers = [l.name for l in active_locs]
     writer.writerow([
-        'Product ID', 'Item Name', 'Pack Size', 'Formula',
+        'Product ID', 'Item Name', 'Pack Size', 'Formula', 'Rack Location',
         'Category', 'Manufacturer', 'Min Stock', 'MRP', 'Expiry Date',
     ] + loc_headers)
 
@@ -942,6 +944,7 @@ def export_inventory_edit():
             product.item_name,
             product.pack_size or '',
             product.formula or '',
+            product.rack_location or '',
             product.category or '',
             product.manufacturer or '',
             product.min_stock_level if product.min_stock_level is not None else '',
@@ -962,7 +965,7 @@ KNOWN_IMPORT_FIELDS = {
     'manufacturer', 'mrp', 'expiry date', 'manufacture date',
     'quantity', 'batch number', 'purchase rate', 'batch gst rate',
     'product gst rate', 'hsn code', 'min stock', 'generic tags',
-    'initial quantity', 'free quantity', 'gst amount',
+    'initial quantity', 'free quantity', 'gst amount', 'rack location',
 }
 
 @inventory.route('/inventory/import/parse-headers', methods=['POST'])
@@ -1162,6 +1165,7 @@ def import_inventory():
                     hsn_code=get_val(['HSN Code', 'hsn']) or '',
                     generic_tags=get_val(['Generic Tags', 'tags']) or '',
                     formula=get_val(['Formula', 'formula']) or '',
+                    rack_location=get_val(['Rack Location', 'rack']) or '',
                 )
                 try:
                     item.gst_rate = float(str(get_val(['Product GST Rate', 'Product GST', 'gst_rate']) or '0').replace('%', ''))
@@ -1184,6 +1188,8 @@ def import_inventory():
                 if tags: item.generic_tags = tags
                 formula = get_val(['Formula', 'formula'])
                 if formula: item.formula = formula
+                rack = get_val(['Rack Location', 'rack'])
+                if rack: item.rack_location = rack
                 pgst = get_val(['Product GST Rate', 'Product GST', 'gst_rate'])
                 if pgst:
                     try:
