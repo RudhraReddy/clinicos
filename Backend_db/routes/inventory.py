@@ -1611,6 +1611,11 @@ def update_invoice(invoice_number):
     if 'payment_mode' in data:
         inv.payment_mode = data['payment_mode'] or None
 
+    if 'image_path' in data:
+        if g.current_user.get('role') != 'admin':
+            return jsonify({'error': 'Only admins can change the attached invoice image'}), 403
+        inv.image_path = data['image_path'] or None
+
     db.session.commit()
 
     log_activity(

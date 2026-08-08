@@ -385,7 +385,7 @@ export const api = {
         return fetchApi(`/api/inventory/invoices/${id}`);
     },
 
-    async updateInvoice(id: string, data: { paid_date?: string | null; payment_mode?: string | null }): Promise<{ message: string }> {
+    async updateInvoice(id: string, data: { paid_date?: string | null; payment_mode?: string | null; image_path?: string | null }): Promise<{ message: string }> {
         return fetchApi(`/api/inventory/invoices/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),

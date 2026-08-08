@@ -186,6 +186,10 @@ export default function InvoiceEditPage() {
     }, [inventory.length, loading]) // Run once when everything loaded
 
     const handleSave = async () => {
+        if (!imagePath) {
+            toast.error("Attach an image of the invoice before saving")
+            return
+        }
         setSaving(true)
         try {
             const payload = {
@@ -344,12 +348,21 @@ export default function InvoiceEditPage() {
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     )}
-                    <Button onClick={handleSave} disabled={saving}>
+                    <Button
+                        onClick={handleSave}
+                        disabled={saving || !imagePath}
+                        title={!imagePath ? "Attach an image of the invoice before saving" : undefined}
+                    >
                         <Save className="mr-2 h-4 w-4" />
                         {saving ? "Saving..." : "Save to Inventory"}
                     </Button>
                 </div>
             </div>
+            {!imagePath && (
+                <p className="text-sm text-muted-foreground -mt-2">
+                    Attach an image (or upload one via QR) before you can save this invoice.
+                </p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-6 p-6 border rounded-lg bg-card">
                 <div className="space-y-2">

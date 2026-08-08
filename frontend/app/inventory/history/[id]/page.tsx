@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu, Save, Loader2 } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu, Save, Loader2, Upload } from "lucide-react"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { useMenu } from "@/components/layout/AppShell"
+import { useAuth } from "@/lib/auth_context"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -28,6 +29,7 @@ export default function InvoiceDetailPage() {
     const params = useParams()
     const invoiceId = params.id as string
     const { openMenu } = useMenu()
+    const { role } = useAuth()
 
     const [invoice, setInvoice] = useState<any>(null)
     const [items, setItems] = useState<any[]>([])
@@ -37,6 +39,9 @@ export default function InvoiceDetailPage() {
     const [paidDate, setPaidDate] = useState("")
     const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | ''>('')
     const [savingPayment, setSavingPayment] = useState(false)
+
+    const [changingImage, setChangingImage] = useState(false)
+    const [imageVersion, setImageVersion] = useState(0)
 
     useEffect(() => {
         if (invoiceId) {
@@ -66,6 +71,24 @@ export default function InvoiceDetailPage() {
             toast.error(err instanceof Error ? err.message : "Failed to save payment details")
         } finally {
             setSavingPayment(false)
+        }
+    }
+
+    const handleChangeImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setChangingImage(true)
+        try {
+            const res = await api.uploadInventoryReport(file)
+            await api.updateInvoice(invoiceId, { image_path: res.path })
+            setInvoice((prev: any) => ({ ...prev, has_image: true }))
+            setImageVersion(v => v + 1)
+            toast.success("Invoice image updated")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to update image")
+        } finally {
+            setChangingImage(false)
+            e.target.value = ''
         }
     }
 
@@ -117,13 +140,34 @@ export default function InvoiceDetailPage() {
                                         onClose={() => setViewImage(false)}
                                         title={`Invoice #${invoice.invoice_number}`}
                                         subtitle={invoice.vendor_name}
-                                        srcGenerator={() => `${API_BASE_URL}/api/inventory/invoices/${invoiceId}/image`}
+                                        srcGenerator={() => `${API_BASE_URL}/api/inventory/invoices/${invoiceId}/image?v=${imageVersion}`}
                                     />
                                 </>
                             ) : (
                                 <div className="p-4 bg-muted/20 border rounded text-center text-sm text-muted-foreground">
                                     No Image Available
                                 </div>
+                            )}
+
+                            {role === 'admin' && (
+                                <>
+                                    <input
+                                        id="change-invoice-image"
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleChangeImage}
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        disabled={changingImage}
+                                        onClick={() => document.getElementById('change-invoice-image')?.click()}
+                                    >
+                                        {changingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                        {invoice.has_image ? "Replace Image" : "Add Image"}
+                                    </Button>
+                                </>
                             )}
 
                             <Button variant="outline" className="w-full" onClick={() => window.location.href = `${API_BASE_URL}/api/inventory/invoices/${invoiceId}/export`}>
