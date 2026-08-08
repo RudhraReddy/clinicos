@@ -3,12 +3,22 @@
 import { useState, useEffect } from "react"
 import { api, API_BASE_URL } from "@/lib/api" // Assuming api lib updated
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu, Save, Loader2 } from "lucide-react"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { useMenu } from "@/components/layout/AppShell"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+
+// Date-only strings ("YYYY-MM-DD") parse as UTC midnight — appending a local
+// time avoids the off-by-one-day shift that causes in negative-UTC timezones.
+const parseDateOnly = (dateStr?: string | null) => {
+    if (!dateStr) return null
+    return new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`)
+}
 
 // const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 // We can use API_BASE_URL directly
@@ -24,15 +34,17 @@ export default function InvoiceDetailPage() {
     const [loading, setLoading] = useState(true)
     const [viewImage, setViewImage] = useState(false)
 
+    const [paidDate, setPaidDate] = useState("")
+    const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | ''>('')
+    const [savingPayment, setSavingPayment] = useState(false)
+
     useEffect(() => {
         if (invoiceId) {
-            // We need a new endpoint for details? OR just reuse list?
-            // Actually, let's assume we implement getInvoiceDetail(id)
-            // For now, I'll mock or the backend needs to support it. 
-            // Based on plan: GET /inventory/invoices/<id>
             api.getInvoiceDetail(invoiceId).then(data => {
                 setInvoice(data.invoice)
                 setItems(data.items)
+                setPaidDate(data.invoice.paid_date || "")
+                setPaymentMode(data.invoice.payment_mode || '')
                 setLoading(false)
             }).catch(err => {
                 console.error(err)
@@ -40,6 +52,22 @@ export default function InvoiceDetailPage() {
             })
         }
     }, [invoiceId])
+
+    const handleSavePayment = async () => {
+        setSavingPayment(true)
+        try {
+            await api.updateInvoice(invoiceId, {
+                paid_date: paidDate || null,
+                payment_mode: paymentMode || null,
+            })
+            setInvoice((prev: any) => ({ ...prev, paid_date: paidDate || null, payment_mode: paymentMode || null }))
+            toast.success("Payment details saved")
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to save payment details")
+        } finally {
+            setSavingPayment(false)
+        }
+    }
 
     if (loading) return <div className="p-8">Loading details...</div>
     if (!invoice) return <div className="p-8">Invoice not found</div>
@@ -113,7 +141,7 @@ export default function InvoiceDetailPage() {
                             <CardTitle>Summary</CardTitle>
                             <CardDescription>Upload Date: {new Date(invoice.upload_date).toLocaleString()}</CardDescription>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-2 gap-4">
+                        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Vendor</p>
                                 <p className="text-lg">{invoice.vendor_name || "Unknown"}</p>
@@ -125,6 +153,45 @@ export default function InvoiceDetailPage() {
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
                                 <p className="text-lg font-bold text-green-600">₹{invoice.total_amount?.toFixed(2)}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Invoice Date</p>
+                                <p className="text-lg">{parseDateOnly(invoice.invoice_date)?.toLocaleDateString() ?? "N/A"}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Paid Date</p>
+                                <Input
+                                    type="date"
+                                    value={paidDate}
+                                    onChange={e => setPaidDate(e.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Pay Type</p>
+                                <div className="inline-flex items-center rounded-md border bg-muted p-0.5 h-9 w-full">
+                                    {(['cash', 'upi'] as const).map(mode => (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() => setPaymentMode(mode)}
+                                            className={cn(
+                                                "flex-1 h-full rounded-sm text-xs font-medium transition-colors capitalize",
+                                                paymentMode === mode
+                                                    ? "bg-background text-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {mode}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="col-span-2 md:col-span-3 flex justify-end">
+                                <Button size="sm" onClick={handleSavePayment} disabled={savingPayment}>
+                                    {savingPayment ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+                                    Save Payment Details
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
