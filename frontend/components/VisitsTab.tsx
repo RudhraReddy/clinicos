@@ -75,6 +75,7 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                                     <TableHead>Time</TableHead>
                                     <TableHead>Patient</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Visit Fee</TableHead>
                                     <TableHead>Reason</TableHead>
                                     <TableHead>Actions</TableHead>
                                 </TableRow>
@@ -108,6 +109,9 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                                             `}>
                                                 {visit.status}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="tabular-nums">
+                                            {typeof visit.visiting_fee === 'number' ? `₹${visit.visiting_fee}` : '-'}
                                         </TableCell>
                                         <TableCell className="max-w-[200px] truncate">
                                             {visit.reason || "-"}
