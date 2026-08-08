@@ -376,12 +376,20 @@ export const api = {
         });
     },
 
-    async getInvoices(): Promise<any[]> {
-        return fetchApi('/api/inventory/invoices');
+    async getInvoices(locationId?: number): Promise<any[]> {
+        const qs = locationId ? `?location_id=${locationId}` : ''
+        return fetchApi(`/api/inventory/invoices${qs}`);
     },
 
     async getInvoiceDetail(id: string): Promise<{ invoice: any; items: any[] }> {
         return fetchApi(`/api/inventory/invoices/${id}`);
+    },
+
+    async updateInvoice(id: string, data: { paid_date?: string | null; payment_mode?: string | null }): Promise<{ message: string }> {
+        return fetchApi(`/api/inventory/invoices/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        });
     },
 
     async getInventoryHistory(productId: string, page = 1, limit = 50): Promise<{ history: InventoryHistoryEntry[]; page: number; limit: number }> {

@@ -1522,7 +1522,20 @@ def import_inventory():
 @inventory.route('/inventory/invoices', methods=['GET'])
 @require_auth
 def get_invoices():
-    invoices = PurchaseInvoice.query.order_by(PurchaseInvoice.upload_date.desc()).all()
+    from models import Location
+
+    location_id_param = request.args.get('location_id')
+    filter_location_id = None
+    if location_id_param and location_id_param.isdigit():
+        filter_location_id = int(location_id_param)
+
+    query = PurchaseInvoice.query.order_by(PurchaseInvoice.upload_date.desc())
+    if filter_location_id is not None:
+        query = query.filter(PurchaseInvoice.location_id == filter_location_id)
+    invoices = query.all()
+
+    locations_map = {loc.id: loc.name for loc in Location.query.all()}
+
     results = []
     for inv in invoices:
         results.append({
@@ -1531,7 +1544,12 @@ def get_invoices():
             'total_amount': float(inv.total_amount) if inv.total_amount else 0,
             'vendor_name': inv.vendor_name,
             'source': inv.source,
+            'invoice_date': inv.invoice_date.isoformat() if inv.invoice_date else None,
             'upload_date': inv.upload_date.isoformat(),
+            'paid_date': inv.paid_date.isoformat() if inv.paid_date else None,
+            'payment_mode': inv.payment_mode,
+            'location_id': inv.location_id,
+            'location_name': locations_map.get(inv.location_id),
             'has_image': bool(inv.image_path)
         })
     return jsonify(results), 200
@@ -1566,11 +1584,46 @@ def get_invoice_detail(invoice_number):
             'gst_number': inv.gst_number,
             'total_amount': float(inv.total_amount) if inv.total_amount else 0,
             'vendor_name': inv.vendor_name,
+            'invoice_date': inv.invoice_date.isoformat() if inv.invoice_date else None,
             'upload_date': inv.upload_date.isoformat(),
+            'paid_date': inv.paid_date.isoformat() if inv.paid_date else None,
+            'payment_mode': inv.payment_mode,
             'has_image': bool(inv.image_path)
         },
         'items': items
     }), 200
+
+@inventory.route('/inventory/invoices/<invoice_number>', methods=['PATCH'])
+@require_auth
+def update_invoice(invoice_number):
+    inv = PurchaseInvoice.query.get_or_404(invoice_number)
+    data = request.get_json()
+
+    from datetime import datetime as _datetime
+    if 'paid_date' in data:
+        if data['paid_date']:
+            try:
+                inv.paid_date = _datetime.strptime(data['paid_date'], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid paid_date format, expected YYYY-MM-DD'}), 400
+        else:
+            inv.paid_date = None
+    if 'payment_mode' in data:
+        inv.payment_mode = data['payment_mode'] or None
+
+    db.session.commit()
+
+    log_activity(
+        action='UPDATE',
+        resource_type='purchase_invoice',
+        resource_id=invoice_number,
+        resource_label=f"{inv.vendor_name or 'Unknown Vendor'} — {invoice_number}",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
+    return jsonify({'message': 'Invoice updated'}), 200
 
 @inventory.route('/inventory/invoices/<invoice_number>/image', methods=['GET'])
 @require_auth
@@ -1617,7 +1670,15 @@ def save_invoice():
         
     gst_no = data.get('gst_number', '')
     image_path = data.get('image_path', '')
-    
+
+    from datetime import datetime as _datetime
+    invoice_date = get_ist_now().date()
+    if data.get('invoice_date'):
+        try:
+            invoice_date = _datetime.strptime(data['invoice_date'], '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            pass
+
     warnings: list = []
     existing = PurchaseInvoice.query.get(invoice_no)
     is_duplicate_invoice = existing is not None
@@ -1634,13 +1695,19 @@ def save_invoice():
             gst_number=gst_no,
             total_amount=data.get('total_amount', 0),
             vendor_name=data.get('vendor_name', ''),
-            invoice_date=get_ist_now().date(),
+            invoice_date=invoice_date,
             image_path=image_path,
             source='MANUAL',
             upload_date=get_ist_now(),
             created_by_user_id=g.current_user.get('user_id'),
         )
-        if creator and creator.location_id:
+        selected_location_id = data.get('location_id')
+        if selected_location_id:
+            try:
+                new_inv.location_id = int(selected_location_id)
+            except (ValueError, TypeError):
+                pass
+        elif creator and creator.location_id:
             new_inv.location_id = creator.location_id
         db.session.add(new_inv)
 

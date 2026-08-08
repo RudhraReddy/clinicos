@@ -49,6 +49,8 @@ class PurchaseInvoice(db.Model):
     location = db.Column(db.String(50), nullable=True, default='Main') # For Dimensionality
     created_by_user_id = db.Column(db.String(36), nullable=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
+    paid_date = db.Column(db.Date, nullable=True) # When this invoice was paid to the vendor
+    payment_mode = db.Column(db.String(20), nullable=True) # cash, upi
 
 class ProductMaster(db.Model):
     """

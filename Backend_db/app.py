@@ -56,6 +56,9 @@ def _apply_migrations(db):
         "ALTER TABLE patients DROP COLUMN IF EXISTS reference",
         # 2026-08-06: cash/UPI payment mode on visits (replaces full/partial/unpaid picker on booking)
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20)",
+        # 2026-08-08: paid_date/payment_mode on purchase invoices (vendor payment tracking)
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS paid_date DATE",
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
