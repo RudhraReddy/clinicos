@@ -71,6 +71,10 @@ export default function Dashboard() {
     const [editVisitOpen, setEditVisitOpen] = useState(false)
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
 
+    // Controlled so the date-filter control (kept in the same header slot) can be
+    // hidden on the Overview tab and shown only on All Visits, where it's meaningful.
+    const [activeTab, setActiveTab] = useState("overview")
+
     const { role, isLoading } = useAuth()
     const router = useRouter()
     const { openMenu } = useMenu()
@@ -249,7 +253,7 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
-            <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden gap-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden gap-4">
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <button
                         type="button"
@@ -285,12 +289,14 @@ export default function Dashboard() {
                         <TabsTrigger value="visits">All Visits</TabsTrigger>
                     </TabsList>
                     <div className="ml-auto">
-                        <DatePickerWithRange
-                            date={dateRange}
-                            setDate={setDateRange}
-                            placeholder="Filter by date"
-                            className="w-auto"
-                        />
+                        {activeTab === "visits" && (
+                            <DatePickerWithRange
+                                date={dateRange}
+                                setDate={setDateRange}
+                                placeholder="Filter by date"
+                                className="w-auto"
+                            />
+                        )}
                     </div>
                 </div>
 
