@@ -55,7 +55,10 @@ function formatUpdatedTime(updatedAtStr?: string, createdAtStr?: string) {
 
 
 export default function Dashboard() {
-    // Always-unfiltered, always-recent — feeds the Overview tab's "Today's Visits" card.
+    // Explicitly filtered to today's date — feeds the Overview tab's "Today's Visits" card.
+    // Must stay date-filtered: an unfiltered fetch is capped server-side to the 50 most
+    // recently-*created* visits system-wide, so on a busy multi-clinic day today's own
+    // visits can get pushed out of that window before this card ever sees them.
     const [visits, setVisits] = useState<Visit[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -82,7 +85,8 @@ export default function Dashboard() {
     const fetchVisits = async () => {
         try {
             setLoading(true)
-            const all = await api.getVisits()
+            const todayStr = getTodayIST()
+            const all = await api.getVisits(undefined, { date_from: todayStr, date_to: todayStr })
             setVisits(all.filter(v => v.status !== 'deleted'))
         } catch (err) {
             console.error("Failed to fetch visits:", err)

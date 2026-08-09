@@ -31,7 +31,12 @@ export default function DoctorDashboard() {
     const fetchVisits = async () => {
         try {
             setLoading(true)
-            const allVisits = await api.getVisits()
+            // Explicitly date-filtered to today: an unfiltered fetch is capped server-side
+            // to the 50 most recently-*created* visits system-wide, so on a busy multi-clinic
+            // day today's own visits can get pushed out of that window before this stat
+            // strip ever sees them.
+            const todayStr = getTodayIST()
+            const allVisits = await api.getVisits(undefined, { date_from: todayStr, date_to: todayStr })
             // Filter for standard active visits
             setVisits(allVisits.filter(v => v.status !== 'deleted'))
         } catch (err) {
