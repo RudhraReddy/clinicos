@@ -1021,7 +1021,7 @@ export default function DoctorDashboard() {
                                         setMobileDetailOpen(true)
                                     }}
                                     className={cn(
-                                        "p-3 rounded-md border transition-all duration-200 cursor-pointer flex items-center gap-2",
+                                        "p-3 rounded-md border transition-all duration-200 cursor-pointer flex items-start gap-2",
                                         visit.status === 'done'
                                             ? 'opacity-60 border-green-500 bg-green-500/5 hover:bg-green-500/10'
                                             : selectedVisitId === visit.visit_id
@@ -1029,15 +1029,31 @@ export default function DoctorDashboard() {
                                                 : 'bg-transparent border-transparent hover:bg-muted/50 hover:border-border/50'
                                     )}
                                 >
-                                    <span className="font-bold text-sm min-w-[3rem] flex-shrink-0">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
-                                    <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
-                                        {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
-                                    </span>
-                                    <div className="font-medium text-sm truncate flex-1 min-w-0">{visit.patient_name}</div>
-                                    {visit.billed_amount != null && (
-                                        <span className="text-xs font-semibold tabular-nums text-green-700 dark:text-green-400 flex-shrink-0">
-                                            ₹{visit.billed_amount}
+                                    {/* Fee/Refund on top, Time below — stacked instead of side by side */}
+                                    <div className="flex flex-col min-w-[3.5rem] flex-shrink-0">
+                                        <span className="text-sm font-semibold tabular-nums">
+                                            {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                         </span>
+                                        <span className="text-xs text-muted-foreground">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
+                                    </div>
+
+                                    {/* Name wraps and shrinks instead of being cropped when it's long */}
+                                    <div className={cn(
+                                        "font-semibold flex-1 min-w-0 break-words",
+                                        visit.patient_name.length > 14 ? "text-xs" : "text-sm"
+                                    )}>
+                                        {visit.patient_name}
+                                    </div>
+
+                                    {/* One line per bill against this visit */}
+                                    {visit.bills && visit.bills.length > 0 && (
+                                        <div className="flex flex-col items-end flex-shrink-0">
+                                            {visit.bills.map(bill => (
+                                                <span key={bill.invoice_id} className="text-xs font-semibold tabular-nums text-green-700 dark:text-green-400">
+                                                    ₹{bill.total_amount}
+                                                </span>
+                                            ))}
+                                        </div>
                                     )}
                                     <button
                                         type="button"

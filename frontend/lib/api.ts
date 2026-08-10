@@ -35,6 +35,7 @@ export interface Visit {
     payment_status?: string;
     payment_mode?: string;
     billed_amount?: number | null;
+    bills?: { invoice_id: string; total_amount: number; payment_type: string }[];
     has_prescription?: boolean;
     location_id?: number | null;
 }
