@@ -10,6 +10,19 @@ export function getTodayIST(): string {
     return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
+// How long ago a visit happened, relative to today (IST). Counts in days up
+// to 90 days old, then switches to whole months (e.g. "8d", "90d", "3mo").
+export function getVisitAge(visitDate: string | null | undefined): string | null {
+    if (!visitDate) return null
+    const today = new Date(`${getTodayIST()}T00:00:00`)
+    const then = new Date(`${visitDate}T00:00:00`)
+    if (isNaN(then.getTime())) return null
+    const days = Math.round((today.getTime() - then.getTime()) / (1000 * 60 * 60 * 24))
+    if (days < 0) return null
+    if (days <= 90) return `${days}d`
+    return `${Math.floor(days / 30)}mo`
+}
+
 // Not-done visits stay sorted by time; done visits sink below them, most
 // recently completed first, so a just-finished appointment appears right
 // under the pending list instead of staying in its original time slot.

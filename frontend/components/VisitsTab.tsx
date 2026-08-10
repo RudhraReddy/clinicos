@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table"
 import { Calendar, Loader2, X } from "lucide-react"
 import { type Visit } from "@/lib/api"
+import { getVisitAge } from "@/lib/utils"
 import { VisitDetailsDialog } from "@/components/VisitDetailsDialog"
 import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
@@ -147,6 +148,7 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                             <TableHeader className="sticky top-0 z-10 bg-card">
                                 <TableRow>
                                     <TableHead>Date</TableHead>
+                                    <TableHead>Age</TableHead>
                                     <TableHead>Time</TableHead>
                                     <TableHead>
                                         <DataTableColumnFilter title="Patient" options={optionsPatient} selectedValues={filterPatient} onChange={setFilterPatient} />
@@ -175,7 +177,7 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                             <TableBody>
                                 {filteredVisits.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                                        <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
                                             No visits match these filters
                                         </TableCell>
                                     </TableRow>
@@ -190,6 +192,9 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                                         >
                                             <TableCell className="font-medium">
                                                 {visit.visit_date ? new Date(visit.visit_date).toLocaleDateString() : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground tabular-nums">
+                                                {getVisitAge(visit.visit_date) || '-'}
                                             </TableCell>
                                             <TableCell className="font-mono text-xs text-muted-foreground">
                                                 {formatTime(visit.visit_time, visit.created_at)}

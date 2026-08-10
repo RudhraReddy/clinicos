@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getTodayIST, orderTodayVisits } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits, getVisitAge } from "@/lib/utils"
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -188,6 +188,9 @@ function DashboardContent() {
                     </span>
                     <span className="text-xs text-muted-foreground font-mono">
                         {formatTime(visit.visit_time, visit.created_at)}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                        {getVisitAge(visit.visit_date)}
                     </span>
                 </div>
                 <div className="flex items-center gap-0.5">

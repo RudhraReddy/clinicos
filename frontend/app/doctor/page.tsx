@@ -6,7 +6,7 @@ import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
-import { getTodayIST, orderTodayVisits, cn } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits, cn, getVisitAge } from "@/lib/utils"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -349,6 +349,11 @@ export default function DoctorDashboard() {
                                     {selectedVisit.visit_time.substring(0, 5)}
                                 </span>
                             )}
+                            {getVisitAge(selectedVisit.visit_date) && (
+                                <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
+                                    {getVisitAge(selectedVisit.visit_date)}
+                                </span>
+                            )}
                             {selectedVisit.reason && (
                                 <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
                                     {selectedVisit.reason}
@@ -465,6 +470,9 @@ export default function DoctorDashboard() {
                                     onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
                                 >
                                     <span className="font-bold text-sm min-w-[38px] flex-shrink-0">{visit.visit_time?.substring(0, 5) || 'ASAP'}</span>
+                                    <span className="text-[10px] font-medium tabular-nums text-muted-foreground min-w-[1.75rem] flex-shrink-0">
+                                        {getVisitAge(visit.visit_date)}
+                                    </span>
                                     <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
                                         {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                     </span>
@@ -616,7 +624,11 @@ export default function DoctorDashboard() {
                                                         >
                                                             <div className="font-medium flex items-center justify-between">
                                                                 <span>{new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}</span>
-                                                                {visit?.visit_id === selectedVisit?.visit_id && <Badge variant="secondary" className="text-[10px] h-4">Today</Badge>}
+                                                                {visit?.visit_id === selectedVisit?.visit_id ? (
+                                                                    <Badge variant="secondary" className="text-[10px] h-4">Today</Badge>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground tabular-nums">{getVisitAge(date)}</span>
+                                                                )}
                                                             </div>
 
 
@@ -779,6 +791,11 @@ export default function DoctorDashboard() {
                                                                                 <Clock className="h-3 w-3" />
                                                                                 <span className="font-medium">{visitForDate.reason || "General Checkup"}</span>
                                                                             </div>
+                                                                            {getVisitAge(date) && (
+                                                                                <span className="text-xs text-muted-foreground tabular-nums">
+                                                                                    {getVisitAge(date)}
+                                                                                </span>
+                                                                            )}
                                                                             {typeof visitForDate.visiting_fee === 'number' && (
                                                                                 <span className="text-xs font-semibold tabular-nums ml-auto">
                                                                                     ₹{visitForDate.visiting_fee}
@@ -789,10 +806,17 @@ export default function DoctorDashboard() {
                                                                             )}
                                                                         </>
                                                                     ) : (
-                                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                                                                            <ImageIcon className="h-3 w-3" />
-                                                                            <span className="font-medium">Direct Uploads</span>
-                                                                        </div>
+                                                                        <>
+                                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                                                                                <ImageIcon className="h-3 w-3" />
+                                                                                <span className="font-medium">Direct Uploads</span>
+                                                                            </div>
+                                                                            {getVisitAge(date) && (
+                                                                                <span className="text-xs text-muted-foreground tabular-nums ml-auto">
+                                                                                    {getVisitAge(date)}
+                                                                                </span>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
 
@@ -1035,6 +1059,7 @@ export default function DoctorDashboard() {
                                             {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                         </span>
                                         <span className="text-xs text-muted-foreground">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
+                                        <span className="text-[10px] text-muted-foreground/70 tabular-nums">{getVisitAge(visit.visit_date)}</span>
                                     </div>
 
                                     {/* Name wraps and shrinks instead of being cropped when it's long */}
