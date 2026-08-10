@@ -36,6 +36,7 @@ export interface Visit {
     payment_mode?: string;
     billed_amount?: number | null;
     has_prescription?: boolean;
+    location_id?: number | null;
 }
 
 export interface InventoryBatch {

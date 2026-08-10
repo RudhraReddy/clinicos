@@ -3,7 +3,7 @@ import math
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory, User
+from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory, User, Location
 from sqlalchemy import func
 from utils import generate_invoice_id
 from .auth import require_auth, log_activity
@@ -51,10 +51,36 @@ def create_bill():
         discount_value = None
 
     visit_id = data.get('visit_id') if patient else None
+    visit = None
     if visit_id:
+        visit = Visit.query.get(visit_id)
         existing_bill = Bill.query.filter_by(visit_id=visit_id).first()
         if existing_bill:
             return jsonify({'error': 'A bill already exists for this visit'}), 400
+
+    # ── Clinic resolution ────────────────────────────────────────────────
+    # A visit-linked bill can never disagree with its own visit's clinic —
+    # that takes priority over anything the caller sends. Otherwise an
+    # explicit location_id (the admin/doctor picker) is honored, falling
+    # back to the creator's own assigned clinic (the frontdesk-lock case).
+    creator = db.session.get(User, g.current_user.get('user_id'))
+    resolved_location_id = None
+    if visit and visit.location_id:
+        resolved_location_id = visit.location_id
+    elif data.get('location_id') not in (None, ''):
+        try:
+            requested_location_id = int(data['location_id'])
+        except (TypeError, ValueError):
+            return jsonify({'error': 'location_id must be a number'}), 400
+        location = Location.query.get(requested_location_id)
+        if not location or not location.is_active:
+            return jsonify({'error': 'Invalid or inactive clinic'}), 400
+        resolved_location_id = requested_location_id
+    elif creator and creator.location_id:
+        resolved_location_id = creator.location_id
+
+    if not resolved_location_id:
+        return jsonify({'error': 'A clinic must be assigned to this bill'}), 400
 
     invoice_id = generate_invoice_id()
 
@@ -77,20 +103,16 @@ def create_bill():
         visit_id=visit_id,
         payment_type=payment_type,
         total_amount=0,
+        location_id=resolved_location_id,
         created_by_user_id=g.current_user.get('user_id')
     )
-    creator = db.session.get(User, g.current_user.get('user_id'))
-    if creator and creator.location_id:
-        new_bill.location_id = creator.location_id
     db.session.add(new_bill)
     db.session.flush()
 
-    if visit_id:
-        visit = Visit.query.get(visit_id)
-        if visit:
-            visit.invoice_id = invoice_id
-            visit.status = 'done' 
-    
+    if visit:
+        visit.invoice_id = invoice_id
+        visit.status = 'done'
+
     total_calc_amount = 0
     
     for item in items_used:

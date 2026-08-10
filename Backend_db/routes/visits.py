@@ -125,6 +125,7 @@ def get_all_visits():
             'amount_paid': v.amount_paid,
             'refund_amount': v.refund_amount or 0,
             'refund_mode': v.refund_mode,
+            'location_id': v.location_id,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'billed_amount': bills_map.get(v.invoice_id),
@@ -152,6 +153,7 @@ def get_patient_visits(patient_id):
             'amount_paid': v.amount_paid,
             'refund_amount': v.refund_amount or 0,
             'refund_mode': v.refund_mode,
+            'location_id': v.location_id,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'created_at': v.created_at.isoformat() if v.created_at else None,
@@ -178,6 +180,7 @@ def get_visit(visit_id):
         'amount_paid': visit.amount_paid,
         'refund_amount': visit.refund_amount or 0,
         'refund_mode': visit.refund_mode,
+        'location_id': visit.location_id,
         'payment_status': visit.payment_status,
         'payment_mode': visit.payment_mode,
         'created_at': visit.created_at.isoformat() if visit.created_at else None,
@@ -284,6 +287,7 @@ def refund_visit(visit_id):
         'message': 'Refund recorded',
         'refund_amount': visit.refund_amount,
         'refund_mode': visit.refund_mode,
+        'location_id': visit.location_id,
         'payment_status': visit.payment_status,
     }), 200
 

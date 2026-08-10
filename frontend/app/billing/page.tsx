@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit } from "@/lib/api"
+import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit, type Location } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
+import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users, MapPin } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import Link from "next/link"
 import { PatientSearch } from "@/components/PatientSearch"
@@ -73,7 +73,7 @@ const getPackMultiplier = (packSize?: string) => {
 
 function BillingContent() {
     const searchParams = useSearchParams()
-    const { role } = useAuth()
+    const { role, user } = useAuth()
     const { openMenu } = useMenu()
 
     // Tab
@@ -121,6 +121,17 @@ function BillingContent() {
     const [refundValue, setRefundValue] = useState("")
     const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
     const [refundSubmitting, setRefundSubmitting] = useState(false)
+
+    // Clinic assignment — every bill is tagged to a clinic, same as the visit it may
+    // be linked to. A visit-linked bill is locked to that visit's own clinic (can't
+    // disagree with it); otherwise admin/doctor pick one explicitly and frontdesk is
+    // locked to their own assigned clinic.
+    const [locations, setLocations] = useState<Location[]>([])
+    const [selectedLocationId, setSelectedLocationId] = useState<number | "">("")
+
+    useEffect(() => {
+        api.getLocations().then(locs => setLocations(locs.filter(l => l.is_active))).catch(() => {})
+    }, [])
 
     // History
     const [history, setHistory] = useState<BillingHistoryEntry[]>([])
@@ -296,6 +307,10 @@ function BillingContent() {
             toast.error("Enter a quantity for every item before creating the bill")
             return
         }
+        if (!resolvedLocationId) {
+            toast.error(isAdminOrDoctor ? "Select a clinic for this bill" : "No clinic assigned to your account — contact an admin")
+            return
+        }
 
         setSubmitting(true)
         try {
@@ -305,6 +320,7 @@ function BillingContent() {
                 walk_in_age: walkInMode && walkInAge ? walkInAge : undefined,
                 walk_in_sex: walkInMode && walkInSex ? walkInSex : undefined,
                 visit_id: walkInMode ? undefined : (visitId || undefined),
+                location_id: resolvedLocationId,
                 payment_type: paymentType,
                 discount_type: parsedDiscountValue > 0 ? discountType : undefined,
                 discount_value: parsedDiscountValue > 0 ? parsedDiscountValue : undefined,
@@ -401,6 +417,20 @@ function BillingContent() {
         : Math.min(Math.max(parsedDiscountValue, 0), subtotal)
     const finalTotal = subtotal - discountAmount
 
+    // Clinic resolution — mirrors the backend's own resolution order exactly, so the
+    // UI never shows/enables something the server would reject.
+    const isAdminOrDoctor = role === 'admin' || role === 'doctor'
+    const visitLocationId = (!walkInMode && linkedVisit) ? (linkedVisit.location_id ?? null) : null
+    const isLockedToVisit = !!visitLocationId
+    const frontdeskLocationId = user?.location_id ?? null
+    const resolvedLocationId = isLockedToVisit
+        ? visitLocationId
+        : isAdminOrDoctor
+            ? (selectedLocationId || null)
+            : frontdeskLocationId
+    const locationName = (id: number | null) => locations.find(l => l.id === id)?.name
+    const noClinicAssigned = !isLockedToVisit && !isAdminOrDoctor && !frontdeskLocationId
+
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden gap-4 min-h-0">
@@ -489,6 +519,40 @@ function BillingContent() {
                                             />
                                         </div>
                                     )}
+                                    <div className="shrink-0">
+                                        {(isLockedToVisit || !isAdminOrDoctor) ? (
+                                            <div className={cn(
+                                                "h-10 px-3 flex items-center gap-1.5 text-sm rounded-md border w-44",
+                                                noClinicAssigned
+                                                    ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-400"
+                                                    : "border-input bg-muted/40 text-muted-foreground"
+                                            )}>
+                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {isLockedToVisit
+                                                        ? (locationName(visitLocationId) || 'Unknown clinic')
+                                                        : noClinicAssigned
+                                                            ? 'No clinic assigned'
+                                                            : (locationName(frontdeskLocationId) || 'Unknown clinic')}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <Select
+                                                value={selectedLocationId ? selectedLocationId.toString() : ""}
+                                                onValueChange={(v) => setSelectedLocationId(parseInt(v))}
+                                            >
+                                                <SelectTrigger className="h-10 w-44">
+                                                    <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground shrink-0" />
+                                                    <SelectValue placeholder="Select clinic" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {locations.map(l => (
+                                                        <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
                                     <Button
                                         type="button"
                                         variant={walkInMode ? "default" : "outline"}
@@ -566,7 +630,7 @@ function BillingContent() {
                                     </Select>
                                     <Button
                                         size="lg"
-                                        disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty}
+                                        disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty || !resolvedLocationId}
                                         onClick={handleCreateBill}
                                     >
                                         {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
