@@ -439,13 +439,13 @@ function BillingContent() {
                         <CardContent className="p-6 flex flex-col gap-6 flex-1 overflow-hidden min-h-0">
                             {/* Patient & Actions Row */}
                             <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between shrink-0">
-                                <div className="flex-1 max-w-xl flex items-start gap-2">
+                                <div className="flex items-start gap-2">
                                     {walkInMode ? (
                                         <>
                                             <Input
                                                 autoFocus
                                                 placeholder="Walk-in customer name"
-                                                className="h-10"
+                                                className="w-80 shrink-0 h-10"
                                                 value={walkInName}
                                                 onChange={(e) => setWalkInName(e.target.value)}
                                                 maxLength={100}
@@ -471,7 +471,7 @@ function BillingContent() {
                                             </Select>
                                         </>
                                     ) : (
-                                        <div className="flex-1">
+                                        <div className="w-80 shrink-0">
                                             <PatientSearch
                                                 selectedPatient={patient}
                                                 onSelect={(p) => {
