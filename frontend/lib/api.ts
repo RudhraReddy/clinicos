@@ -471,7 +471,10 @@ export const api = {
         });
     },
 
-    async refundVisit(id: string, amount: number, mode: 'cash' | 'upi'): Promise<{ refund_amount: number; payment_status: string; refund_mode: string }> {
+    // `amount` is the visit's total desired refund (not a delta) — editing an
+    // existing refund up or down is just resubmitting a different number.
+    // `mode` is only required when amount > 0.
+    async refundVisit(id: string, amount: number, mode?: 'cash' | 'upi' | ''): Promise<{ refund_amount: number; payment_status: string; refund_mode: string }> {
         return fetchApi(`/api/visits/${id}/refund`, {
             method: 'POST',
             body: JSON.stringify({ amount, mode }),

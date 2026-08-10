@@ -163,6 +163,17 @@ function BillingContent() {
 
     useEffect(() => { loadLinkedVisit() }, [loadLinkedVisit])
 
+    // Refund reflects the visit's current total refund and is directly editable —
+    // whenever the linked visit (re)loads, pre-check the box and pre-fill the
+    // existing amount/mode if one exists, so increasing/decreasing it is just
+    // editing the number and resubmitting.
+    useEffect(() => {
+        const existingRefund = linkedVisit?.refund_amount || 0
+        setRefundChecked(existingRefund > 0)
+        setRefundValue(existingRefund > 0 ? existingRefund.toString() : "")
+        setRefundMode((linkedVisit?.refund_mode as "cash" | "upi") || "")
+    }, [linkedVisit])
+
     const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
         try {
@@ -345,23 +356,20 @@ function BillingContent() {
     const handleRefund = async () => {
         if (!linkedVisit) return
         const amount = parseFloat(refundValue || '0')
-        const remaining = Math.max(0, (linkedVisit.amount_paid || 0) - (linkedVisit.refund_amount || 0))
-        if (!(amount > 0) || amount > remaining) {
-            toast.error(`Enter a refund amount between ₹0 and ₹${remaining.toFixed(2)}`)
+        const cap = linkedVisit.amount_paid || 0
+        if (!(amount >= 0) || amount > cap) {
+            toast.error(`Enter a refund amount between ₹0 and ₹${cap.toFixed(2)}`)
             return
         }
-        if (refundMode !== 'cash' && refundMode !== 'upi') {
+        if (amount > 0 && refundMode !== 'cash' && refundMode !== 'upi') {
             toast.error("Select a refund type (Cash or UPI)")
             return
         }
 
         setRefundSubmitting(true)
         try {
-            await api.refundVisit(linkedVisit.visit_id, amount, refundMode)
+            await api.refundVisit(linkedVisit.visit_id, amount, refundMode || undefined)
             toast.success("Refund recorded")
-            setRefundChecked(false)
-            setRefundValue("")
-            setRefundMode("")
             loadLinkedVisit()
         } catch (e: unknown) {
             console.error(e)

@@ -33,8 +33,11 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         visiting_fee: "",
         status: "scheduled"
     })
-    // Refund is an action slot, not a stored field — it always starts unchecked/empty
-    // and represents "amount to refund right now", not the running refunded total.
+    // Refund reflects the visit's current total refund and is directly editable —
+    // reopening a visit that already has a refund pre-checks the box and pre-fills
+    // the existing amount/mode, so increasing or decreasing it is just editing the
+    // number and saving again. Unchecking the box means "don't touch the refund
+    // this save" (not "clear it") — to remove a refund entirely, edit it down to 0.
     const [refundChecked, setRefundChecked] = useState(false)
     const [refundInput, setRefundInput] = useState("")
     const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
@@ -48,9 +51,10 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 visiting_fee: visit.visiting_fee?.toString() || "",
                 status: visit.status
             })
-            setRefundChecked(false)
-            setRefundInput("")
-            setRefundMode("")
+            const existingRefund = visit.refund_amount || 0
+            setRefundChecked(existingRefund > 0)
+            setRefundInput(existingRefund > 0 ? existingRefund.toString() : "")
+            setRefundMode((visit.refund_mode as "cash" | "upi") || "")
         }
     }, [visit, open])
 
@@ -59,7 +63,6 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
     const visitingFee = visit?.visiting_fee || 0
     const refundedSoFar = visit?.refund_amount || 0
     const netPaid = visitingFee - refundedSoFar
-    const remainingRefundable = Math.max(0, netPaid)
     const canRefund = role !== 'doctor' && visitingFee > 0
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -72,14 +75,14 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
             return
         }
 
-        let refundAmount = 0
+        let newRefundTotal: number | null = null
         if (refundChecked) {
-            refundAmount = parseFloat(refundInput || '0')
-            if (!(refundAmount > 0) || refundAmount > remainingRefundable) {
-                alert(`Enter a refund amount between ₹0 and ₹${remainingRefundable.toFixed(2)}`)
+            newRefundTotal = parseFloat(refundInput || '0')
+            if (!(newRefundTotal >= 0) || newRefundTotal > visitingFee) {
+                alert(`Enter a refund amount between ₹0 and ₹${visitingFee.toFixed(2)}`)
                 return
             }
-            if (refundMode !== 'cash' && refundMode !== 'upi') {
+            if (newRefundTotal > 0 && refundMode !== 'cash' && refundMode !== 'upi') {
                 alert("Select a refund type (Cash or UPI)")
                 return
             }
@@ -98,8 +101,8 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 status: formData.status
             })
 
-            if (refundAmount > 0) {
-                await api.refundVisit(visit.visit_id, refundAmount, refundMode as "cash" | "upi")
+            if (newRefundTotal !== null) {
+                await api.refundVisit(visit.visit_id, newRefundTotal, refundMode || undefined)
             }
 
             // Close dialog and notify success
@@ -223,10 +226,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                         type="checkbox"
                                         id="edit-refund-check"
                                         checked={refundChecked}
-                                        onChange={(e) => {
-                                            setRefundChecked(e.target.checked)
-                                            if (!e.target.checked) setRefundInput("")
-                                        }}
+                                        onChange={(e) => setRefundChecked(e.target.checked)}
                                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                     />
                                     <label htmlFor="edit-refund-check" className="text-sm font-medium cursor-pointer select-none">

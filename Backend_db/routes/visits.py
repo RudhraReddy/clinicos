@@ -218,6 +218,13 @@ def update_visit(visit_id):
 @visits.route('/visits/<visit_id>/refund', methods=['POST'])
 @require_auth
 def refund_visit(visit_id):
+    """Sets the visit's refund to an absolute total (not an incremental add) —
+    the caller re-sends the full desired refund_amount each time, so editing an
+    existing refund up or down is just resubmitting a different number. The
+    VisitRefund log records the signed delta between old and new totals so
+    Daily Summary still reports accurately by the day each change happened,
+    including corrections (a decrease logs a negative entry, netting back
+    into that day's Total)."""
     if g.current_user.get('role') == 'doctor':
         return jsonify({'error': 'Not authorized to issue refunds'}), 403
 
@@ -225,33 +232,38 @@ def refund_visit(visit_id):
     data = request.get_json() or {}
 
     try:
-        amount = float(data.get('amount'))
+        new_total = float(data.get('amount'))
     except (TypeError, ValueError):
-        return jsonify({'error': 'A positive refund amount is required'}), 400
+        return jsonify({'error': 'A refund amount is required'}), 400
 
-    if amount <= 0:
-        return jsonify({'error': 'A positive refund amount is required'}), 400
+    if new_total < 0:
+        return jsonify({'error': 'Refund amount cannot be negative'}), 400
+
+    amount_paid = float(visit.amount_paid or 0)
+    if new_total > amount_paid:
+        return jsonify({'error': f'Cannot refund more than the ₹{amount_paid:.2f} collected for this visit'}), 400
 
     mode = (data.get('mode') or '').strip().lower()
-    if mode not in ('cash', 'upi'):
+    if new_total > 0 and mode not in ('cash', 'upi'):
         return jsonify({'error': "A refund type of 'cash' or 'upi' is required"}), 400
 
-    remaining = float(visit.amount_paid or 0) - float(visit.refund_amount or 0)
-    if amount > remaining:
-        return jsonify({'error': f'Cannot refund more than the remaining ₹{remaining:.2f} collected for this visit'}), 400
+    previous_total = float(visit.refund_amount or 0)
+    previous_mode = visit.refund_mode
+    delta = new_total - previous_total
 
-    visit.refund_amount = float(visit.refund_amount or 0) + amount
-    visit.refund_mode = mode
-    visit.payment_status = 'refunded'
+    visit.refund_amount = new_total
+    visit.refund_mode = mode if new_total > 0 else None
+    visit.payment_status = 'refunded' if new_total > 0 else 'full'
     visit.updated_at = get_ist_now()
-    db.session.add(VisitRefund(visit_id=visit_id, amount=amount, mode=mode))
+    if delta != 0:
+        db.session.add(VisitRefund(visit_id=visit_id, amount=delta, mode=mode or previous_mode or 'cash'))
     db.session.commit()
 
     log_activity(
         action='REFUND',
         resource_type='visit',
         resource_id=visit_id,
-        resource_label=f"{visit_id} — ₹{amount:.2f} refunded ({mode})",
+        resource_label=f"{visit_id} — refund set to ₹{new_total:.2f} (was ₹{previous_total:.2f})",
         user_id=g.current_user.get('user_id'),
         username=g.current_user.get('username'),
         ip_address=request.remote_addr,
