@@ -26,19 +26,28 @@ import { useAuth } from "@/lib/auth_context"
 // spinning forever or accidentally showing another clinic's numbers.
 const EMPTY_SUMMARY_BUCKET = { cash: 0, upi: 0, total: 0 }
 
-function FeeCell({ amount, mode }: { amount: number | null; mode: string | null }) {
+function ModeBadge({ mode }: { mode: string | null }) {
+    if (mode === 'cash') {
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] h-5 hover:bg-green-100">Cash</Badge>
+    }
+    if (mode === 'upi') {
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] h-5 hover:bg-blue-100">UPI</Badge>
+    }
+    return null
+}
+
+function FeeCell({ amount, mode, refund, refundMode }: { amount: number | null; mode: string | null; refund?: number | null; refundMode?: string | null }) {
     if (amount === null || amount === undefined) {
         return <span className="text-muted-foreground">-</span>
     }
     return (
         <div className="flex items-center gap-2">
-            <span className="tabular-nums font-medium">₹{amount}</span>
-            {mode === 'cash' && (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] h-5 hover:bg-green-100">Cash</Badge>
-            )}
-            {mode === 'upi' && (
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] h-5 hover:bg-blue-100">UPI</Badge>
-            )}
+            <span className="tabular-nums font-medium">
+                ₹{amount}
+                {!!refund && <span className="text-red-600 dark:text-red-400">/₹{refund}</span>}
+            </span>
+            <ModeBadge mode={mode} />
+            {!!refund && <ModeBadge mode={refundMode ?? null} />}
         </div>
     )
 }
@@ -347,7 +356,7 @@ export default function DailySummaryPage() {
                                     <TableRow key={`${row.type}-${row.visit_id ?? row.invoice_id ?? i}`}>
                                         <TableCell className="font-medium">{row.patient_name}</TableCell>
                                         <TableCell className="text-muted-foreground">{row.phone_number || '-'}</TableCell>
-                                        <TableCell><FeeCell amount={row.visit_fee} mode={row.visit_fee_mode} /></TableCell>
+                                        <TableCell><FeeCell amount={row.visit_fee} mode={row.visit_fee_mode} refund={row.refund_amount} refundMode={row.refund_mode} /></TableCell>
                                         <TableCell><FeeCell amount={row.billing_fee} mode={row.billing_fee_mode} /></TableCell>
                                         <TableCell className="max-w-[240px] truncate text-muted-foreground">{row.reason || '-'}</TableCell>
                                     </TableRow>

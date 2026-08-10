@@ -113,6 +113,8 @@ def get_daily_summary():
             'time': v.visit_time.strftime('%H:%M') if v.visit_time else '00:00',
             'visit_fee': visit_fee if visit_fee else None,
             'visit_fee_mode': visit_fee_mode,
+            'refund_amount': float(v.refund_amount) if v.refund_amount else None,
+            'refund_mode': v.refund_mode,
             'billing_fee': billing_fee,
             'billing_fee_mode': billing_fee_mode,
         })

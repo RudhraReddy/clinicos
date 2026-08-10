@@ -161,6 +161,8 @@ export interface DailySummaryRow {
     time: string;
     visit_fee: number | null;
     visit_fee_mode: 'cash' | 'upi' | 'other' | null;
+    refund_amount: number | null;
+    refund_mode: 'cash' | 'upi' | null;
     billing_fee: number | null;
     billing_fee_mode: 'cash' | 'upi' | 'other' | null;
 }
