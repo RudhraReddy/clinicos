@@ -796,80 +796,103 @@ export default function DoctorDashboard() {
                                                                     )}
                                                                 </div>
 
-                                                                {imagesForDate.length > 0 ? (
-                                                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                                                                        {imagesForDate.map((img) => (
-                                                                            <div
-                                                                                key={img.id}
-                                                                                className="relative aspect-square rounded-md overflow-hidden border bg-muted/20 group cursor-pointer shadow-sm hover:shadow-md transition-all"
-                                                                                onClick={() => setLightboxState({ image: img, context: imagesForDate })}
-                                                                            >
-                                                                                <img
-                                                                                    src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
-                                                                                    alt="Patient"
-                                                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                                                    loading="lazy"
-                                                                                    onError={(e) => {
-                                                                                        (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                                                                        (e.target as HTMLImageElement).classList.add('opacity-50', 'p-4');
-                                                                                    }}
-                                                                                />
-                                                                                {/* Overlay Gradient */}
-                                                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                                                                {(() => {
+                                                                    // Prescription-tagged images render at the existing size; every
+                                                                    // other tag renders at half that, so the two are visually distinct.
+                                                                    const prescriptionImages = imagesForDate.filter(img => img.tag === 'Prescription')
+                                                                    const regularImages = imagesForDate.filter(img => img.tag !== 'Prescription')
 
-                                                                                {/* Icons/Info on Hover */}
-                                                                                {img.tag && (
-                                                                                    <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-md text-white text-[10px] px-1.5 py-0.5 rounded font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                        {img.tag}
-                                                                                    </div>
-                                                                                )}
+                                                                    const renderTile = (img: any, size: number) => (
+                                                                        <div
+                                                                            key={img.id}
+                                                                            style={{ width: size, height: size }}
+                                                                            className="relative inline-block align-top rounded-md overflow-hidden border bg-muted/20 group cursor-pointer shadow-sm hover:shadow-md transition-all mr-2 mb-2"
+                                                                            onClick={() => setLightboxState({ image: img, context: imagesForDate })}
+                                                                        >
+                                                                            <img
+                                                                                src={`${API_BASE_URL}/api/patients/images/${img.id}/file`}
+                                                                                alt="Patient"
+                                                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                                                loading="lazy"
+                                                                                onError={(e) => {
+                                                                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                                                                                    (e.target as HTMLImageElement).classList.add('opacity-50', 'p-4');
+                                                                                }}
+                                                                            />
+                                                                            {/* Overlay Gradient */}
+                                                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
-                                                                                {img.notes && (
-                                                                                    <div className="absolute bottom-0 left-0 right-0 p-2 text-white text-xs truncate font-medium transform translate-y-full group-hover:translate-y-0 transition-transform duration-200">
-                                                                                        {img.notes}
-                                                                                    </div>
-                                                                                )}
-
-                                                                                {/* Delete (trash) button */}
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-red-600 hover:text-white transition-colors z-10"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id) }}
-                                                                                    title="Move to trash"
-                                                                                >
-                                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                                </button>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-xs text-muted-foreground italic pl-6 py-2">
-                                                                        No images for this date.
-                                                                    </div>
-                                                                )}
-
-                                                                {billsForDate.length > 0 && (
-                                                                    <div className="space-y-2 pt-1">
-                                                                        <h4 className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
-                                                                            <FileText className="h-3 w-3" /> Bills
-                                                                        </h4>
-                                                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                                                            {billsForDate.map(bill => (
-                                                                                <div
-                                                                                    key={bill.invoice_id}
-                                                                                    onClick={() => { setInvoiceId(bill.invoice_id); setInvoiceOpen(true) }}
-                                                                                    className="bg-card border rounded-md p-2.5 text-sm flex justify-between items-center shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors"
-                                                                                >
-                                                                                    <div className="min-w-0">
-                                                                                        <div className="font-mono text-[10px] text-muted-foreground truncate">{bill.invoice_id}</div>
-                                                                                        <div className="font-medium text-xs">{bill.payment_type}</div>
-                                                                                    </div>
-                                                                                    <div className="font-bold shrink-0 ml-2">₹{bill.total_amount.toFixed(2)}</div>
+                                                                            {/* Icons/Info on Hover */}
+                                                                            {img.tag && (
+                                                                                <div className="absolute top-1 right-1 bg-black/50 backdrop-blur-md text-white text-[9px] px-1 py-0.5 rounded font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                    {img.tag}
                                                                                 </div>
-                                                                            ))}
+                                                                            )}
+
+                                                                            {img.notes && (
+                                                                                <div className="absolute bottom-0 left-0 right-0 p-1 text-white text-[9px] truncate font-medium transform translate-y-full group-hover:translate-y-0 transition-transform duration-200">
+                                                                                    {img.notes}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Delete (trash) button */}
+                                                                            <button
+                                                                                type="button"
+                                                                                className="absolute bottom-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-red-600 hover:text-white transition-colors z-10"
+                                                                                onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id) }}
+                                                                                title="Move to trash"
+                                                                            >
+                                                                                <Trash2 className="h-3 w-3" />
+                                                                            </button>
                                                                         </div>
-                                                                    </div>
-                                                                )}
+                                                                    )
+
+                                                                    return (
+                                                                        // overflow-hidden establishes a new block formatting context so
+                                                                        // this container's height accounts for the floated Bills column
+                                                                        // instead of collapsing to zero around it.
+                                                                        <div className="overflow-hidden">
+                                                                            {billsForDate.length > 0 && (
+                                                                                <div className="float-right w-36 shrink-0 ml-3 mb-2 space-y-2">
+                                                                                    <h4 className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                                                                                        <FileText className="h-3 w-3" /> Bills
+                                                                                    </h4>
+                                                                                    {billsForDate.map(bill => (
+                                                                                        <div
+                                                                                            key={bill.invoice_id}
+                                                                                            onClick={() => { setInvoiceId(bill.invoice_id); setInvoiceOpen(true) }}
+                                                                                            className="bg-card border rounded-md p-2 text-xs shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors"
+                                                                                        >
+                                                                                            <div className="font-mono text-[9px] text-muted-foreground truncate">{bill.invoice_id}</div>
+                                                                                            <div className="flex justify-between items-center gap-1">
+                                                                                                <span className="font-medium">{bill.payment_type}</span>
+                                                                                                <span className="font-bold">₹{bill.total_amount.toFixed(2)}</span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {imagesForDate.length > 0 ? (
+                                                                                <>
+                                                                                    {/* Separate blocks so regular Images always start on a new
+                                                                                        line below Prescription, never sharing a row with it —
+                                                                                        both still wrap around the floated Bills column above. */}
+                                                                                    {prescriptionImages.length > 0 && (
+                                                                                        <div>{prescriptionImages.map(img => renderTile(img, 140))}</div>
+                                                                                    )}
+                                                                                    {regularImages.length > 0 && (
+                                                                                        <div>{regularImages.map(img => renderTile(img, 70))}</div>
+                                                                                    )}
+                                                                                </>
+                                                                            ) : (
+                                                                                <div className="text-xs text-muted-foreground italic pl-6 py-2">
+                                                                                    No images for this date.
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )
+                                                                })()}
                                                             </div>
                                                         );
                                                     });
