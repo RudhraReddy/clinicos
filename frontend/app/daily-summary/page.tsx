@@ -52,6 +52,27 @@ function FeeCell({ amount, mode, refund, refundMode }: { amount: number | null; 
     )
 }
 
+// A visit can have several bills — shown slash-separated (e.g. 200/300/400)
+// rather than only ever the single bill the old single-bill-per-visit model
+// assumed. Each amount keeps its own cash/upi badge since separate bills can
+// easily have been paid different ways.
+function BillingFeesCell({ fees }: { fees: { amount: number; mode: string | null }[] }) {
+    if (!fees || fees.length === 0) {
+        return <span className="text-muted-foreground">-</span>
+    }
+    return (
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            {fees.map((f, i) => (
+                <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-muted-foreground">/</span>}
+                    <span className="tabular-nums font-medium">₹{f.amount}</span>
+                    <ModeBadge mode={f.mode} />
+                </span>
+            ))}
+        </div>
+    )
+}
+
 export default function DailySummaryPage() {
     const { openMenu } = useMenu()
     const { role, user } = useAuth()
@@ -357,7 +378,7 @@ export default function DailySummaryPage() {
                                         <TableCell className="font-medium">{row.patient_name}</TableCell>
                                         <TableCell className="text-muted-foreground">{row.phone_number || '-'}</TableCell>
                                         <TableCell><FeeCell amount={row.visit_fee} mode={row.visit_fee_mode} refund={row.refund_amount} refundMode={row.refund_mode} /></TableCell>
-                                        <TableCell><FeeCell amount={row.billing_fee} mode={row.billing_fee_mode} /></TableCell>
+                                        <TableCell><BillingFeesCell fees={row.billing_fees} /></TableCell>
                                         <TableCell className="max-w-[240px] truncate text-muted-foreground">{row.reason || '-'}</TableCell>
                                     </TableRow>
                                 ))}

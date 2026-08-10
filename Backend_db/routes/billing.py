@@ -50,13 +50,11 @@ def create_bill():
         discount_type = None
         discount_value = None
 
+    # A visit can have any number of bills against it — no longer capped at one.
     visit_id = data.get('visit_id') if patient else None
     visit = None
     if visit_id:
         visit = Visit.query.get(visit_id)
-        existing_bill = Bill.query.filter_by(visit_id=visit_id).first()
-        if existing_bill:
-            return jsonify({'error': 'A bill already exists for this visit'}), 400
 
     # ── Clinic resolution ────────────────────────────────────────────────
     # A visit-linked bill can never disagree with its own visit's clinic —
@@ -370,18 +368,21 @@ def delete_bill(invoice_id):
     if not bill:
         return jsonify({'error': 'Bill not found'}), 404
 
-    # 1. Unlink associated Visit if present
+    # 1. Unlink associated Visit if present — but only revert its status back to
+    #    in_progress if this was the *last* bill against it. A visit can have
+    #    several bills now, so deleting one of them shouldn't undo "done" while
+    #    other valid bills still exist for it.
     if bill.visit_id:
         visit = Visit.query.get(bill.visit_id)
         if visit:
-            visit.invoice_id = None
-            visit.status = 'in_progress'
-
-    # Also check other visits that might reference this invoice_id
-    visits = Visit.query.filter_by(invoice_id=invoice_id).all()
-    for v in visits:
-        v.invoice_id = None
-        v.status = 'in_progress'
+            if visit.invoice_id == invoice_id:
+                visit.invoice_id = None
+            remaining_bills = Bill.query.filter(
+                Bill.visit_id == visit.visit_id,
+                Bill.invoice_id != invoice_id,
+            ).count()
+            if remaining_bills == 0:
+                visit.status = 'in_progress'
 
     # 2. Revert inventory stock deductions
     bill_items = BillItem.query.filter_by(bill_id=invoice_id).all()

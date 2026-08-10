@@ -164,8 +164,9 @@ export interface DailySummaryRow {
     visit_fee_mode: 'cash' | 'upi' | 'other' | null;
     refund_amount: number | null;
     refund_mode: 'cash' | 'upi' | null;
-    billing_fee: number | null;
-    billing_fee_mode: 'cash' | 'upi' | 'other' | null;
+    // One entry per bill against this visit (a visit can have several) — empty
+    // if none. Walk-in rows always carry exactly one entry, for their own bill.
+    billing_fees: { amount: number; mode: 'cash' | 'upi' | 'other' | null }[];
 }
 
 export interface DailySummaryBucket {

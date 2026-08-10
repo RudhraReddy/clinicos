@@ -92,11 +92,15 @@ def get_all_visits():
     else:
         visits_list = query.limit(50).all()
 
-    invoice_ids = [v.invoice_id for v in visits_list if v.invoice_id]
-    bills_map = {}
-    if invoice_ids:
-        bills = Bill.query.filter(Bill.invoice_id.in_(invoice_ids)).all()
-        bills_map = {b.invoice_id: float(b.total_amount) for b in bills}
+    # A visit can have several bills against it, so this sums ALL of them —
+    # Visit.invoice_id only ever remembers the most-recently-created one and
+    # can't be relied on once a visit has more than one bill.
+    visit_ids_for_bills = [v.visit_id for v in visits_list]
+    billed_totals = {}
+    if visit_ids_for_bills:
+        bills = Bill.query.filter(Bill.visit_id.in_(visit_ids_for_bills)).all()
+        for b in bills:
+            billed_totals[b.visit_id] = billed_totals.get(b.visit_id, 0) + float(b.total_amount)
 
     visit_ids_all = [v.visit_id for v in visits_list]
     prescription_visit_ids = set()
@@ -128,7 +132,7 @@ def get_all_visits():
             'location_id': v.location_id,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
-            'billed_amount': bills_map.get(v.invoice_id),
+            'billed_amount': billed_totals.get(v.visit_id),
             'has_prescription': v.visit_id in prescription_visit_ids,
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None

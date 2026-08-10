@@ -83,10 +83,13 @@ def get_daily_summary():
     visit_ids = [v.visit_id for v in visits_list]
     patient_ids = [v.patient_id for v in visits_list]
 
+    # A visit can now have any number of bills, so this maps to a *list* — never
+    # assume [0] is "the" bill for a visit.
     bills_by_visit = {}
     if visit_ids:
         linked_bills = Bill.query.filter(Bill.visit_id.in_(visit_ids)).all()
-        bills_by_visit = {b.visit_id: b for b in linked_bills}
+        for b in linked_bills:
+            bills_by_visit.setdefault(b.visit_id, []).append(b)
 
     patients_map = {}
     if patient_ids:
@@ -96,12 +99,22 @@ def get_daily_summary():
     rows = []
     for v in visits_list:
         patient = patients_map.get(v.patient_id)
-        bill = bills_by_visit.get(v.visit_id)
+        visit_bills = bills_by_visit.get(v.visit_id, [])
 
         visit_fee = float(v.amount_paid or 0)
         visit_fee_mode = _norm_mode(v.payment_mode) if visit_fee else None
-        billing_fee = float(bill.total_amount) if bill else None
-        billing_fee_mode = _norm_mode(bill.payment_type) if bill else None
+
+        # One entry per bill on this visit, so the row can show "200/300/400"
+        # instead of only ever the single bill the old code assumed existed.
+        billing_fees = []
+        for bill in visit_bills:
+            amount = float(bill.total_amount)
+            mode = _norm_mode(bill.payment_type)
+            billing_fees.append({'amount': amount, 'mode': mode})
+            add('billing_fee', mode, amount)
+            if bill.subtotal_amount is not None:
+                discount_amount = float(bill.subtotal_amount) - float(bill.total_amount)
+                add_info('discount', mode, discount_amount)
 
         rows.append({
             'type': 'visit',
@@ -115,16 +128,13 @@ def get_daily_summary():
             'visit_fee_mode': visit_fee_mode,
             'refund_amount': float(v.refund_amount) if v.refund_amount else None,
             'refund_mode': v.refund_mode,
-            'billing_fee': billing_fee,
-            'billing_fee_mode': billing_fee_mode,
+            'billing_fees': billing_fees,
         })
 
+        # Added exactly once per visit, regardless of how many bills it has —
+        # the visit's own fee doesn't multiply just because it was billed
+        # against multiple times.
         add('visit_fee', visit_fee_mode, visit_fee)
-        if bill:
-            add('billing_fee', billing_fee_mode, billing_fee)
-            if bill.subtotal_amount is not None:
-                discount_amount = float(bill.subtotal_amount) - float(bill.total_amount)
-                add_info('discount', billing_fee_mode, discount_amount)
 
     # ── Walk-in bills for the day (no patient_id → not already covered above) ──
     walkin_q = Bill.query.filter(
@@ -148,8 +158,7 @@ def get_daily_summary():
             'time': b.created_at.strftime('%H:%M') if b.created_at else '00:00',
             'visit_fee': None,
             'visit_fee_mode': None,
-            'billing_fee': amount,
-            'billing_fee_mode': mode,
+            'billing_fees': [{'amount': amount, 'mode': mode}],
         })
         add('billing_fee', mode, amount)
         if b.subtotal_amount is not None:
