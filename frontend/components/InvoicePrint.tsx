@@ -28,6 +28,9 @@ interface InvoicePrintProps {
     billItems: BillItem[]
     invoiceId?: string
     total: number
+    subtotal?: number
+    discountType?: "percent" | "flat" | null
+    discountValue?: number | null
     date?: Date
     referenceDoctor?: string
     className?: string
@@ -54,6 +57,9 @@ export function InvoicePrint({
     billItems,
     invoiceId,
     total,
+    subtotal,
+    discountType = null,
+    discountValue = null,
     date = new Date(),
     referenceDoctor,
     className,
@@ -62,6 +68,10 @@ export function InvoicePrint({
 
     const printTime = format(date, "HH:mm")
     const printDate = format(date, "dd/MM/yyyy")
+    const hasDiscount = !!discountType && (subtotal ?? total) > total
+    const discountLabel = discountType === 'percent'
+        ? `Discount (${discountValue}%)`
+        : 'Discount'
 
     const hasAge = patient.age !== null && patient.age !== undefined
     const hasSex = !!patient.sex
@@ -204,6 +214,21 @@ export function InvoicePrint({
                             ))}
                         </tr>
                     ))}
+                    {/* Subtotal + Discount rows — only shown when a discount was applied */}
+                    {hasDiscount && (
+                        <>
+                            <tr>
+                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>Subtotal</td>
+                                <td style={cellStyle}></td>
+                                <td style={{ ...cellStyle, textAlign: "right" }}>{(subtotal ?? total).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>{discountLabel}</td>
+                                <td style={cellStyle}></td>
+                                <td style={{ ...cellStyle, textAlign: "right" }}>−{((subtotal ?? total) - total).toFixed(2)}</td>
+                            </tr>
+                        </>
+                    )}
                     {/* Total row */}
                     <tr>
                         <td colSpan={9} style={{

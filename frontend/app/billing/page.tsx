@@ -110,6 +110,8 @@ function BillingContent() {
 
     // Payment type
     const [paymentType, setPaymentType] = useState<"CASH" | "CARD" | "UPI">("CASH")
+    const [discountType, setDiscountType] = useState<"percent" | "flat">("percent")
+    const [discountValue, setDiscountValue] = useState("")
 
     // History
     const [history, setHistory] = useState<BillingHistoryEntry[]>([])
@@ -272,6 +274,8 @@ function BillingContent() {
                 walk_in_sex: walkInMode && walkInSex ? walkInSex : undefined,
                 visit_id: walkInMode ? undefined : (visitId || undefined),
                 payment_type: paymentType,
+                discount_type: parsedDiscountValue > 0 ? discountType : undefined,
+                discount_value: parsedDiscountValue > 0 ? parsedDiscountValue : undefined,
                 items_used: billItems.map(i => {
                     const qty = i.qty === '' ? 0 : i.qty
                     const multiplier = getPackMultiplier(i.pack_size)
@@ -289,6 +293,7 @@ function BillingContent() {
 
             const data = await api.createBill(payload)
             setBillItems([])
+            setDiscountValue("")
             if (walkInMode) {
                 setWalkInMode(false)
                 setWalkInName("")
@@ -321,6 +326,13 @@ function BillingContent() {
     }
 
     const hasInvalidQty = billItems.some(i => i.qty === '' || i.qty <= 0)
+
+    const subtotal = calculateTotal()
+    const parsedDiscountValue = parseFloat(discountValue || '0') || 0
+    const discountAmount = discountType === 'percent'
+        ? subtotal * Math.min(Math.max(parsedDiscountValue, 0), 100) / 100
+        : Math.min(Math.max(parsedDiscountValue, 0), subtotal)
+    const finalTotal = subtotal - discountAmount
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
@@ -590,9 +602,55 @@ function BillingContent() {
 
                             {billItems.length > 0 && (
                                 <div className="flex justify-end mt-4 shrink-0">
-                                    <span className="text-lg font-bold">
-                                        Total: ₹{calculateTotal().toFixed(2)}
-                                    </span>
+                                    <div className="flex flex-col items-end gap-2 min-w-[260px]">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">Discount</span>
+                                            <div className="flex rounded-md border overflow-hidden">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={discountType === "percent" ? "default" : "ghost"}
+                                                    className="rounded-none h-8 px-2.5"
+                                                    onClick={() => setDiscountType("percent")}
+                                                >
+                                                    %
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={discountType === "flat" ? "default" : "ghost"}
+                                                    className="rounded-none h-8 px-2.5"
+                                                    onClick={() => setDiscountType("flat")}
+                                                >
+                                                    ₹
+                                                </Button>
+                                            </div>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={discountType === "percent" ? 100 : subtotal}
+                                                value={discountValue}
+                                                onChange={(e) => setDiscountValue(e.target.value)}
+                                                placeholder="0"
+                                                className="w-24 h-8"
+                                            />
+                                        </div>
+                                        {discountAmount > 0 && (
+                                            <>
+                                                <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                                    <span>Subtotal</span>
+                                                    <span>₹{subtotal.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                                    <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
+                                                    <span>−₹{discountAmount.toFixed(2)}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        <span className="text-lg font-bold">
+                                            Total: ₹{finalTotal.toFixed(2)}
+                                        </span>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

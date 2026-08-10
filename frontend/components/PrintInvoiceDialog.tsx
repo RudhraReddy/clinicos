@@ -55,6 +55,9 @@ interface PrintInvoiceData {
     billItems: PrintBillItem[]
     invoiceId: string
     total: number
+    subtotal: number
+    discountType: "percent" | "flat" | null
+    discountValue: number | null
     date: Date
 }
 
@@ -141,6 +144,9 @@ export function PrintInvoiceDialog({
                     billItems,
                     invoiceId: data.invoice_id,
                     total: data.total_amount,
+                    subtotal: data.subtotal_amount ?? data.total_amount,
+                    discountType: data.discount_type ?? null,
+                    discountValue: data.discount_value ?? null,
                     date: new Date(data.created_at),
                 })
             } catch (e) {
@@ -180,6 +186,9 @@ export function PrintInvoiceDialog({
                         billItems={invoiceData.billItems}
                         invoiceId={invoiceData.invoiceId}
                         total={invoiceData.total}
+                        subtotal={invoiceData.subtotal}
+                        discountType={invoiceData.discountType}
+                        discountValue={invoiceData.discountValue}
                         date={invoiceData.date}
                         className="bg-white p-6 text-black"
                     />

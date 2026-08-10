@@ -29,6 +29,23 @@ def create_bill():
     if not items_used:
         return jsonify({'error': 'No items in bill'}), 400
 
+    discount_type = data.get('discount_type')
+    discount_value = data.get('discount_value')
+    if discount_type is not None or discount_value is not None:
+        if discount_type not in ('percent', 'flat'):
+            return jsonify({'error': "discount_type must be 'percent' or 'flat'"}), 400
+        try:
+            discount_value = float(discount_value)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'discount_value must be a number'}), 400
+        if discount_value < 0:
+            return jsonify({'error': 'discount_value cannot be negative'}), 400
+        if discount_type == 'percent' and discount_value > 100:
+            return jsonify({'error': 'Percent discount cannot exceed 100'}), 400
+    else:
+        discount_type = None
+        discount_value = None
+
     visit_id = data.get('visit_id') if patient else None
     if visit_id:
         existing_bill = Bill.query.filter_by(visit_id=visit_id).first()
@@ -137,10 +154,21 @@ def create_bill():
         )
         db.session.add(bill_item)
 
-    if 'total_amount' in data:
-         new_bill.total_amount = total_calc_amount
-    else:
-         new_bill.total_amount = total_calc_amount
+    subtotal_amount = total_calc_amount
+    discount_amount = 0
+    if discount_type == 'percent':
+        discount_amount = subtotal_amount * discount_value / 100
+    elif discount_type == 'flat':
+        if discount_value > subtotal_amount:
+            return jsonify({'error': 'Flat discount cannot exceed the bill subtotal'}), 400
+        discount_amount = discount_value
+
+    final_total = subtotal_amount - discount_amount
+
+    new_bill.subtotal_amount = subtotal_amount
+    new_bill.discount_type = discount_type
+    new_bill.discount_value = discount_value
+    new_bill.total_amount = final_total
 
     db.session.commit()
 
@@ -148,13 +176,13 @@ def create_bill():
         action='CREATE',
         resource_type='bill',
         resource_id=invoice_id,
-        resource_label=f"{patient.name if patient else (walk_in_name or 'Walk-in')} — ₹{total_calc_amount:.2f}",
+        resource_label=f"{patient.name if patient else (walk_in_name or 'Walk-in')} — ₹{final_total:.2f}",
         user_id=g.current_user.get('user_id'),
         username=g.current_user.get('username'),
         ip_address=request.remote_addr,
     )
 
-    return jsonify({'message': 'Bill created', 'invoice_id': invoice_id, 'total': total_calc_amount}), 201
+    return jsonify({'message': 'Bill created', 'invoice_id': invoice_id, 'total': final_total}), 201
 
 @billing.route('/billing/history', methods=['GET'])
 @require_auth
@@ -299,6 +327,9 @@ def get_bill_details(invoice_id):
         },
         'is_walk_in': bill.patient_id is None,
         'payment_type': bill.payment_type,
+        'subtotal_amount': float(bill.subtotal_amount) if bill.subtotal_amount is not None else float(bill.total_amount),
+        'discount_type': bill.discount_type,
+        'discount_value': float(bill.discount_value) if bill.discount_value is not None else None,
         'total_amount': float(bill.total_amount),
         'items': item_list
     }), 200

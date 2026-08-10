@@ -69,6 +69,10 @@ def _apply_migrations(db):
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_sex VARCHAR(10)",
         # 2026-08-09: visit fee refund tracking
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS refund_amount INTEGER DEFAULT 0",
+        # 2026-08-09: bill-level discount (percent or flat), applied at creation time only
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS subtotal_amount NUMERIC(10, 2)",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10)",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

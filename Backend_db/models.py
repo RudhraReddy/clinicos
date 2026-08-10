@@ -179,7 +179,10 @@ class Bill(db.Model):
     walk_in_age = db.Column(db.Integer, nullable=True)
     walk_in_sex = db.Column(db.String(10), nullable=True)
     visit_id = db.Column(db.String(50), db.ForeignKey('visits.visit_id'), nullable=True)
-    total_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal_amount = db.Column(db.Numeric(10, 2), nullable=True) # item total before discount; null on bills predating discounts
+    discount_type = db.Column(db.String(10), nullable=True) # 'percent' | 'flat' | null
+    discount_value = db.Column(db.Numeric(10, 2), nullable=True) # raw entered number (e.g. 10 for 10%, or 50 for a flat ₹50)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=False) # final payable amount (post-discount)
     payment_type = db.Column(db.String(50)) # CASH, CARD, INSURANCE
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
