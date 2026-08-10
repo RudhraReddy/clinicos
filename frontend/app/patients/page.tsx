@@ -144,27 +144,31 @@ export default function PatientsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm">
-                        <Download className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                        Export Registry
-                    </Button>
+                    {(role === 'doctor' || role === 'admin') && (
+                        <>
+                            <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex shadow-sm">
+                                <Download className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                                Export Registry
+                            </Button>
 
-                    <div className="relative">
-                        <input
-                            type="file"
-                            id="bulk-import-csv"
-                            className="hidden"
-                            accept=".csv"
-                            onChange={handleImport}
-                            disabled={importing}
-                        />
-                        <Button variant="outline" size="sm" asChild className="shadow-sm" disabled={importing}>
-                            <label htmlFor="bulk-import-csv" className="cursor-pointer flex items-center text-sm">
-                                {importing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5 text-muted-foreground" />}
-                                {importing ? 'Loading...' : 'Import List'}
-                            </label>
-                        </Button>
-                    </div>
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    id="bulk-import-csv"
+                                    className="hidden"
+                                    accept=".csv"
+                                    onChange={handleImport}
+                                    disabled={importing}
+                                />
+                                <Button variant="outline" size="sm" asChild className="shadow-sm" disabled={importing}>
+                                    <label htmlFor="bulk-import-csv" className="cursor-pointer flex items-center text-sm">
+                                        {importing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5 text-muted-foreground" />}
+                                        {importing ? 'Loading...' : 'Import List'}
+                                    </label>
+                                </Button>
+                            </div>
+                        </>
+                    )}
 
                     <Popover>
                         <PopoverTrigger asChild>

@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, g, send_file
 from models import Patient
 from extensions import db, get_ist_now
 from sqlalchemy import func
-from .auth import require_auth, log_activity
+from .auth import require_auth, require_doctor, log_activity
 
 patients = Blueprint('patients', __name__)
 
@@ -159,6 +159,7 @@ def update_patient(patient_id):
 
 @patients.route('/patients/export', methods=['GET'])
 @require_auth
+@require_doctor
 def export_patients():
     """
     Generates a streamable CSV record of all registered clinic patients.
@@ -203,6 +204,7 @@ def export_patients():
 
 @patients.route('/patients/import', methods=['POST'])
 @require_auth
+@require_doctor
 def import_patients():
     """
     High-efficiency CSV processor for bulk hydrating patient database.

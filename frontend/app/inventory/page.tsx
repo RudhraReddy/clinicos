@@ -890,16 +890,20 @@ export default function InventoryPage() {
                         </TabsList>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
-                            <Download className="mr-1.5 h-3.5 w-3.5" />
-                            Export
-                        </Button>
-                        <ImportInventoryDialog trigger={
-                            <Button variant="outline" size="sm">
-                                <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                Import
-                            </Button>
-                        } onSuccess={loadData} />
+                        {(role === 'doctor' || role === 'admin') && (
+                            <>
+                                <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
+                                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                                    Export
+                                </Button>
+                                <ImportInventoryDialog trigger={
+                                    <Button variant="outline" size="sm">
+                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                        Import
+                                    </Button>
+                                } onSuccess={loadData} />
+                            </>
+                        )}
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm">

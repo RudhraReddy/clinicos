@@ -8,7 +8,7 @@ import csv
 import os
 
 from utils import parse_expiry_date
-from .auth import require_auth, require_admin, log_activity
+from .auth import require_auth, require_admin, require_doctor, log_activity
 
 inventory = Blueprint('inventory', __name__)
 
@@ -833,6 +833,7 @@ def search_inventory():
 
 @inventory.route('/inventory/export', methods=['GET'])
 @require_auth
+@require_doctor
 def export_inventory():
     output = io.StringIO()
     writer = csv.writer(output)
@@ -889,6 +890,7 @@ def export_inventory():
 
 @inventory.route('/inventory/export/edit', methods=['GET'])
 @require_auth
+@require_doctor
 def export_inventory_edit():
     from models import Location
     scope = request.args.get('scope', 'all')  # 'all' or a location_id integer string
@@ -970,6 +972,7 @@ KNOWN_IMPORT_FIELDS = {
 
 @inventory.route('/inventory/import/parse-headers', methods=['POST'])
 @require_auth
+@require_doctor
 def parse_import_headers():
     from models import Location
     if 'file' not in request.files:
@@ -1044,6 +1047,7 @@ def export_invoice(invoice_number):
 
 @inventory.route('/inventory/import', methods=['POST'])
 @require_auth
+@require_doctor
 def import_inventory():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
