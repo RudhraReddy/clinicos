@@ -556,7 +556,7 @@ export default function DoctorDashboard() {
                                     </CardHeader>
                                     <div id="patient-pictures-panes" className="flex-1 flex overflow-hidden">
                                         {/* Timeline Sidebar — width is drag-resizable via the handle below */}
-                                        <div style={{ width: timelineWidth }} className="shrink-0 border-r bg-muted/50 overflow-y-auto p-2 space-y-2">
+                                        <div style={{ width: timelineWidth }} className="shrink-0 bg-muted/50 overflow-y-auto p-2 space-y-2">
                                             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2 sticky top-0 bg-muted/50 backdrop-blur-sm py-1 z-10">Visit Timeline</div>
 
                                             {/* Show All Option */}
@@ -930,7 +930,12 @@ export default function DoctorDashboard() {
                             orderedTodayVisits.map(visit => (
                                 <div
                                     key={visit.visit_id}
-                                    onClick={() => { setSelectedVisitId(visit.visit_id); setMobileDetailOpen(true) }}
+                                    onClick={() => {
+                                        // Clicking the already-selected visit again deselects it,
+                                        // returning to the default "No Patient Selected" view.
+                                        setSelectedVisitId(prev => prev === visit.visit_id ? null : visit.visit_id)
+                                        setMobileDetailOpen(true)
+                                    }}
                                     className={cn(
                                         "p-3 rounded-md border transition-all duration-200 cursor-pointer flex items-center gap-2",
                                         visit.status === 'done'
