@@ -31,9 +31,6 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         visit_time: "",
         reason: "",
         visiting_fee: "",
-        amount_paid: "",
-        payment_status: "unpaid",
-        paid_full: false,
         status: "scheduled"
     })
     // Refund is an action slot, not a stored field — it always starts unchecked/empty
@@ -48,9 +45,6 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 visit_time: visit.visit_time || "",
                 reason: visit.reason || "",
                 visiting_fee: visit.visiting_fee?.toString() || "",
-                amount_paid: visit.amount_paid?.toString() || "",
-                payment_status: visit.payment_status || "unpaid",
-                paid_full: (visit.payment_status === 'full'),
                 status: visit.status
             })
             setRefundChecked(false)
@@ -58,19 +52,21 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         }
     }, [visit, open])
 
-    const amountPaid = visit?.amount_paid || 0
+    // Whatever fee is entered is treated as collected in full — there's no
+    // partial/unpaid concept here. The only way money moves back out is a refund.
+    const visitingFee = visit?.visiting_fee || 0
     const refundedSoFar = visit?.refund_amount || 0
-    const netPaid = amountPaid - refundedSoFar
+    const netPaid = visitingFee - refundedSoFar
     const remainingRefundable = Math.max(0, netPaid)
-    const canRefund = role !== 'doctor' && amountPaid > 0
+    const canRefund = role !== 'doctor' && visitingFee > 0
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!visit) return
 
-        const newAmountPaid = formData.amount_paid ? parseFloat(formData.amount_paid) : 0
-        if (refundedSoFar > 0 && newAmountPaid < amountPaid) {
-            alert("Amount Paid can't be lowered once a refund has been issued — use the Refund field instead.")
+        const newVisitingFee = formData.visiting_fee ? parseFloat(formData.visiting_fee) : 0
+        if (refundedSoFar > 0 && newVisitingFee < visitingFee) {
+            alert("Visiting Fee can't be lowered once a refund has been issued — use the Refund field instead.")
             return
         }
 
@@ -90,9 +86,9 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 visit_date: formData.visit_date,
                 visit_time: formData.visit_time || undefined,
                 reason: formData.reason || undefined,
-                visiting_fee: formData.visiting_fee ? parseFloat(formData.visiting_fee) : 0,
-                amount_paid: formData.amount_paid ? parseFloat(formData.amount_paid) : 0,
-                payment_status: formData.payment_status,
+                visiting_fee: newVisitingFee,
+                amount_paid: newVisitingFee,
+                payment_status: refundedSoFar > 0 ? 'refunded' : 'full',
                 status: formData.status
             })
 
@@ -194,77 +190,21 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label htmlFor="edit-visiting_fee" className="text-sm font-medium">
-                                    Visiting Fee
-                                </label>
-                                <Input
-                                    id="edit-visiting_fee"
-                                    type="number"
-                                    value={formData.visiting_fee}
-                                    onChange={(e) => {
-                                        const fee = e.target.value;
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            visiting_fee: fee,
-                                            amount_paid: prev.paid_full ? fee : prev.amount_paid
-                                        }));
-                                    }}
-                                    placeholder="0"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label htmlFor="edit-amount_paid" className="text-sm font-medium">
-                                        Amount Paid
-                                    </label>
-                                    <div className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id="edit-paid_full"
-                                            checked={formData.paid_full}
-                                            onChange={(e) => {
-                                                const isFull = e.target.checked;
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    paid_full: isFull,
-                                                    amount_paid: isFull ? prev.visiting_fee : prev.amount_paid,
-                                                    payment_status: isFull ? 'full' : (parseFloat(prev.amount_paid || '0') > 0 ? 'partial' : 'unpaid')
-                                                }));
-                                            }}
-                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                        />
-                                        <label htmlFor="edit-paid_full" className="text-xs font-medium cursor-pointer select-none">
-                                            Paid in Full
-                                        </label>
-                                    </div>
-                                </div>
-                                <Input
-                                    id="edit-amount_paid"
-                                    type="number"
-                                    value={formData.amount_paid}
-                                    onChange={(e) => {
-                                        const paid = e.target.value;
-                                        const fee = parseFloat(formData.visiting_fee || '0');
-                                        const paidNum = parseFloat(paid || '0');
-
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            amount_paid: paid,
-                                            paid_full: paidNum >= fee && fee > 0,
-                                            payment_status: paidNum >= fee && fee > 0 ? 'full' : (paidNum > 0 ? 'partial' : 'unpaid')
-                                        }));
-                                    }}
-                                    placeholder="0"
-                                    disabled={formData.paid_full}
-                                />
-                            </div>
+                        <div className="space-y-2">
+                            <label htmlFor="edit-visiting_fee" className="text-sm font-medium">
+                                Visiting Fee
+                            </label>
+                            <Input
+                                id="edit-visiting_fee"
+                                type="number"
+                                value={formData.visiting_fee}
+                                onChange={(e) => setFormData({ ...formData, visiting_fee: e.target.value })}
+                                placeholder="0"
+                            />
                         </div>
 
                         {refundedSoFar > 0 && (
                             <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
-                                <span>Amount Paid: <span className="font-medium text-foreground">₹{amountPaid.toFixed(2)}</span></span>
                                 <span>Refunded: <span className="font-medium text-foreground">₹{refundedSoFar.toFixed(2)}</span></span>
                                 <span>Net: <span className="font-medium text-foreground">₹{netPaid.toFixed(2)}</span></span>
                             </div>
@@ -295,9 +235,6 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                     placeholder="0"
                                     disabled={!refundChecked}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    Max refundable right now: ₹{remainingRefundable.toFixed(2)}
-                                </p>
                             </div>
                         )}
                         {visit.created_at && (
