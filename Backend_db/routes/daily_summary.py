@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from sqlalchemy import func
-from models import Visit, Patient, Bill
+from models import Visit, Patient, Bill, VisitRefund
 from .auth import require_auth
 
 daily_summary = Blueprint('daily_summary', __name__)
@@ -39,10 +39,13 @@ def get_daily_summary():
     summary = {
         'visit_fee': _empty_bucket(),
         'billing_fee': _empty_bucket(),
+        'refund': _empty_bucket(),
+        'discount': _empty_bucket(),
         'total': _empty_bucket(),
     }
 
     def add(bucket, mode, amount):
+        """Adds to `bucket` and to Total — for money actually coming in."""
         if not amount:
             return
         summary[bucket]['total'] += amount
@@ -50,6 +53,26 @@ def get_daily_summary():
         if mode in ('cash', 'upi'):
             summary[bucket][mode] += amount
             summary['total'][mode] += amount
+
+    def subtract(bucket, mode, amount):
+        """Adds to `bucket` but subtracts from Total — for money going back out."""
+        if not amount:
+            return
+        summary[bucket]['total'] += amount
+        summary['total']['total'] -= amount
+        if mode in ('cash', 'upi'):
+            summary[bucket][mode] += amount
+            summary['total'][mode] -= amount
+
+    def add_info(bucket, mode, amount):
+        """Adds to `bucket` only — informational, doesn't touch Total. Discount
+        doesn't move money on its own; the bill's total_amount already reflects
+        it, and that's what billing_fee/Total already count."""
+        if not amount:
+            return
+        summary[bucket]['total'] += amount
+        if mode in ('cash', 'upi'):
+            summary[bucket][mode] += amount
 
     # ── Visits for the day ──────────────────────────────────────────────
     visit_q = Visit.query.filter(Visit.visit_date == date_obj, Visit.status != 'deleted')
@@ -75,7 +98,7 @@ def get_daily_summary():
         patient = patients_map.get(v.patient_id)
         bill = bills_by_visit.get(v.visit_id)
 
-        visit_fee = float(v.amount_paid or 0) - float(v.refund_amount or 0)
+        visit_fee = float(v.amount_paid or 0)
         visit_fee_mode = _norm_mode(v.payment_mode) if visit_fee else None
         billing_fee = float(bill.total_amount) if bill else None
         billing_fee_mode = _norm_mode(bill.payment_type) if bill else None
@@ -97,6 +120,9 @@ def get_daily_summary():
         add('visit_fee', visit_fee_mode, visit_fee)
         if bill:
             add('billing_fee', billing_fee_mode, billing_fee)
+            if bill.subtotal_amount is not None:
+                discount_amount = float(bill.subtotal_amount) - float(bill.total_amount)
+                add_info('discount', billing_fee_mode, discount_amount)
 
     # ── Walk-in bills for the day (no patient_id → not already covered above) ──
     walkin_q = Bill.query.filter(
@@ -124,6 +150,17 @@ def get_daily_summary():
             'billing_fee_mode': mode,
         })
         add('billing_fee', mode, amount)
+        if b.subtotal_amount is not None:
+            discount_amount = float(b.subtotal_amount) - float(b.total_amount)
+            add_info('discount', mode, discount_amount)
+
+    # ── Refunds issued today (may belong to visits from any earlier day) ──────
+    refund_q = VisitRefund.query.filter(func.date(VisitRefund.created_at) == date_str)
+    if filter_location_id is not None:
+        refund_q = refund_q.join(Visit, Visit.visit_id == VisitRefund.visit_id) \
+                            .filter(Visit.location_id == filter_location_id)
+    for r in refund_q.all():
+        subtract('refund', r.mode, float(r.amount))
 
     rows.sort(key=lambda r: r['time'])
 

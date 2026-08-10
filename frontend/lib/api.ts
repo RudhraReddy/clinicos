@@ -176,6 +176,8 @@ export interface DailySummaryResponse {
     summary: {
         visit_fee: DailySummaryBucket;
         billing_fee: DailySummaryBucket;
+        refund: DailySummaryBucket;
+        discount: DailySummaryBucket;
         total: DailySummaryBucket;
     };
 }

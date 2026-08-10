@@ -192,6 +192,20 @@ class Bill(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
 
 
+class VisitRefund(db.Model):
+    """One row per refund event on a visit — Visit.refund_amount/refund_mode only
+    track the cumulative total and most-recent mode, which isn't enough to report
+    "how much was refunded on day X" when refunds happen days after the visit
+    itself. Purely an append-only log, mirroring InventoryHistory's role for stock."""
+    __tablename__ = 'visit_refunds'
+
+    id = db.Column(db.Integer, primary_key=True)
+    visit_id = db.Column(db.String(50), db.ForeignKey('visits.visit_id'), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    mode = db.Column(db.String(10), nullable=False) # cash, upi
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+
+
 
 class BillItem(db.Model):
     __tablename__ = 'bill_items'

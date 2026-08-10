@@ -70,7 +70,13 @@ export default function DailySummaryPage() {
             setData({
                 date: dateStr,
                 rows: [],
-                summary: { visit_fee: { ...EMPTY_SUMMARY_BUCKET }, billing_fee: { ...EMPTY_SUMMARY_BUCKET }, total: { ...EMPTY_SUMMARY_BUCKET } },
+                summary: {
+                    visit_fee: { ...EMPTY_SUMMARY_BUCKET },
+                    billing_fee: { ...EMPTY_SUMMARY_BUCKET },
+                    refund: { ...EMPTY_SUMMARY_BUCKET },
+                    discount: { ...EMPTY_SUMMARY_BUCKET },
+                    total: { ...EMPTY_SUMMARY_BUCKET },
+                },
             })
             setLoading(false)
             return
@@ -199,6 +205,18 @@ export default function DailySummaryPage() {
                                         <TableCell className="text-right tabular-nums">₹{summary.billing_fee.cash}</TableCell>
                                         <TableCell className="text-right tabular-nums">₹{summary.billing_fee.upi}</TableCell>
                                         <TableCell className="text-right tabular-nums font-semibold">₹{summary.billing_fee.total}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium">Refund</TableCell>
+                                        <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">−₹{summary.refund.cash}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-red-600 dark:text-red-400">−₹{summary.refund.upi}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-semibold text-red-600 dark:text-red-400">−₹{summary.refund.total}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium text-muted-foreground">Discount <span className="text-[10px]">(info only)</span></TableCell>
+                                        <TableCell className="text-right tabular-nums text-muted-foreground">₹{summary.discount.cash}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-muted-foreground">₹{summary.discount.upi}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-semibold text-muted-foreground">₹{summary.discount.total}</TableCell>
                                     </TableRow>
                                     <TableRow className="border-t-2">
                                         <TableCell className="font-bold">Total</TableCell>

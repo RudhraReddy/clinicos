@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Visit, Patient, ProductMaster, User, Bill
+from models import Visit, Patient, ProductMaster, User, Bill, VisitRefund
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
@@ -244,6 +244,7 @@ def refund_visit(visit_id):
     visit.refund_mode = mode
     visit.payment_status = 'refunded'
     visit.updated_at = get_ist_now()
+    db.session.add(VisitRefund(visit_id=visit_id, amount=amount, mode=mode))
     db.session.commit()
 
     log_activity(
