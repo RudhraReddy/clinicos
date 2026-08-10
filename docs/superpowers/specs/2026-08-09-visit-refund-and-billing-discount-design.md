@@ -1,7 +1,7 @@
 # Visit Fee Refund & Billing Discount — Design
 
 Date: 2026-08-09
-Status: Approved, ready for implementation planning
+Status: Implemented (commits 7549c8e, 6921017)
 
 Two independent, money-in-flow features, designed together but implemented and
 shipped as separate units of work:
