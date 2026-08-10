@@ -452,9 +452,9 @@ export default function DoctorDashboard() {
             </div>
 
             {/* ── DESKTOP LAYOUT (hidden on mobile) ── */}
-            <div className="hidden md:flex md:flex-col h-[calc(100vh-100px)] bg-background overflow-hidden relative">
+            <div className="hidden md:flex md:flex-col gap-4 h-[calc(100vh-100px)] overflow-hidden relative">
             {/* Header */}
-            <div className="flex items-center justify-between shrink-0 px-6 pt-6 pb-4">
+            <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <button
                         type="button"
@@ -846,10 +846,10 @@ export default function DoctorDashboard() {
             </div >
 
             {/* RIGHT SIDEBAR (Fixed Width, ~30%) */}
-            < div className="w-[380px] p-6 flex flex-col gap-6 shrink-0 bg-transparent" >
+            < div className="w-[380px] flex flex-col gap-6 shrink-0" >
 
                 {/* Summary Card */}
-                < Card className="bg-transparent border-input shadow-sm" >
+                < Card className="shadow-sm" >
                     <CardHeader className="pb-2 pt-5 px-6">
                         <CardTitle className="text-lg font-medium">Summary</CardTitle>
                     </CardHeader>
@@ -874,7 +874,7 @@ export default function DoctorDashboard() {
                 </Card >
 
                 {/* Today's Appointments Card */}
-                < Card className="flex-1 flex flex-col bg-transparent border-input shadow-sm overflow-hidden min-h-0" >
+                < Card className="flex-1 flex flex-col shadow-sm overflow-hidden min-h-0" >
                     <CardHeader className="pb-3 pt-5 px-6 bg-muted/10">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
