@@ -114,6 +114,7 @@ def get_all_visits():
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'refund_amount': v.refund_amount or 0,
+            'refund_mode': v.refund_mode,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'billed_amount': bills_map.get(v.invoice_id),
@@ -139,6 +140,7 @@ def get_patient_visits(patient_id):
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
             'refund_amount': v.refund_amount or 0,
+            'refund_mode': v.refund_mode,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'created_at': v.created_at.isoformat() if v.created_at else None,
@@ -164,6 +166,7 @@ def get_visit(visit_id):
         'visiting_fee': visit.visiting_fee,
         'amount_paid': visit.amount_paid,
         'refund_amount': visit.refund_amount or 0,
+        'refund_mode': visit.refund_mode,
         'payment_status': visit.payment_status,
         'payment_mode': visit.payment_mode,
         'created_at': visit.created_at.isoformat() if visit.created_at else None,
@@ -229,11 +232,16 @@ def refund_visit(visit_id):
     if amount <= 0:
         return jsonify({'error': 'A positive refund amount is required'}), 400
 
+    mode = (data.get('mode') or '').strip().lower()
+    if mode not in ('cash', 'upi'):
+        return jsonify({'error': "A refund type of 'cash' or 'upi' is required"}), 400
+
     remaining = float(visit.amount_paid or 0) - float(visit.refund_amount or 0)
     if amount > remaining:
         return jsonify({'error': f'Cannot refund more than the remaining ₹{remaining:.2f} collected for this visit'}), 400
 
     visit.refund_amount = float(visit.refund_amount or 0) + amount
+    visit.refund_mode = mode
     visit.payment_status = 'refunded'
     visit.updated_at = get_ist_now()
     db.session.commit()
@@ -242,7 +250,7 @@ def refund_visit(visit_id):
         action='REFUND',
         resource_type='visit',
         resource_id=visit_id,
-        resource_label=f"{visit_id} — ₹{amount:.2f} refunded",
+        resource_label=f"{visit_id} — ₹{amount:.2f} refunded ({mode})",
         user_id=g.current_user.get('user_id'),
         username=g.current_user.get('username'),
         ip_address=request.remote_addr,
@@ -251,6 +259,7 @@ def refund_visit(visit_id):
     return jsonify({
         'message': 'Refund recorded',
         'refund_amount': visit.refund_amount,
+        'refund_mode': visit.refund_mode,
         'payment_status': visit.payment_status,
     }), 200
 

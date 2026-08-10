@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry } from "@/lib/api"
+import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users } from "lucide-react"
@@ -113,6 +113,15 @@ function BillingContent() {
     const [discountType, setDiscountType] = useState<"percent" | "flat">("percent")
     const [discountValue, setDiscountValue] = useState("")
 
+    // Visit refund — only meaningful when Billing was opened from a specific visit
+    // (visit_id in the URL, e.g. the dashboard's "Go to Billing" action). A plain
+    // patient search doesn't point at any one visit, so there's nothing to refund.
+    const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null)
+    const [refundChecked, setRefundChecked] = useState(false)
+    const [refundValue, setRefundValue] = useState("")
+    const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
+    const [refundSubmitting, setRefundSubmitting] = useState(false)
+
     // History
     const [history, setHistory] = useState<BillingHistoryEntry[]>([])
     const [loadingHistory, setLoadingHistory] = useState(false)
@@ -141,6 +150,18 @@ function BillingContent() {
                 .catch(() => setPatient(null))
         }
     }, [patientId])
+
+    const loadLinkedVisit = useCallback(() => {
+        if (!visitId) {
+            setLinkedVisit(null)
+            return
+        }
+        api.getVisit(visitId)
+            .then(setLinkedVisit)
+            .catch(() => setLinkedVisit(null))
+    }, [visitId])
+
+    useEffect(() => { loadLinkedVisit() }, [loadLinkedVisit])
 
     const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
@@ -321,6 +342,44 @@ function BillingContent() {
         }
     }
 
+    const handleRefund = async () => {
+        if (!linkedVisit) return
+        const amount = parseFloat(refundValue || '0')
+        const remaining = Math.max(0, (linkedVisit.amount_paid || 0) - (linkedVisit.refund_amount || 0))
+        if (!(amount > 0) || amount > remaining) {
+            toast.error(`Enter a refund amount between ₹0 and ₹${remaining.toFixed(2)}`)
+            return
+        }
+        if (refundMode !== 'cash' && refundMode !== 'upi') {
+            toast.error("Select a refund type (Cash or UPI)")
+            return
+        }
+
+        setRefundSubmitting(true)
+        try {
+            await api.refundVisit(linkedVisit.visit_id, amount, refundMode)
+            toast.success("Refund recorded")
+            setRefundChecked(false)
+            setRefundValue("")
+            setRefundMode("")
+            loadLinkedVisit()
+        } catch (e: unknown) {
+            console.error(e)
+            let errorMessage = "Failed to record refund"
+            if (e instanceof Error) {
+                try {
+                    const parsed = JSON.parse(e.message) as { error?: string }
+                    if (parsed?.error) errorMessage = parsed.error
+                } catch {
+                    errorMessage = e.message
+                }
+            }
+            toast.error(errorMessage)
+        } finally {
+            setRefundSubmitting(false)
+        }
+    }
+
     const calculateTotal = () => {
         return billItems.reduce((acc, item) => acc + (item.total || 0), 0)
     }
@@ -437,6 +496,55 @@ function BillingContent() {
                                     >
                                         Walk-in Bill
                                     </Button>
+                                    {linkedVisit && !walkInMode && (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id="billing-refund-check"
+                                                    checked={refundChecked}
+                                                    onChange={(e) => {
+                                                        setRefundChecked(e.target.checked)
+                                                        if (!e.target.checked) {
+                                                            setRefundValue("")
+                                                            setRefundMode("")
+                                                        }
+                                                    }}
+                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                />
+                                                <label htmlFor="billing-refund-check" className="text-sm font-medium cursor-pointer select-none">
+                                                    Refund
+                                                </label>
+                                            </div>
+                                            <Input
+                                                type="number"
+                                                placeholder="Value"
+                                                className="w-24 h-10"
+                                                value={refundValue}
+                                                onChange={(e) => setRefundValue(e.target.value)}
+                                                disabled={!refundChecked}
+                                            />
+                                            <Select value={refundMode} onValueChange={(v) => setRefundMode(v as "cash" | "upi")} disabled={!refundChecked}>
+                                                <SelectTrigger className="w-24 h-10">
+                                                    <SelectValue placeholder="Type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="cash">Cash</SelectItem>
+                                                    <SelectItem value="upi">UPI</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-10 shrink-0"
+                                                disabled={!refundChecked || refundSubmitting}
+                                                onClick={handleRefund}
+                                            >
+                                                {refundSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Submit Refund
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>

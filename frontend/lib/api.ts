@@ -31,6 +31,7 @@ export interface Visit {
     visiting_fee?: number;
     amount_paid?: number;
     refund_amount?: number;
+    refund_mode?: string;
     payment_status?: string;
     payment_mode?: string;
     billed_amount?: number | null;
@@ -468,10 +469,10 @@ export const api = {
         });
     },
 
-    async refundVisit(id: string, amount: number): Promise<{ refund_amount: number; payment_status: string }> {
+    async refundVisit(id: string, amount: number, mode: 'cash' | 'upi'): Promise<{ refund_amount: number; payment_status: string; refund_mode: string }> {
         return fetchApi(`/api/visits/${id}/refund`, {
             method: 'POST',
-            body: JSON.stringify({ amount }),
+            body: JSON.stringify({ amount, mode }),
         });
     },
 

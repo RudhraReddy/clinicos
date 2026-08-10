@@ -37,6 +37,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
     // and represents "amount to refund right now", not the running refunded total.
     const [refundChecked, setRefundChecked] = useState(false)
     const [refundInput, setRefundInput] = useState("")
+    const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
 
     useEffect(() => {
         if (visit && open) {
@@ -49,6 +50,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
             })
             setRefundChecked(false)
             setRefundInput("")
+            setRefundMode("")
         }
     }, [visit, open])
 
@@ -77,6 +79,10 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 alert(`Enter a refund amount between ₹0 and ₹${remainingRefundable.toFixed(2)}`)
                 return
             }
+            if (refundMode !== 'cash' && refundMode !== 'upi') {
+                alert("Select a refund type (Cash or UPI)")
+                return
+            }
         }
 
         setSubmitting(true)
@@ -93,7 +99,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
             })
 
             if (refundAmount > 0) {
-                await api.refundVisit(visit.visit_id, refundAmount)
+                await api.refundVisit(visit.visit_id, refundAmount, refundMode as "cash" | "upi")
             }
 
             // Close dialog and notify success
@@ -235,6 +241,17 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                     placeholder="0"
                                     disabled={!refundChecked}
                                 />
+                                <select
+                                    id="edit-refund-mode"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={refundMode}
+                                    onChange={(e) => setRefundMode(e.target.value as "" | "cash" | "upi")}
+                                    disabled={!refundChecked}
+                                >
+                                    <option value="" disabled>Type</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="upi">UPI</option>
+                                </select>
                             </div>
                         )}
                         {visit.created_at && (
