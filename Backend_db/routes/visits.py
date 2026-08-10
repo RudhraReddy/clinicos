@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Visit, Patient, ProductMaster, User, Bill, VisitRefund
+from models import Visit, Patient, ProductMaster, User, Bill, VisitRefund, PatientImage
 from sqlalchemy import func
 from datetime import datetime
 from utils import generate_visit_id
@@ -98,6 +98,16 @@ def get_all_visits():
         bills = Bill.query.filter(Bill.invoice_id.in_(invoice_ids)).all()
         bills_map = {b.invoice_id: float(b.total_amount) for b in bills}
 
+    visit_ids_all = [v.visit_id for v in visits_list]
+    prescription_visit_ids = set()
+    if visit_ids_all:
+        prescription_rows = PatientImage.query.filter(
+            PatientImage.visit_id.in_(visit_ids_all),
+            PatientImage.tag == 'Prescription',
+            PatientImage.deleted_at.is_(None),
+        ).with_entities(PatientImage.visit_id).distinct().all()
+        prescription_visit_ids = {row[0] for row in prescription_rows}
+
     results = []
     for v in visits_list:
         patient = Patient.query.get(v.patient_id)
@@ -118,6 +128,7 @@ def get_all_visits():
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'billed_amount': bills_map.get(v.invoice_id),
+            'has_prescription': v.visit_id in prescription_visit_ids,
             'created_at': v.created_at.isoformat() if v.created_at else None,
             'updated_at': v.updated_at.isoformat() if hasattr(v, 'updated_at') and v.updated_at else None
         })
