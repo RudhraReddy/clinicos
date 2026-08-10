@@ -104,12 +104,19 @@ export default function DailySummaryPage() {
     const summary = data?.summary
     const rows = data?.rows ?? []
 
-    // Payment-mode split for the pie chart — includes an "Other" slice for any amount in
-    // summary.total.total not accounted for by cash/upi (e.g. a stray CARD-mode bill).
+    // Double pie: outer ring is the Cash/UPI payment-mode split (includes an "Other"
+    // slice for any amount in summary.total.total not accounted for by cash/upi,
+    // e.g. a stray CARD-mode bill). Inner pie is the Visit Fee/Billing Fee category
+    // split — a different breakdown of the same total, nested concentrically.
     const paymentSplitData = summary ? [
         { name: 'Cash', value: summary.total.cash, fill: '#22c55e' },
         { name: 'UPI', value: summary.total.upi, fill: '#3b82f6' },
         { name: 'Other', value: Math.max(0, Math.round((summary.total.total - summary.total.cash - summary.total.upi) * 100) / 100), fill: '#94a3b8' },
+    ].filter(d => d.value > 0) : []
+
+    const categorySplitData = summary ? [
+        { name: 'Visit Fee', value: summary.visit_fee.total, fill: '#8b5cf6' },
+        { name: 'Billing Fee', value: summary.billing_fee.total, fill: '#f59e0b' },
     ].filter(d => d.value > 0) : []
 
     return (
@@ -240,22 +247,38 @@ export default function DailySummaryPage() {
                                 No income to chart for this day
                             </div>
                         ) : (
-                            <div className="w-full flex items-center gap-4">
-                                <div className="w-32 h-32 shrink-0">
+                            <div className="w-full flex items-center gap-5">
+                                <div className="w-36 h-36 shrink-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RePie>
+                                            {/* Outer tube: Cash/UPI payment-mode split */}
                                             <Pie
                                                 data={paymentSplitData}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={35}
-                                                outerRadius={55}
+                                                innerRadius={46}
+                                                outerRadius={64}
                                                 paddingAngle={2}
                                                 dataKey="value"
                                                 animationDuration={600}
                                             >
                                                 {paymentSplitData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
+                                                    <Cell key={`outer-cell-${index}`} fill={entry.fill} stroke="none" />
+                                                ))}
+                                            </Pie>
+                                            {/* Inner pie: Visit Fee/Billing Fee category split */}
+                                            <Pie
+                                                data={categorySplitData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={0}
+                                                outerRadius={38}
+                                                paddingAngle={2}
+                                                dataKey="value"
+                                                animationDuration={600}
+                                            >
+                                                {categorySplitData.map((entry, index) => (
+                                                    <Cell key={`inner-cell-${index}`} fill={entry.fill} stroke="none" />
                                                 ))}
                                             </Pie>
                                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -263,14 +286,27 @@ export default function DailySummaryPage() {
                                         </RePie>
                                     </ResponsiveContainer>
                                 </div>
-                                <div className="space-y-2">
-                                    {paymentSplitData.map(entry => (
-                                        <div key={entry.name} className="flex items-center gap-2 text-sm">
-                                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
-                                            <span className="text-muted-foreground">{entry.name}</span>
-                                            <span className="font-semibold tabular-nums">₹{entry.value}</span>
-                                        </div>
-                                    ))}
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Payment Mode</p>
+                                        {paymentSplitData.map(entry => (
+                                            <div key={entry.name} className="flex items-center gap-2 text-sm">
+                                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
+                                                <span className="text-muted-foreground">{entry.name}</span>
+                                                <span className="font-semibold tabular-nums">₹{entry.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Fee Type</p>
+                                        {categorySplitData.map(entry => (
+                                            <div key={entry.name} className="flex items-center gap-2 text-sm">
+                                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
+                                                <span className="text-muted-foreground">{entry.name}</span>
+                                                <span className="font-semibold tabular-nums">₹{entry.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm pt-1 border-t">
                                         <span className="h-2.5 w-2.5 shrink-0" />
                                         <span className="text-muted-foreground">Total</span>
