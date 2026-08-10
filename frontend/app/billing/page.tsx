@@ -109,7 +109,7 @@ function BillingContent() {
     const [submitting, setSubmitting] = useState(false)
 
     // Payment type
-    const [paymentType, setPaymentType] = useState<"CASH" | "CARD" | "UPI">("CASH")
+    const [paymentType, setPaymentType] = useState<"CASH" | "UPI">("CASH")
     const [discountType, setDiscountType] = useState<"percent" | "flat">("percent")
     const [discountValue, setDiscountValue] = useState("")
 
@@ -547,13 +547,12 @@ function BillingContent() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
-                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "CARD" | "UPI")}>
+                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "UPI")}>
                                         <SelectTrigger id="payment-type" className="w-[140px]">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="CASH">Cash</SelectItem>
-                                            <SelectItem value="CARD">Card</SelectItem>
                                             <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -786,7 +785,6 @@ function BillingContent() {
                                         <SelectContent>
                                             <SelectItem value="ALL">All</SelectItem>
                                             <SelectItem value="CASH">Cash</SelectItem>
-                                            <SelectItem value="CARD">Card</SelectItem>
                                             <SelectItem value="UPI">UPI</SelectItem>
                                         </SelectContent>
                                     </Select>

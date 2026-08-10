@@ -127,7 +127,6 @@ export default function StatusPage() {
   const paymentSplits = [
     { method: "Physical Cash", amount: findPay("CASH"), share: Math.round((findPay("CASH")/totalTPay)*100), icon: Wallet, style: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100" },
     { method: "UPI / Digital QR", amount: findPay("UPI"), share: Math.round((findPay("UPI")/totalTPay)*100), icon: Smartphone, style: "text-sky-600 bg-sky-50 dark:bg-sky-900/20 border-sky-100" },
-    { method: "Credit/Debit Cards", amount: findPay("CARD"), share: Math.round((findPay("CARD")/totalTPay)*100), icon: CreditCard, style: "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100" },
     { method: "Sitting Inventory", amount: sittingInv, isMetric: true, icon: Package, style: "text-violet-600 bg-violet-50 dark:bg-violet-900/20 border-violet-100", note: "Current Asset Value" },
   ]
 

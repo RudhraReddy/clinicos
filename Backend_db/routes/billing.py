@@ -29,6 +29,10 @@ def create_bill():
     if not items_used:
         return jsonify({'error': 'No items in bill'}), 400
 
+    payment_type = (data.get('payment_type') or 'CASH').strip().upper()
+    if payment_type not in ('CASH', 'UPI'):
+        return jsonify({'error': "payment_type must be 'CASH' or 'UPI'"}), 400
+
     discount_type = data.get('discount_type')
     discount_value = data.get('discount_value')
     if discount_type is not None or discount_value is not None:
@@ -71,7 +75,7 @@ def create_bill():
         walk_in_age=walk_in_age,
         walk_in_sex=walk_in_sex,
         visit_id=visit_id,
-        payment_type=data.get('payment_type', 'CASH'),
+        payment_type=payment_type,
         total_amount=0,
         created_by_user_id=g.current_user.get('user_id')
     )

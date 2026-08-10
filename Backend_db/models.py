@@ -184,7 +184,7 @@ class Bill(db.Model):
     discount_type = db.Column(db.String(10), nullable=True) # 'percent' | 'flat' | null
     discount_value = db.Column(db.Numeric(10, 2), nullable=True) # raw entered number (e.g. 10 for 10%, or 50 for a flat ₹50)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False) # final payable amount (post-discount)
-    payment_type = db.Column(db.String(50)) # CASH, CARD, INSURANCE
+    payment_type = db.Column(db.String(50)) # CASH, UPI — legacy rows may still hold CARD
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
     created_by_user_id = db.Column(db.String(50), db.ForeignKey('users.id'), nullable=True) # Admin/Staff ID
