@@ -41,6 +41,7 @@ def get_daily_summary():
         'billing_fee': _empty_bucket(),
         'refund': _empty_bucket(),
         'discount': _empty_bucket(),
+        'billing_refund': _empty_bucket(),
         'total': _empty_bucket(),
     }
 
@@ -54,14 +55,17 @@ def get_daily_summary():
             summary[bucket][mode] += amount
             summary['total'][mode] += amount
 
-    def subtract(bucket, mode, amount):
-        """Adds to `bucket` but subtracts from Total — for money going back out."""
+    def net_out(bucket, mode, amount):
+        """Removes `amount` from `bucket` itself, and from Total — for a payout
+        refund that actually left a specific till. Unlike `add`'s mirror image,
+        this decreases the bucket's own total too, so e.g. 'Visit Cash' reads as
+        the true net figure (collected minus paid back out of that same till)."""
         if not amount:
             return
-        summary[bucket]['total'] += amount
+        summary[bucket]['total'] -= amount
         summary['total']['total'] -= amount
         if mode in ('cash', 'upi'):
-            summary[bucket][mode] += amount
+            summary[bucket][mode] -= amount
             summary['total'][mode] -= amount
 
     def add_info(bucket, mode, amount):
@@ -113,8 +117,13 @@ def get_daily_summary():
             billing_fees.append({'amount': amount, 'mode': mode})
             add('billing_fee', mode, amount)
             if bill.subtotal_amount is not None:
-                discount_amount = float(bill.subtotal_amount) - float(bill.total_amount)
+                # visit_refund_applied is already netted out of total_amount too —
+                # back it out here so 'discount' only ever reflects an actual
+                # discount, not a refund that happened to shrink this same bill.
+                discount_amount = float(bill.subtotal_amount) - float(bill.total_amount) - float(bill.visit_refund_applied or 0)
                 add_info('discount', mode, discount_amount)
+            if bill.visit_refund_applied:
+                add_info('billing_refund', mode, float(bill.visit_refund_applied))
 
         rows.append({
             'type': 'visit',
@@ -166,12 +175,29 @@ def get_daily_summary():
             add_info('discount', mode, discount_amount)
 
     # ── Refunds issued today (may belong to visits from any earlier day) ──────
+    # Payout refunds are tagged with exactly which till they came out of —
+    # subtract from that bucket directly (so "Visit Cash"/"Billing UPI" etc.
+    # are true net-of-refunds tally figures), while still logging into the
+    # info-only 'refund' bucket (split by cash/upi regardless of source) for
+    # at-a-glance reconciliation. 'apply_to_bill' refunds never reach this log
+    # at all — see routes/visits.py — they're accounted for via billing_refund
+    # above instead, since they never left any till.
+    REFUND_BUCKET_MAP = {
+        'visit_cash': ('visit_fee', 'cash'),
+        'visit_upi': ('visit_fee', 'upi'),
+        'billing_cash': ('billing_fee', 'cash'),
+        'billing_upi': ('billing_fee', 'upi'),
+    }
     refund_q = VisitRefund.query.filter(func.date(VisitRefund.created_at) == date_str)
     if filter_location_id is not None:
         refund_q = refund_q.join(Visit, Visit.visit_id == VisitRefund.visit_id) \
                             .filter(Visit.location_id == filter_location_id)
     for r in refund_q.all():
-        subtract('refund', r.mode, float(r.amount))
+        bucket, norm_mode = REFUND_BUCKET_MAP.get(r.mode, (None, None))
+        if not bucket:
+            continue
+        net_out(bucket, norm_mode, float(r.amount))
+        add_info('refund', norm_mode, float(r.amount))
 
     rows.sort(key=lambda r: r['time'])
 

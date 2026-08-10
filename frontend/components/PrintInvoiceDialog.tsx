@@ -58,6 +58,7 @@ interface PrintInvoiceData {
     subtotal: number
     discountType: "percent" | "flat" | null
     discountValue: number | null
+    visitRefundApplied: number | null
     date: Date
 }
 
@@ -147,6 +148,7 @@ export function PrintInvoiceDialog({
                     subtotal: data.subtotal_amount ?? data.total_amount,
                     discountType: data.discount_type ?? null,
                     discountValue: data.discount_value ?? null,
+                    visitRefundApplied: data.visit_refund_applied ?? null,
                     date: new Date(data.created_at),
                 })
             } catch (e) {
@@ -189,6 +191,7 @@ export function PrintInvoiceDialog({
                         subtotal={invoiceData.subtotal}
                         discountType={invoiceData.discountType}
                         discountValue={invoiceData.discountValue}
+                        visitRefundApplied={invoiceData.visitRefundApplied}
                         date={invoiceData.date}
                         className="bg-white p-6 text-black"
                     />

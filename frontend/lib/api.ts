@@ -16,6 +16,11 @@ export interface Patient {
     created_at?: string;
 }
 
+// The 4 payout codes each name exactly one till the money physically came
+// out of; apply_to_bill means the refund is still pending, to be folded into
+// a future bill's total instead of paid out directly.
+export type RefundMode = 'visit_cash' | 'visit_upi' | 'billing_cash' | 'billing_upi' | 'apply_to_bill' | string;
+
 export interface Visit {
     visit_id: string;
     patient_id: string;
@@ -31,7 +36,10 @@ export interface Visit {
     visiting_fee?: number;
     amount_paid?: number;
     refund_amount?: number;
-    refund_mode?: string;
+    refund_mode?: RefundMode;
+    // Only meaningful when refund_mode is 'apply_to_bill' — how much of the
+    // pending refund hasn't yet been folded into a bill.
+    refund_remaining?: number;
     payment_status?: string;
     payment_mode?: string;
     billed_amount?: number | null;
@@ -164,7 +172,7 @@ export interface DailySummaryRow {
     visit_fee: number | null;
     visit_fee_mode: 'cash' | 'upi' | 'other' | null;
     refund_amount: number | null;
-    refund_mode: 'cash' | 'upi' | null;
+    refund_mode: RefundMode | null;
     // One entry per bill against this visit (a visit can have several) — empty
     // if none. Walk-in rows always carry exactly one entry, for their own bill.
     billing_fees: { amount: number; mode: 'cash' | 'upi' | 'other' | null }[];
@@ -184,6 +192,7 @@ export interface DailySummaryResponse {
         billing_fee: DailySummaryBucket;
         refund: DailySummaryBucket;
         discount: DailySummaryBucket;
+        billing_refund: DailySummaryBucket;
         total: DailySummaryBucket;
     };
 }
@@ -480,7 +489,7 @@ export const api = {
     // `amount` is the visit's total desired refund (not a delta) — editing an
     // existing refund up or down is just resubmitting a different number.
     // `mode` is only required when amount > 0.
-    async refundVisit(id: string, amount: number, mode?: 'cash' | 'upi' | ''): Promise<{ refund_amount: number; payment_status: string; refund_mode: string }> {
+    async refundVisit(id: string, amount: number, mode?: RefundMode | ''): Promise<{ refund_amount: number; payment_status: string; refund_mode: string; refund_remaining: number }> {
         return fetchApi(`/api/visits/${id}/refund`, {
             method: 'POST',
             body: JSON.stringify({ amount, mode }),
@@ -504,7 +513,7 @@ export const api = {
         return fetchApi(`/api/billing/patient/${patientId}`);
     },
 
-    async createBill(data: any): Promise<{ invoice_id: string; total: number }> {
+    async createBill(data: any): Promise<{ invoice_id: string; total: number; visit_refund_applied?: number | null }> {
         return fetchApi('/api/billing', {
             method: 'POST',
             body: JSON.stringify(data),

@@ -75,6 +75,19 @@ def _apply_migrations(db):
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS subtotal_amount NUMERIC(10, 2)",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10)",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2)",
+        # 2026-08-10: 5-way refund settlement (visit/billing x cash/upi, + apply_to_bill) —
+        # widen the mode columns (old 'cash'/'upi' values still fit) and add the column
+        # that records how much of a pending refund a given bill absorbed.
+        "ALTER TABLE visits ALTER COLUMN refund_mode TYPE VARCHAR(20)",
+        "ALTER TABLE visit_refunds ALTER COLUMN mode TYPE VARCHAR(20)",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS visit_refund_applied NUMERIC(10, 2)",
+        # Pre-existing refunds were always visit-side payouts (billing/apply_to_bill
+        # didn't exist yet) — remap their old generic 'cash'/'upi' values onto the
+        # new explicit codes. Idempotent: matches nothing once already remapped.
+        "UPDATE visits SET refund_mode = 'visit_cash' WHERE refund_mode = 'cash'",
+        "UPDATE visits SET refund_mode = 'visit_upi' WHERE refund_mode = 'upi'",
+        "UPDATE visit_refunds SET mode = 'visit_cash' WHERE mode = 'cash'",
+        "UPDATE visit_refunds SET mode = 'visit_upi' WHERE mode = 'upi'",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

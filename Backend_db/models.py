@@ -162,7 +162,11 @@ class Visit(db.Model):
     visiting_fee = db.Column(db.Integer, default=0)
     amount_paid = db.Column(db.Integer, default=0)
     refund_amount = db.Column(db.Integer, default=0) # cumulative amount refunded against amount_paid
-    refund_mode = db.Column(db.String(10), nullable=True) # cash, upi — mode of the most recent refund
+    # Settlement of the most recent refund — one of 5 codes (see routes/visits.py
+    # REFUND_MODES): visit_cash/visit_upi/billing_cash/billing_upi are direct
+    # payouts from that specific till; apply_to_bill means the refund is still
+    # pending and gets folded into a future bill's total instead of paid out.
+    refund_mode = db.Column(db.String(20), nullable=True)
     payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid, refunded
     payment_mode = db.Column(db.String(20), nullable=True) # cash, upi
     
@@ -183,8 +187,12 @@ class Bill(db.Model):
     subtotal_amount = db.Column(db.Numeric(10, 2), nullable=True) # item total before discount; null on bills predating discounts
     discount_type = db.Column(db.String(10), nullable=True) # 'percent' | 'flat' | null
     discount_value = db.Column(db.Numeric(10, 2), nullable=True) # raw entered number (e.g. 10 for 10%, or 50 for a flat ₹50)
-    total_amount = db.Column(db.Numeric(10, 2), nullable=False) # final payable amount (post-discount)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=False) # final payable amount (post-discount, post-refund)
     payment_type = db.Column(db.String(50)) # CASH, UPI — legacy rows may still hold CARD
+    # How much of an 'apply_to_bill' visit refund was folded into this bill —
+    # total_amount already has this subtracted; this column exists purely so the
+    # invoice print and Daily Summary know it happened and can annotate it.
+    visit_refund_applied = db.Column(db.Numeric(10, 2), nullable=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
     created_by_user_id = db.Column(db.String(50), db.ForeignKey('users.id'), nullable=True) # Admin/Staff ID
@@ -202,7 +210,7 @@ class VisitRefund(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     visit_id = db.Column(db.String(50), db.ForeignKey('visits.visit_id'), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
-    mode = db.Column(db.String(10), nullable=False) # cash, upi
+    mode = db.Column(db.String(20), nullable=False) # visit_cash, visit_upi, billing_cash, billing_upi
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
 

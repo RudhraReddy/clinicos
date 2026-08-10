@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit, type Location } from "@/lib/api"
+import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit, type Location, type RefundMode } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users, MapPin } from "lucide-react"
@@ -119,8 +119,11 @@ function BillingContent() {
     const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null)
     const [refundChecked, setRefundChecked] = useState(false)
     const [refundValue, setRefundValue] = useState("")
-    const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
+    const [refundMode, setRefundMode] = useState<"" | RefundMode>("")
     const [refundSubmitting, setRefundSubmitting] = useState(false)
+    // Only offered when the linked visit has a pending 'apply_to_bill' refund —
+    // folds whatever's left of it into this new bill instead of paying it out.
+    const [applyRefundToBill, setApplyRefundToBill] = useState(false)
 
     // Clinic assignment — every bill is tagged to a clinic, same as the visit it may
     // be linked to. A visit-linked bill is locked to that visit's own clinic (can't
@@ -182,8 +185,13 @@ function BillingContent() {
         const existingRefund = linkedVisit?.refund_amount || 0
         setRefundChecked(existingRefund > 0)
         setRefundValue(existingRefund > 0 ? existingRefund.toString() : "")
-        setRefundMode((linkedVisit?.refund_mode as "cash" | "upi") || "")
+        setRefundMode(linkedVisit?.refund_mode || "")
+        setApplyRefundToBill(false)
     }, [linkedVisit])
+
+    // How much of a pending 'apply_to_bill' refund is still unconsumed —
+    // drives the "Apply pending refund" checkbox and the live total preview.
+    const pendingBillRefund = linkedVisit?.refund_mode === 'apply_to_bill' ? (linkedVisit.refund_remaining || 0) : 0
 
     const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
@@ -324,6 +332,7 @@ function BillingContent() {
                 payment_type: paymentType,
                 discount_type: parsedDiscountValue > 0 ? discountType : undefined,
                 discount_value: parsedDiscountValue > 0 ? parsedDiscountValue : undefined,
+                apply_visit_refund: (!walkInMode && pendingBillRefund > 0 && applyRefundToBill) || undefined,
                 items_used: billItems.map(i => {
                     const qty = i.qty === '' ? 0 : i.qty
                     const multiplier = getPackMultiplier(i.pack_size)
@@ -342,13 +351,19 @@ function BillingContent() {
             const data = await api.createBill(payload)
             setBillItems([])
             setDiscountValue("")
+            setApplyRefundToBill(false)
             if (walkInMode) {
                 setWalkInMode(false)
                 setWalkInName("")
                 setWalkInAge("")
                 setWalkInSex("")
             }
-            toast.success(`Bill created! Invoice #${data.invoice_id}`)
+            if (data.visit_refund_applied) {
+                toast.success(`Bill created! Invoice #${data.invoice_id} — ₹${data.visit_refund_applied.toFixed(2)} pending refund applied`)
+                loadLinkedVisit()
+            } else {
+                toast.success(`Bill created! Invoice #${data.invoice_id}`)
+            }
             setActiveTab('history')
             setPrintInvoiceId(data.invoice_id)
             setPrintDialogOpen(true)
@@ -377,8 +392,8 @@ function BillingContent() {
             toast.error(`Enter a refund amount between ₹0 and ₹${cap.toFixed(2)}`)
             return
         }
-        if (amount > 0 && refundMode !== 'cash' && refundMode !== 'upi') {
-            toast.error("Select a refund type (Cash or UPI)")
+        if (amount > 0 && !refundMode) {
+            toast.error("Select how this refund is being settled")
             return
         }
 
@@ -415,7 +430,11 @@ function BillingContent() {
     const discountAmount = discountType === 'percent'
         ? subtotal * Math.min(Math.max(parsedDiscountValue, 0), 100) / 100
         : Math.min(Math.max(parsedDiscountValue, 0), subtotal)
-    const finalTotal = subtotal - discountAmount
+    const preRefundTotal = subtotal - discountAmount
+    // Never more than what's left of the pending refund, and never more than
+    // the bill itself — any excess simply stays unconsumed for a later bill.
+    const refundToApply = applyRefundToBill ? Math.min(pendingBillRefund, preRefundTotal) : 0
+    const finalTotal = preRefundTotal - refundToApply
 
     // Clinic resolution — mirrors the backend's own resolution order exactly, so the
     // UI never shows/enables something the server would reject.
@@ -596,13 +615,16 @@ function BillingContent() {
                                                 onChange={(e) => setRefundValue(e.target.value)}
                                                 disabled={!refundChecked}
                                             />
-                                            <Select value={refundMode} onValueChange={(v) => setRefundMode(v as "cash" | "upi")} disabled={!refundChecked}>
-                                                <SelectTrigger className="w-24 h-10">
-                                                    <SelectValue placeholder="Type" />
+                                            <Select value={refundMode} onValueChange={(v) => setRefundMode(v as RefundMode)} disabled={!refundChecked}>
+                                                <SelectTrigger className="w-36 h-10">
+                                                    <SelectValue placeholder="Settle via..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="cash">Cash</SelectItem>
-                                                    <SelectItem value="upi">UPI</SelectItem>
+                                                    <SelectItem value="visit_cash">Visit Cash</SelectItem>
+                                                    <SelectItem value="visit_upi">Visit UPI</SelectItem>
+                                                    <SelectItem value="billing_cash">Billing Cash</SelectItem>
+                                                    <SelectItem value="billing_upi">Billing UPI</SelectItem>
+                                                    <SelectItem value="apply_to_bill">Apply to Bill</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <Button
@@ -814,16 +836,38 @@ function BillingContent() {
                                                 className="w-24 h-8"
                                             />
                                         </div>
-                                        {discountAmount > 0 && (
+                                        {!walkInMode && pendingBillRefund > 0 && (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <input
+                                                    type="checkbox"
+                                                    id="apply-refund-check"
+                                                    checked={applyRefundToBill}
+                                                    onChange={(e) => setApplyRefundToBill(e.target.checked)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                />
+                                                <label htmlFor="apply-refund-check" className="text-sm text-muted-foreground cursor-pointer select-none">
+                                                    Apply ₹{pendingBillRefund.toFixed(2)} pending refund to this bill
+                                                </label>
+                                            </div>
+                                        )}
+                                        {(discountAmount > 0 || refundToApply > 0) && (
                                             <>
                                                 <div className="flex justify-between w-full text-sm text-muted-foreground">
                                                     <span>Subtotal</span>
                                                     <span>₹{subtotal.toFixed(2)}</span>
                                                 </div>
-                                                <div className="flex justify-between w-full text-sm text-muted-foreground">
-                                                    <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
-                                                    <span>−₹{discountAmount.toFixed(2)}</span>
-                                                </div>
+                                                {discountAmount > 0 && (
+                                                    <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                                        <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
+                                                        <span>−₹{discountAmount.toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                                {refundToApply > 0 && (
+                                                    <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                                        <span>Refund Applied</span>
+                                                        <span>−₹{refundToApply.toFixed(2)}</span>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                         <span className="text-lg font-bold">

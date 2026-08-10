@@ -189,10 +189,25 @@ def create_bill():
 
     final_total = subtotal_amount - discount_amount
 
+    # Fold in a pending 'apply_to_bill' visit refund, if the caller opted in.
+    # Applies against whatever's left unconsumed (a visit can have several
+    # bills — the refund is always spent against the first one(s) created,
+    # never split evenly). Floors this bill at ₹0 rather than going negative;
+    # any excess simply stays unconsumed for the next bill on this visit.
+    refund_applied = None
+    if visit and data.get('apply_visit_refund') and visit.refund_mode == 'apply_to_bill':
+        already_applied = float(db.session.query(func.coalesce(func.sum(Bill.visit_refund_applied), 0))
+                                 .filter(Bill.visit_id == visit_id).scalar() or 0)
+        remaining = float(visit.refund_amount or 0) - already_applied
+        if remaining > 0:
+            refund_applied = min(remaining, final_total)
+            final_total -= refund_applied
+
     new_bill.subtotal_amount = subtotal_amount
     new_bill.discount_type = discount_type
     new_bill.discount_value = discount_value
     new_bill.total_amount = final_total
+    new_bill.visit_refund_applied = refund_applied
 
     db.session.commit()
 
@@ -206,7 +221,12 @@ def create_bill():
         ip_address=request.remote_addr,
     )
 
-    return jsonify({'message': 'Bill created', 'invoice_id': invoice_id, 'total': final_total}), 201
+    return jsonify({
+        'message': 'Bill created',
+        'invoice_id': invoice_id,
+        'total': final_total,
+        'visit_refund_applied': refund_applied,
+    }), 201
 
 @billing.route('/billing/history', methods=['GET'])
 @require_auth
@@ -354,6 +374,7 @@ def get_bill_details(invoice_id):
         'subtotal_amount': float(bill.subtotal_amount) if bill.subtotal_amount is not None else float(bill.total_amount),
         'discount_type': bill.discount_type,
         'discount_value': float(bill.discount_value) if bill.discount_value is not None else None,
+        'visit_refund_applied': float(bill.visit_refund_applied) if bill.visit_refund_applied else None,
         'total_amount': float(bill.total_amount),
         'items': item_list
     }), 200

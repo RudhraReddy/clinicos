@@ -31,6 +31,9 @@ interface InvoicePrintProps {
     subtotal?: number
     discountType?: "percent" | "flat" | null
     discountValue?: number | null
+    // Amount of a pending visit-fee refund folded into this bill's total —
+    // rendered as a bare "-₹amount" line with no label at all.
+    visitRefundApplied?: number | null
     date?: Date
     referenceDoctor?: string
     className?: string
@@ -60,6 +63,7 @@ export function InvoicePrint({
     subtotal,
     discountType = null,
     discountValue = null,
+    visitRefundApplied = null,
     date = new Date(),
     referenceDoctor,
     className,
@@ -68,7 +72,12 @@ export function InvoicePrint({
 
     const printTime = format(date, "HH:mm")
     const printDate = format(date, "dd/MM/yyyy")
-    const hasDiscount = !!discountType && (subtotal ?? total) > total
+    // total = subtotal − discount − visitRefundApplied, so back the refund out
+    // before computing the discount amount — otherwise a refund-only bill (no
+    // real discount) would misreport its refund as a "discount".
+    const discountAmount = (subtotal ?? total) - total - (visitRefundApplied ?? 0)
+    const hasDiscount = !!discountType && discountAmount > 0
+    const hasSubtotalBreakdown = hasDiscount || !!visitRefundApplied
     const discountLabel = discountType === 'percent'
         ? `Discount (${discountValue}%)`
         : 'Discount'
@@ -214,20 +223,29 @@ export function InvoicePrint({
                             ))}
                         </tr>
                     ))}
-                    {/* Subtotal + Discount rows — only shown when a discount was applied */}
+                    {/* Subtotal row — shown whenever either a discount or a folded-in refund
+                        makes the Total differ from the sum of line items */}
+                    {hasSubtotalBreakdown && (
+                        <tr>
+                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>Subtotal</td>
+                            <td style={cellStyle}></td>
+                            <td style={{ ...cellStyle, textAlign: "right" }}>{(subtotal ?? total).toFixed(2)}</td>
+                        </tr>
+                    )}
                     {hasDiscount && (
-                        <>
-                            <tr>
-                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>Subtotal</td>
-                                <td style={cellStyle}></td>
-                                <td style={{ ...cellStyle, textAlign: "right" }}>{(subtotal ?? total).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>{discountLabel}</td>
-                                <td style={cellStyle}></td>
-                                <td style={{ ...cellStyle, textAlign: "right" }}>−{((subtotal ?? total) - total).toFixed(2)}</td>
-                            </tr>
-                        </>
+                        <tr>
+                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>{discountLabel}</td>
+                            <td style={cellStyle}></td>
+                            <td style={{ ...cellStyle, textAlign: "right" }}>−{discountAmount.toFixed(2)}</td>
+                        </tr>
+                    )}
+                    {/* Refund folded into this bill — no label, per clinic policy: just the bare amount */}
+                    {!!visitRefundApplied && (
+                        <tr>
+                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}></td>
+                            <td style={cellStyle}></td>
+                            <td style={{ ...cellStyle, textAlign: "right" }}>−{visitRefundApplied.toFixed(2)}</td>
+                        </tr>
                     )}
                     {/* Total row */}
                     <tr>

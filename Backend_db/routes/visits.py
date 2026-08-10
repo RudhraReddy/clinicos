@@ -9,6 +9,18 @@ from .auth import require_auth, log_activity
 
 visits = Blueprint('visits', __name__)
 
+# 4 direct-payout settlements (one per till) + apply_to_bill, which doesn't pay
+# anything out — it just earmarks the refund to be folded into a future bill.
+REFUND_MODES = ('visit_cash', 'visit_upi', 'billing_cash', 'billing_upi', 'apply_to_bill')
+
+
+def _refund_applied_to_bills(visit_id):
+    """Sum of Bill.visit_refund_applied across every bill this visit has ever
+    had — i.e. how much of an 'apply_to_bill' refund is already consumed."""
+    total = db.session.query(func.coalesce(func.sum(Bill.visit_refund_applied), 0)) \
+        .filter(Bill.visit_id == visit_id).scalar()
+    return float(total or 0)
+
 @visits.route('/visits', methods=['POST'])
 @require_auth
 def create_visit():
@@ -177,6 +189,8 @@ def get_patient_visits(patient_id):
 def get_visit(visit_id):
     visit = Visit.query.get_or_404(visit_id)
     patient = Patient.query.get(visit.patient_id)
+    refund_amount = float(visit.refund_amount or 0)
+    applied = _refund_applied_to_bills(visit_id) if visit.refund_mode == 'apply_to_bill' else 0
     return jsonify({
         'visit_id': visit.visit_id,
         'patient_id': visit.patient_id,
@@ -191,6 +205,10 @@ def get_visit(visit_id):
         'amount_paid': visit.amount_paid,
         'refund_amount': visit.refund_amount or 0,
         'refund_mode': visit.refund_mode,
+        # Only meaningful when refund_mode is 'apply_to_bill' — how much of the
+        # pending refund hasn't yet been folded into a bill. Drives the "Apply
+        # pending refund" checkbox on the Billing page.
+        'refund_remaining': round(refund_amount - applied, 2) if visit.refund_mode == 'apply_to_bill' else 0,
         'location_id': visit.location_id,
         'payment_status': visit.payment_status,
         'payment_mode': visit.payment_mode,
@@ -269,8 +287,18 @@ def refund_visit(visit_id):
         return jsonify({'error': f'Cannot refund more than the ₹{amount_paid:.2f} collected for this visit'}), 400
 
     mode = (data.get('mode') or '').strip().lower()
-    if new_total > 0 and mode not in ('cash', 'upi'):
-        return jsonify({'error': "A refund type of 'cash' or 'upi' is required"}), 400
+    if new_total > 0 and mode not in REFUND_MODES:
+        return jsonify({'error': "A valid refund settlement type is required"}), 400
+
+    # Once part of an 'apply_to_bill' refund has actually been folded into a
+    # bill, that portion is settled — the settlement type can no longer change,
+    # and the total can't drop below what's already been applied.
+    applied_so_far = _refund_applied_to_bills(visit_id)
+    if applied_so_far > 0:
+        if new_total > 0 and mode != 'apply_to_bill':
+            return jsonify({'error': f"₹{applied_so_far:.2f} of this refund has already been applied to a bill — settlement type can't be changed"}), 400
+        if new_total < applied_so_far:
+            return jsonify({'error': f"Cannot reduce the refund below the ₹{applied_so_far:.2f} already applied to a bill"}), 400
 
     previous_total = float(visit.refund_amount or 0)
     previous_mode = visit.refund_mode
@@ -280,8 +308,11 @@ def refund_visit(visit_id):
     visit.refund_mode = mode if new_total > 0 else None
     visit.payment_status = 'refunded' if new_total > 0 else 'full'
     visit.updated_at = get_ist_now()
-    if delta != 0:
-        db.session.add(VisitRefund(visit_id=visit_id, amount=delta, mode=mode or previous_mode or 'cash'))
+    # Only payout settlements are a real money-movement event worth logging —
+    # 'apply_to_bill' doesn't move anything until a bill actually consumes it
+    # (logged separately via Bill.visit_refund_applied at that point).
+    if delta != 0 and mode != 'apply_to_bill':
+        db.session.add(VisitRefund(visit_id=visit_id, amount=delta, mode=mode or previous_mode or 'visit_cash'))
     db.session.commit()
 
     log_activity(
@@ -298,6 +329,7 @@ def refund_visit(visit_id):
         'message': 'Refund recorded',
         'refund_amount': visit.refund_amount,
         'refund_mode': visit.refund_mode,
+        'refund_remaining': round(new_total - applied_so_far, 2) if visit.refund_mode == 'apply_to_bill' else 0,
         'location_id': visit.location_id,
         'payment_status': visit.payment_status,
     }), 200

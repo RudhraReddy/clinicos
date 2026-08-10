@@ -27,14 +27,26 @@ interface VisitsTabProps {
 const yesNo = (b: boolean) => (b ? "Yes" : "No")
 
 // Same green(cash)/blue(upi) convention already used on Daily Summary's fee cells.
+// Refund settlement adds 3 more codes: billing_cash/billing_upi (a payout
+// sourced from the billing till instead of the visit till) and apply_to_bill
+// (not a payout at all — folded into a bill's total instead).
 function ModeBadge({ mode }: { mode?: string | null }) {
-    if (mode === 'cash') {
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] h-5 hover:bg-green-100">Cash</Badge>
+    switch (mode) {
+        case 'cash':
+        case 'visit_cash':
+            return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] h-5 hover:bg-green-100">{mode === 'visit_cash' ? 'Visit Cash' : 'Cash'}</Badge>
+        case 'upi':
+        case 'visit_upi':
+            return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] h-5 hover:bg-blue-100">{mode === 'visit_upi' ? 'Visit UPI' : 'UPI'}</Badge>
+        case 'billing_cash':
+            return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] h-5 hover:bg-amber-100">Billing Cash</Badge>
+        case 'billing_upi':
+            return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 text-[10px] h-5 hover:bg-purple-100">Billing UPI</Badge>
+        case 'apply_to_bill':
+            return <Badge variant="secondary" className="text-[10px] h-5">Applied to Bill</Badge>
+        default:
+            return null
     }
-    if (mode === 'upi') {
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] h-5 hover:bg-blue-100">UPI</Badge>
-    }
-    return null
 }
 
 export function VisitsTab({ visits, loading }: VisitsTabProps) {

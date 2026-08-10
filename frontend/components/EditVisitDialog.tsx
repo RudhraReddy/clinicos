@@ -12,7 +12,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
-import { api, type Visit } from "@/lib/api"
+import { api, type Visit, type RefundMode } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
 import { useAuth } from "@/lib/auth_context"
 
@@ -41,7 +41,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
     // this save" (not "clear it") — to remove a refund entirely, edit it down to 0.
     const [refundChecked, setRefundChecked] = useState(false)
     const [refundInput, setRefundInput] = useState("")
-    const [refundMode, setRefundMode] = useState<"" | "cash" | "upi">("")
+    const [refundMode, setRefundMode] = useState<"" | RefundMode>("")
 
     useEffect(() => {
         if (visit && open) {
@@ -56,7 +56,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
             const existingRefund = visit.refund_amount || 0
             setRefundChecked(existingRefund > 0)
             setRefundInput(existingRefund > 0 ? existingRefund.toString() : "")
-            setRefundMode((visit.refund_mode as "cash" | "upi") || "")
+            setRefundMode(visit.refund_mode || "")
         }
     }, [visit, open])
 
@@ -84,8 +84,8 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 alert(`Enter a refund amount between ₹0 and ₹${visitingFee.toFixed(2)}`)
                 return
             }
-            if (newRefundTotal > 0 && refundMode !== 'cash' && refundMode !== 'upi') {
-                alert("Select a refund type (Cash or UPI)")
+            if (newRefundTotal > 0 && !refundMode) {
+                alert("Select how this refund is being settled")
                 return
             }
         }
@@ -266,12 +266,15 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                         id="edit-refund-mode"
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         value={refundMode}
-                                        onChange={(e) => setRefundMode(e.target.value as "" | "cash" | "upi")}
+                                        onChange={(e) => setRefundMode(e.target.value as RefundMode)}
                                         disabled={!refundChecked}
                                     >
-                                        <option value="" disabled>Type</option>
-                                        <option value="cash">Cash</option>
-                                        <option value="upi">UPI</option>
+                                        <option value="" disabled>Settle via...</option>
+                                        <option value="visit_cash">Visit Cash</option>
+                                        <option value="visit_upi">Visit UPI</option>
+                                        <option value="billing_cash">Billing Cash</option>
+                                        <option value="billing_upi">Billing UPI</option>
+                                        <option value="apply_to_bill">Apply to Bill</option>
                                     </select>
                                 </div>
                             </div>
