@@ -105,7 +105,14 @@ export function VisitDetailsDialog({ visit, open, onOpenChange }: VisitDetailsDi
                             <span>{formatVisitDate(visit.visit_date)}</span>
                             {visit.visit_time && <span>{visit.visit_time.substring(0, 5)}</span>}
                             {visit.phone_number && <span>{visit.phone_number}</span>}
-                            {typeof visit.visiting_fee === 'number' && <span>Fee: ₹{visit.visiting_fee}</span>}
+                            {typeof visit.visiting_fee === 'number' && (
+                                <span>
+                                    Fee: ₹{visit.visiting_fee}
+                                    {!!visit.refund_amount && (
+                                        <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>
+                                    )}
+                                </span>
+                            )}
                             {visit.reason && <span className="italic truncate max-w-[220px]">{visit.reason}</span>}
                         </div>
                     </div>

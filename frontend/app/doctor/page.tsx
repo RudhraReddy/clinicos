@@ -428,7 +428,7 @@ export default function DoctorDashboard() {
                                 >
                                     <span className="font-bold text-sm min-w-[38px] flex-shrink-0">{visit.visit_time?.substring(0, 5) || 'ASAP'}</span>
                                     <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
-                                        {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
+                                        {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                     </span>
                                     <p className="flex-1 min-w-0 font-semibold text-sm truncate">{visit.patient_name}</p>
                                     {visit.billed_amount != null && (
@@ -905,7 +905,7 @@ export default function DoctorDashboard() {
                                 >
                                     <span className="font-bold text-sm min-w-[3rem] flex-shrink-0">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
                                     <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
-                                        {visit.visiting_fee ? `₹${visit.visiting_fee}` : '—'}
+                                        {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                     </span>
                                     <div className="font-medium text-sm truncate flex-1 min-w-0">{visit.patient_name}</div>
                                     {visit.billed_amount != null && (

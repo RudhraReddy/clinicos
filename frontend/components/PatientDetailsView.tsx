@@ -190,6 +190,9 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                                                                 {viewMode === 'full' && (
                                                                     <span className="text-sm font-semibold tabular-nums shrink-0">
                                                                         ₹{visit.visiting_fee ?? 0}
+                                                                        {!!visit.refund_amount && (
+                                                                            <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>
+                                                                        )}
                                                                     </span>
                                                                 )}
                                                                 <span className="text-sm text-muted-foreground truncate ml-auto">

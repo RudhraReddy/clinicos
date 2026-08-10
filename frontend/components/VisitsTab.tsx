@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
     Table,
     TableBody,
@@ -23,6 +24,17 @@ interface VisitsTabProps {
 }
 
 const yesNo = (b: boolean) => (b ? "Yes" : "No")
+
+// Same green(cash)/blue(upi) convention already used on Daily Summary's fee cells.
+function ModeBadge({ mode }: { mode?: string | null }) {
+    if (mode === 'cash') {
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-[10px] h-5 hover:bg-green-100">Cash</Badge>
+    }
+    if (mode === 'upi') {
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 text-[10px] h-5 hover:bg-blue-100">UPI</Badge>
+    }
+    return null
+}
 
 export function VisitsTab({ visits, loading }: VisitsTabProps) {
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
@@ -200,11 +212,19 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="tabular-nums">
-                                                {typeof visit.visiting_fee === 'number' ? `₹${visit.visiting_fee}` : '-'}
+                                                {typeof visit.visiting_fee === 'number' ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span>₹{visit.visiting_fee}</span>
+                                                        <ModeBadge mode={visit.payment_mode} />
+                                                    </div>
+                                                ) : '-'}
                                             </TableCell>
                                             <TableCell className="tabular-nums">
                                                 {visit.refund_amount ? (
-                                                    <span className="text-red-600 dark:text-red-400">₹{visit.refund_amount}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-red-600 dark:text-red-400">₹{visit.refund_amount}</span>
+                                                        <ModeBadge mode={visit.refund_mode} />
+                                                    </div>
                                                 ) : '-'}
                                             </TableCell>
                                             <TableCell>
