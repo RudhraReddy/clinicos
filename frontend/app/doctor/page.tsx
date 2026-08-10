@@ -6,7 +6,7 @@ import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { getTodayIST, orderTodayVisits, cn } from "@/lib/utils"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -26,7 +26,31 @@ export default function DoctorDashboard() {
     // const [rxHistory, setRxHistory] = useState<any[]>([]) // Removed
     const [refreshTrigger, setRefreshTrigger] = useState(0)
 
+    // Visit Timeline sidebar width, drag-resizable between the timeline list
+    // and the images grid — was a fixed w-1/3.
+    const [timelineWidth, setTimelineWidth] = useState(280)
+    const isResizingTimeline = useRef(false)
 
+    useEffect(() => {
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isResizingTimeline.current) return
+            const container = document.getElementById('patient-pictures-panes')
+            if (!container) return
+            const left = container.getBoundingClientRect().left
+            const next = e.clientX - left
+            setTimelineWidth(Math.min(500, Math.max(180, next)))
+        }
+        const onMouseUp = () => {
+            isResizingTimeline.current = false
+            document.body.style.userSelect = ''
+        }
+        window.addEventListener('mousemove', onMouseMove)
+        window.addEventListener('mouseup', onMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove)
+            window.removeEventListener('mouseup', onMouseUp)
+        }
+    }, [])
 
     const fetchVisits = async () => {
         try {
@@ -530,9 +554,9 @@ export default function DoctorDashboard() {
                                             </button>
                                         </div>
                                     </CardHeader>
-                                    <div className="flex-1 flex overflow-hidden">
-                                        {/* Timeline Sidebar */}
-                                        <div className="w-1/3 border-r bg-muted/50 overflow-y-auto p-2 space-y-2">
+                                    <div id="patient-pictures-panes" className="flex-1 flex overflow-hidden">
+                                        {/* Timeline Sidebar — width is drag-resizable via the handle below */}
+                                        <div style={{ width: timelineWidth }} className="shrink-0 border-r bg-muted/50 overflow-y-auto p-2 space-y-2">
                                             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-2 sticky top-0 bg-muted/50 backdrop-blur-sm py-1 z-10">Visit Timeline</div>
 
                                             {/* Show All Option */}
@@ -594,6 +618,13 @@ export default function DoctorDashboard() {
                                                 })
                                             })()}
                                         </div>
+
+                                        {/* Drag handle to resize the Visit Timeline sidebar */}
+                                        <div
+                                            onMouseDown={() => { isResizingTimeline.current = true; document.body.style.userSelect = 'none' }}
+                                            className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary/50 active:bg-primary transition-colors"
+                                            title="Drag to resize"
+                                        />
 
                                         {/* Images Grid */}
                                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
