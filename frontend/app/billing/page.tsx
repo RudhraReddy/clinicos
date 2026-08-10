@@ -386,6 +386,7 @@ function BillingContent() {
                                             <Input
                                                 autoFocus
                                                 placeholder="Walk-in customer name"
+                                                className="h-10"
                                                 value={walkInName}
                                                 onChange={(e) => setWalkInName(e.target.value)}
                                                 maxLength={100}
@@ -393,14 +394,14 @@ function BillingContent() {
                                             <Input
                                                 type="number"
                                                 placeholder="Age"
-                                                className="w-20 shrink-0"
+                                                className="w-20 shrink-0 h-10"
                                                 min={0}
                                                 max={150}
                                                 value={walkInAge}
                                                 onChange={(e) => setWalkInAge(e.target.value)}
                                             />
                                             <Select value={walkInSex} onValueChange={setWalkInSex}>
-                                                <SelectTrigger className="w-28 shrink-0">
+                                                <SelectTrigger className="w-28 shrink-0 h-10">
                                                     <SelectValue placeholder="Sex" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -424,8 +425,7 @@ function BillingContent() {
                                     <Button
                                         type="button"
                                         variant={walkInMode ? "default" : "outline"}
-                                        size="sm"
-                                        className="shrink-0"
+                                        className="shrink-0 h-10"
                                         onClick={() => {
                                             setWalkInMode(m => !m)
                                             setPatient(null)
