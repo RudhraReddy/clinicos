@@ -5,12 +5,14 @@ import { Search, Calendar as CalendarIcon, Clock, ChevronRight, ChevronLeft, Tra
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
+import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
 import { getTodayIST, orderTodayVisits, cn } from "@/lib/utils"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useMenu } from "@/components/layout/AppShell"
+import { useSettings } from "@/lib/settings_context"
 
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -86,8 +88,14 @@ export default function DoctorDashboard() {
     // History State
     const [patientHistory, setPatientHistory] = useState<Visit[]>([])
     const [patientImages, setPatientImages] = useState<any[]>([])
+    const [patientBills, setPatientBills] = useState<any[]>([])
     const [showTrash, setShowTrash] = useState(false)
     const [trashImages, setTrashImages] = useState<any[]>([])
+
+    // Invoice preview, opened from a bill card in the Visit Timeline
+    const [invoiceId, setInvoiceId] = useState<string | null>(null)
+    const [invoiceOpen, setInvoiceOpen] = useState(false)
+    const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
 
     // Load Notes and History when selection changes
     useEffect(() => {
@@ -106,10 +114,16 @@ export default function DoctorDashboard() {
                 .then(setPatientImages)
                 .catch(err => console.error("Failed to load images", err))
 
+            // Fetch Bills — so the timeline can show what was actually billed/paid/refunded
+            api.getPatientBillingHistory(selectedVisit.patient_id)
+                .then(setPatientBills)
+                .catch(err => console.error("Failed to load billing history", err))
+
         } else {
 
             setPatientHistory([])
             setPatientImages([])
+            setPatientBills([])
         }
     }, [selectedVisitId, selectedVisit?.visit_id, selectedVisit?.patient_id, refreshTrigger])
 
@@ -738,6 +752,9 @@ export default function DoctorDashboard() {
                                                             return new Date(img.timestamp).toISOString().split('T')[0] === date;
                                                         });
 
+                                                        // Bills created that date — `date` here is "YYYY-MM-DD HH:MM"
+                                                        const billsForDate = patientBills.filter(bill => bill.date?.split(' ')[0] === date);
+
                                                         // If we are showing ALL dates (no filter), hide empty dates to reduce clutter? 
                                                         // User logic: "see those dates images only". 
                                                         // If a date has a visit but no images, do we show it in the filtered view? 
@@ -757,10 +774,20 @@ export default function DoctorDashboard() {
                                                                         <span className="text-sm font-bold tracking-tight">{new Date(date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
                                                                     </div>
                                                                     {visitForDate ? (
-                                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                                                                            <Clock className="h-3 w-3" />
-                                                                            <span className="font-medium">{visitForDate.reason || "General Checkup"}</span>
-                                                                        </div>
+                                                                        <>
+                                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                                                                                <Clock className="h-3 w-3" />
+                                                                                <span className="font-medium">{visitForDate.reason || "General Checkup"}</span>
+                                                                            </div>
+                                                                            {typeof visitForDate.visiting_fee === 'number' && (
+                                                                                <span className="text-xs font-semibold tabular-nums ml-auto">
+                                                                                    ₹{visitForDate.visiting_fee}
+                                                                                    {!!visitForDate.refund_amount && (
+                                                                                        <span className="text-red-600 dark:text-red-400">/₹{visitForDate.refund_amount}</span>
+                                                                                    )}
+                                                                                </span>
+                                                                            )}
+                                                                        </>
                                                                     ) : (
                                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
                                                                             <ImageIcon className="h-3 w-3" />
@@ -820,6 +847,29 @@ export default function DoctorDashboard() {
                                                                         No images for this date.
                                                                     </div>
                                                                 )}
+
+                                                                {billsForDate.length > 0 && (
+                                                                    <div className="space-y-2 pt-1">
+                                                                        <h4 className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+                                                                            <FileText className="h-3 w-3" /> Bills
+                                                                        </h4>
+                                                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                                                            {billsForDate.map(bill => (
+                                                                                <div
+                                                                                    key={bill.invoice_id}
+                                                                                    onClick={() => { setInvoiceId(bill.invoice_id); setInvoiceOpen(true) }}
+                                                                                    className="bg-card border rounded-md p-2.5 text-sm flex justify-between items-center shadow-sm cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors"
+                                                                                >
+                                                                                    <div className="min-w-0">
+                                                                                        <div className="font-mono text-[10px] text-muted-foreground truncate">{bill.invoice_id}</div>
+                                                                                        <div className="font-medium text-xs">{bill.payment_type}</div>
+                                                                                    </div>
+                                                                                    <div className="font-bold shrink-0 ml-2">₹{bill.total_amount.toFixed(2)}</div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         );
                                                     });
@@ -869,6 +919,17 @@ export default function DoctorDashboard() {
                                     title={lightboxState?.image?.patient_name}
                                     subtitle={lightboxState?.image?.timestamp ? new Date(lightboxState.image.timestamp).toLocaleDateString() : ""}
                                     fullScreen={true}
+                                />
+
+                                {/* Invoice Preview, opened from a bill card in the Visit Timeline */}
+                                <PrintInvoiceDialog
+                                    open={invoiceOpen}
+                                    onOpenChange={setInvoiceOpen}
+                                    invoiceId={invoiceId}
+                                    clinicName={clinicName}
+                                    clinicAddress={clinicAddress}
+                                    clinicPhone={clinicPhone}
+                                    referenceDoctor={referenceDoctor}
                                 />
                             </div>
                         </div>
