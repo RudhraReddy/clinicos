@@ -161,7 +161,8 @@ class Visit(db.Model):
     # Financials
     visiting_fee = db.Column(db.Integer, default=0)
     amount_paid = db.Column(db.Integer, default=0)
-    payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid
+    refund_amount = db.Column(db.Integer, default=0) # cumulative amount refunded against amount_paid
+    payment_status = db.Column(db.String(20), default='unpaid') # full, partial, unpaid, refunded
     payment_mode = db.Column(db.String(20), nullable=True) # cash, upi
     
     location = db.Column(db.String(50), nullable=True, default='Main')

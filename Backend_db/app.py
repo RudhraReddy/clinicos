@@ -67,6 +67,8 @@ def _apply_migrations(db):
         # 2026-08-08: optional age/sex on walk-in bills, printed on the invoice when present
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_age INTEGER",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS walk_in_sex VARCHAR(10)",
+        # 2026-08-09: visit fee refund tracking
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS refund_amount INTEGER DEFAULT 0",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

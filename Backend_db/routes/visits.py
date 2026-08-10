@@ -113,6 +113,7 @@ def get_all_visits():
             'status': v.status,
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
+            'refund_amount': v.refund_amount or 0,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'billed_amount': bills_map.get(v.invoice_id),
@@ -137,6 +138,7 @@ def get_patient_visits(patient_id):
             'status': v.status,
             'visiting_fee': v.visiting_fee,
             'amount_paid': v.amount_paid,
+            'refund_amount': v.refund_amount or 0,
             'payment_status': v.payment_status,
             'payment_mode': v.payment_mode,
             'created_at': v.created_at.isoformat() if v.created_at else None,
@@ -161,6 +163,7 @@ def get_visit(visit_id):
         'status': visit.status,
         'visiting_fee': visit.visiting_fee,
         'amount_paid': visit.amount_paid,
+        'refund_amount': visit.refund_amount or 0,
         'payment_status': visit.payment_status,
         'payment_mode': visit.payment_mode,
         'created_at': visit.created_at.isoformat() if visit.created_at else None,
@@ -180,7 +183,10 @@ def update_visit(visit_id):
     if 'visiting_fee' in data:
         visit.visiting_fee = data['visiting_fee']
     if 'amount_paid' in data:
-        visit.amount_paid = data['amount_paid']
+        new_amount_paid = data['amount_paid']
+        if (visit.refund_amount or 0) > 0 and float(new_amount_paid or 0) < float(visit.amount_paid or 0):
+            return jsonify({'error': 'Cannot decrease Amount Paid once a refund has been issued. Use the Refund field instead.'}), 400
+        visit.amount_paid = new_amount_paid
     if 'payment_status' in data:
         visit.payment_status = data['payment_status']
     if 'payment_mode' in data:
@@ -205,6 +211,48 @@ def update_visit(visit_id):
     )
 
     return jsonify({'message': 'Visit updated successfully'}), 200
+
+@visits.route('/visits/<visit_id>/refund', methods=['POST'])
+@require_auth
+def refund_visit(visit_id):
+    if g.current_user.get('role') == 'doctor':
+        return jsonify({'error': 'Not authorized to issue refunds'}), 403
+
+    visit = Visit.query.get_or_404(visit_id)
+    data = request.get_json() or {}
+
+    try:
+        amount = float(data.get('amount'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'A positive refund amount is required'}), 400
+
+    if amount <= 0:
+        return jsonify({'error': 'A positive refund amount is required'}), 400
+
+    remaining = float(visit.amount_paid or 0) - float(visit.refund_amount or 0)
+    if amount > remaining:
+        return jsonify({'error': f'Cannot refund more than the remaining ₹{remaining:.2f} collected for this visit'}), 400
+
+    visit.refund_amount = float(visit.refund_amount or 0) + amount
+    visit.payment_status = 'refunded'
+    visit.updated_at = get_ist_now()
+    db.session.commit()
+
+    log_activity(
+        action='REFUND',
+        resource_type='visit',
+        resource_id=visit_id,
+        resource_label=f"{visit_id} — ₹{amount:.2f} refunded",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
+    return jsonify({
+        'message': 'Refund recorded',
+        'refund_amount': visit.refund_amount,
+        'payment_status': visit.payment_status,
+    }), 200
 
 @visits.route('/visits/<visit_id>', methods=['DELETE'])
 @require_auth

@@ -14,6 +14,7 @@ import {
 import { Loader2 } from "lucide-react"
 import { api, type Visit } from "@/lib/api"
 import { getTodayIST } from "@/lib/utils"
+import { useAuth } from "@/lib/auth_context"
 
 interface EditVisitDialogProps {
     open: boolean
@@ -23,6 +24,7 @@ interface EditVisitDialogProps {
 }
 
 export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVisitDialogProps) {
+    const { role } = useAuth()
     const [submitting, setSubmitting] = useState(false)
     const [formData, setFormData] = useState({
         visit_date: "",
@@ -34,6 +36,10 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         paid_full: false,
         status: "scheduled"
     })
+    // Refund is an action slot, not a stored field — it always starts unchecked/empty
+    // and represents "amount to refund right now", not the running refunded total.
+    const [refundChecked, setRefundChecked] = useState(false)
+    const [refundInput, setRefundInput] = useState("")
 
     useEffect(() => {
         if (visit && open) {
@@ -47,12 +53,35 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 paid_full: (visit.payment_status === 'full'),
                 status: visit.status
             })
+            setRefundChecked(false)
+            setRefundInput("")
         }
     }, [visit, open])
+
+    const amountPaid = visit?.amount_paid || 0
+    const refundedSoFar = visit?.refund_amount || 0
+    const netPaid = amountPaid - refundedSoFar
+    const remainingRefundable = Math.max(0, netPaid)
+    const canRefund = role !== 'doctor' && amountPaid > 0
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!visit) return
+
+        const newAmountPaid = formData.amount_paid ? parseFloat(formData.amount_paid) : 0
+        if (refundedSoFar > 0 && newAmountPaid < amountPaid) {
+            alert("Amount Paid can't be lowered once a refund has been issued — use the Refund field instead.")
+            return
+        }
+
+        let refundAmount = 0
+        if (refundChecked) {
+            refundAmount = parseFloat(refundInput || '0')
+            if (!(refundAmount > 0) || refundAmount > remainingRefundable) {
+                alert(`Enter a refund amount between ₹0 and ₹${remainingRefundable.toFixed(2)}`)
+                return
+            }
+        }
 
         setSubmitting(true)
 
@@ -66,6 +95,10 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 payment_status: formData.payment_status,
                 status: formData.status
             })
+
+            if (refundAmount > 0) {
+                await api.refundVisit(visit.visit_id, refundAmount)
+            }
 
             // Close dialog and notify success
             onOpenChange(false)
@@ -228,6 +261,45 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                 />
                             </div>
                         </div>
+
+                        {refundedSoFar > 0 && (
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
+                                <span>Amount Paid: <span className="font-medium text-foreground">₹{amountPaid.toFixed(2)}</span></span>
+                                <span>Refunded: <span className="font-medium text-foreground">₹{refundedSoFar.toFixed(2)}</span></span>
+                                <span>Net: <span className="font-medium text-foreground">₹{netPaid.toFixed(2)}</span></span>
+                            </div>
+                        )}
+
+                        {canRefund && (
+                            <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="edit-refund-check"
+                                        checked={refundChecked}
+                                        onChange={(e) => {
+                                            setRefundChecked(e.target.checked)
+                                            if (!e.target.checked) setRefundInput("")
+                                        }}
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <label htmlFor="edit-refund-check" className="text-sm font-medium cursor-pointer select-none">
+                                        Refund
+                                    </label>
+                                </div>
+                                <Input
+                                    id="edit-refund-amount"
+                                    type="number"
+                                    value={refundInput}
+                                    onChange={(e) => setRefundInput(e.target.value)}
+                                    placeholder="0"
+                                    disabled={!refundChecked}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Max refundable right now: ₹{remainingRefundable.toFixed(2)}
+                                </p>
+                            </div>
+                        )}
                         {visit.created_at && (
                             <div className="text-[10px] text-muted-foreground/80 space-y-0.5 border-t pt-2 mt-1 flex flex-col gap-0.5 px-1">
                                 <div>Created: {new Date(visit.created_at).toLocaleString()}</div>

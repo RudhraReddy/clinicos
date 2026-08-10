@@ -25,6 +25,10 @@ function VisitFee({ visit }: { visit: Visit }) {
     const fee = visit.visiting_fee ?? 0
     const paid = visit.amount_paid ?? 0
 
+    if (visit.payment_status === 'refunded') {
+        const net = paid - (visit.refund_amount ?? 0)
+        return <span className="font-semibold tabular-nums">₹{net}</span>
+    }
     if (visit.payment_status === 'full') {
         return <span className="font-semibold tabular-nums">₹{fee}</span>
     }

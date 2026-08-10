@@ -75,7 +75,7 @@ def get_daily_summary():
         patient = patients_map.get(v.patient_id)
         bill = bills_by_visit.get(v.visit_id)
 
-        visit_fee = float(v.amount_paid) if v.amount_paid else 0
+        visit_fee = float(v.amount_paid or 0) - float(v.refund_amount or 0)
         visit_fee_mode = _norm_mode(v.payment_mode) if visit_fee else None
         billing_fee = float(bill.total_amount) if bill else None
         billing_fee_mode = _norm_mode(bill.payment_type) if bill else None
