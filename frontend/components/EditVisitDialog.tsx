@@ -31,6 +31,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         visit_time: "",
         reason: "",
         visiting_fee: "",
+        payment_mode: "" as "" | "cash" | "upi",
         status: "scheduled"
     })
     // Refund reflects the visit's current total refund and is directly editable —
@@ -49,6 +50,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 visit_time: visit.visit_time || "",
                 reason: visit.reason || "",
                 visiting_fee: visit.visiting_fee?.toString() || "",
+                payment_mode: (visit.payment_mode as "cash" | "upi") || "",
                 status: visit.status
             })
             const existingRefund = visit.refund_amount || 0
@@ -97,6 +99,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 reason: formData.reason || undefined,
                 visiting_fee: newVisitingFee,
                 amount_paid: newVisitingFee,
+                payment_mode: formData.payment_mode || undefined,
                 payment_status: refundedSoFar > 0 ? 'refunded' : 'full',
                 status: formData.status
             })
@@ -134,8 +137,8 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
-                <form onSubmit={handleSubmit}>
+            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col items-center justify-center">
+                <form onSubmit={handleSubmit} className="w-full max-w-[500px]">
                     <DialogHeader>
                         <DialogTitle>{visit.patient_name}</DialogTitle>
                         <DialogDescription>
@@ -199,17 +202,34 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="edit-visiting_fee" className="text-sm font-medium">
-                                Visiting Fee
-                            </label>
-                            <Input
-                                id="edit-visiting_fee"
-                                type="number"
-                                value={formData.visiting_fee}
-                                onChange={(e) => setFormData({ ...formData, visiting_fee: e.target.value })}
-                                placeholder="0"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label htmlFor="edit-visiting_fee" className="text-sm font-medium">
+                                    Visiting Fee
+                                </label>
+                                <Input
+                                    id="edit-visiting_fee"
+                                    type="number"
+                                    value={formData.visiting_fee}
+                                    onChange={(e) => setFormData({ ...formData, visiting_fee: e.target.value })}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="edit-payment_mode" className="text-sm font-medium">
+                                    Fee Type
+                                </label>
+                                <select
+                                    id="edit-payment_mode"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={formData.payment_mode}
+                                    onChange={(e) => setFormData({ ...formData, payment_mode: e.target.value as "" | "cash" | "upi" })}
+                                >
+                                    <option value="" disabled>Type</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="upi">UPI</option>
+                                </select>
+                            </div>
                         </div>
 
                         {refundedSoFar > 0 && (
@@ -233,25 +253,27 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                         Refund
                                     </label>
                                 </div>
-                                <Input
-                                    id="edit-refund-amount"
-                                    type="number"
-                                    value={refundInput}
-                                    onChange={(e) => setRefundInput(e.target.value)}
-                                    placeholder="0"
-                                    disabled={!refundChecked}
-                                />
-                                <select
-                                    id="edit-refund-mode"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    value={refundMode}
-                                    onChange={(e) => setRefundMode(e.target.value as "" | "cash" | "upi")}
-                                    disabled={!refundChecked}
-                                >
-                                    <option value="" disabled>Type</option>
-                                    <option value="cash">Cash</option>
-                                    <option value="upi">UPI</option>
-                                </select>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        id="edit-refund-amount"
+                                        type="number"
+                                        value={refundInput}
+                                        onChange={(e) => setRefundInput(e.target.value)}
+                                        placeholder="0"
+                                        disabled={!refundChecked}
+                                    />
+                                    <select
+                                        id="edit-refund-mode"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={refundMode}
+                                        onChange={(e) => setRefundMode(e.target.value as "" | "cash" | "upi")}
+                                        disabled={!refundChecked}
+                                    >
+                                        <option value="" disabled>Type</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="upi">UPI</option>
+                                    </select>
+                                </div>
                             </div>
                         )}
                         {visit.created_at && (
