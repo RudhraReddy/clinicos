@@ -79,20 +79,35 @@ New endpoint: `POST /api/visits/<visit_id>/refund`
 
 ### Frontend
 
-`EditVisitDialog.tsx`:
+`EditVisitDialog.tsx` — matches a user-supplied mockup of this dialog: a
+"Refund" field slot added to the form grid alongside the existing
+Date/Time/Status/Visiting Fee/Reason fields, not a separate button flow.
 
 - Displays "Amount Paid" and, whenever `refund_amount > 0`, "Refunded" and a
-  computed "Net" underneath it — both numbers always visible together once a
-  refund exists.
-- A "Refund" button, shown only when `amount_paid > 0` and the current user's
-  role is not `doctor`. Clicking it reveals an inline amount input capped at
-  the remaining refundable balance (`amount_paid − refund_amount`), plus a
-  one-click "Refund Full Remaining" shortcut that fills the cap. Confirming
-  calls the new refund endpoint and refreshes the visit.
+  computed "Net" underneath it — a read-only summary, always visible together
+  once a refund exists.
+- New "Refund" field: a checkbox next to the "Refund" label (same row), with
+  a number input below it — same visual pattern as the other fields in this
+  form. The input starts disabled/greyed out; ticking the checkbox enables
+  it, mirroring the existing "Paid in Full" checkbox already in this dialog
+  that similarly toggles a related field. Helper text under the input shows
+  the remaining refundable cap (`amount_paid − refund_amount`).
+- No separate confirm button and no dedicated dialog for this — the refund
+  amount is just another field on the form. Clicking the dialog's existing
+  **Save** button applies the normal visit-field updates and, if the Refund
+  checkbox is ticked with a valid nonzero amount, additionally calls
+  `POST /api/visits/<visit_id>/refund` with that amount before closing.
+- The Refund field is only shown when `amount_paid > 0`, and is hidden
+  entirely for the `doctor` role.
+- After a successful save, the checkbox unchecks and the input clears —
+  it represents "amount to refund *right now*", not a display of the
+  cumulative total (that's what the read-only "Refunded"/"Net" summary is
+  for). A later edit can tick it again to refund further, up to the
+  then-current remaining cap.
 - Once `refund_amount > 0`, the existing "Amount Paid" input can no longer be
   edited to a value lower than its current stored value (still editable
   upward, e.g. collecting additional payment later). Attempting to lower it
-  shows an inline validation error directing the user to the Refund button
+  shows an inline validation error directing the user to the Refund field
   instead.
 
 Dashboard visit cards (`app/page.tsx` today's list, `app/doctor/page.tsx`
