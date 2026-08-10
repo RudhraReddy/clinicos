@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTodayIST, orderTodayVisits } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
@@ -54,7 +54,9 @@ function formatUpdatedTime(updatedAtStr?: string, createdAtStr?: string) {
 }
 
 
-export default function Dashboard() {
+function DashboardContent() {
+    const searchParams = useSearchParams()
+
     // Explicitly filtered to today's date — feeds the Overview tab's "Today's Visits" card.
     // Must stay date-filtered: an unfiltered fetch is capped server-side to the 50 most
     // recently-*created* visits system-wide, so on a busy multi-clinic day today's own
@@ -73,15 +75,22 @@ export default function Dashboard() {
 
     // Controlled so the date-filter control (kept in the same header slot) can be
     // hidden on the Overview tab and shown only on All Visits, where it's meaningful.
-    const [activeTab, setActiveTab] = useState("overview")
+    // Also lets external links (e.g. the doctor dashboard's "All Visits" button) land
+    // directly on the All Visits tab via ?tab=visits.
+    const [activeTab, setActiveTab] = useState(searchParams.get("tab") === "visits" ? "visits" : "overview")
 
     const { role, isLoading } = useAuth()
     const router = useRouter()
     const { openMenu } = useMenu()
 
+    // Doctors are normally bounced to /doctor — except when they've explicitly
+    // followed a link straight to All Visits (e.g. the doctor dashboard's own
+    // "All Visits" button), which they're allowed to view directly.
+    const cameForAllVisits = searchParams.get("tab") === "visits"
+
     useEffect(() => {
-        if (!isLoading && role === 'doctor') router.push('/doctor')
-    }, [role, isLoading, router])
+        if (!isLoading && role === 'doctor' && !cameForAllVisits) router.push('/doctor')
+    }, [role, isLoading, router, cameForAllVisits])
 
     const filterDateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
     const filterDateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
@@ -121,7 +130,7 @@ export default function Dashboard() {
         fetchFilteredVisits()
     }
 
-    if (isLoading || role === 'doctor') {
+    if (isLoading || (role === 'doctor' && !cameForAllVisits)) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -325,5 +334,13 @@ export default function Dashboard() {
                 onSuccess={refreshAll}
             />
         </div>
+    )
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <DashboardContent />
+        </Suspense>
     )
 }
