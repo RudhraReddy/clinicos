@@ -57,6 +57,30 @@ BACKEND_URL=http://127.0.0.1:5000
 
 There are no test suites for either the backend or frontend.
 
+### Manual / Browser Testing (Playwright, local dev only)
+
+To drive the local app in a real browser (e.g. via the Playwright MCP tools) without going through the
+TOTP login UI, mint a self-signed JWT and inject it as the `auth_token` cookie:
+
+1. **Secret:** `JWT_SECRET_KEY` from `Backend_db/.env` — `dev-jwt-secret-change-in-production`.
+2. **Payload:** `{"user_id": "<a real User.id>", "role": "<their role>", "username": "<their username>", "exp": <a few hours out>}`, signed HS256. `require_auth` (`Backend_db/routes/auth.py`) puts the decoded payload straight onto `g.current_user` — `role`/`username` must be present and correct for that user, not just `user_id`, or role-gated routes/UI will misbehave.
+3. **Mint it** (from `Backend_db/`, with `venv` active):
+   ```python
+   import jwt, datetime
+   token = jwt.encode(
+       {"user_id": "<uuid>", "role": "<role>", "username": "<username>", "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=6)},
+       "dev-jwt-secret-change-in-production", algorithm="HS256",
+   )
+   ```
+4. **Inject it:**
+   - Playwright MCP: navigate to the site once, then `browser_evaluate` with `() => { document.cookie = "auth_token=<token>; path=/"; }`, then navigate again.
+   - `page.context().addCookies([{name: "auth_token", value: token, domain: "localhost", path: "/"}])` if driving Playwright directly.
+   - curl: `curl --cookie "auth_token=$JWT" ...`
+
+This only works against the local dev server, which uses the well-known dev secret above — it will not
+work against Render, which uses a real, unknown `JWT_SECRET_KEY`. It's purely a shortcut to skip the
+TOTP flow when poking the live local app or API during testing/verification.
+
 ## Architecture
 
 ### API Proxy
