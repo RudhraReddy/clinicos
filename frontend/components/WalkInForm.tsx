@@ -585,11 +585,11 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
                                         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                                             Fee (₹)
                                         </label>
-                                        <label className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground select-none">
+                                        <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none">
                                             <input
                                                 type="checkbox"
                                                 checked={freeAppointment}
