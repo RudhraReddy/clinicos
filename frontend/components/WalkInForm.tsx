@@ -71,6 +71,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const [address, setAddress] = useState('')
     const [phoneNumber, setPhoneNumber] = useState('')
     const [visit, setVisit] = useState(emptyVisit())
+    const [freeAppointment, setFreeAppointment] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [patientVisits, setPatientVisits] = useState<Visit[]>([])
     const [editMode, setEditMode] = useState(false)
@@ -217,6 +218,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         setPhoneNumber('')
         setEditMode(false)
         setVisit(emptyVisit())
+        setFreeAppointment(false)
         setPatientVisits([])
     }
 
@@ -288,8 +290,8 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 visit_time: visit.visit_time || undefined,
                 status: 'in_progress',
                 reason: visit.reason || undefined,
-                visiting_fee: visit.visiting_fee ? parseFloat(visit.visiting_fee) : 0,
-                amount_paid: visit.visiting_fee ? parseFloat(visit.visiting_fee) : 0,
+                visiting_fee: feeAmount,
+                amount_paid: feeAmount,
                 payment_status: 'full',
                 payment_mode: visit.payment_mode,
             })
@@ -312,9 +314,10 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
     const fieldsLocked = formState === 'found' && !editMode
     const feeTrimmed = visit.visiting_fee.trim()
-    const feeAmount = feeTrimmed === '' ? 0 : parseFloat(feeTrimmed)
-    const feeValid = feeTrimmed === '' || !isNaN(feeAmount)
-    const isFreeAppointment = feeAmount === 0
+    const feeParsed = parseFloat(feeTrimmed)
+    const feeEntered = feeTrimmed !== '' && !isNaN(feeParsed) && feeParsed >= 0
+    const feeValid = freeAppointment || feeEntered
+    const feeAmount = freeAppointment ? 0 : (feeEntered ? feeParsed : 0)
     const canSubmit = !submitting && feeValid && (
         formState === 'found' ||
         (isNewPatientMode && name.trim() !== '' && phoneNumber.trim() !== '')
@@ -582,16 +585,32 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                        Fee (₹)
-                                    </label>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Fee (₹)
+                                        </label>
+                                        <label className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={freeAppointment}
+                                                onChange={e => {
+                                                    const checked = e.target.checked
+                                                    setFreeAppointment(checked)
+                                                    if (checked) setVisit(v => ({ ...v, visiting_fee: '' }))
+                                                }}
+                                                className="h-3 w-3 accent-foreground"
+                                            />
+                                            Free
+                                        </label>
+                                    </div>
                                     <Input
                                         type="number"
                                         min="0"
                                         value={visit.visiting_fee}
                                         onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
                                         placeholder="0"
-                                        className="mt-1"
+                                        disabled={freeAppointment}
+                                        className={`mt-1 ${freeAppointment ? 'bg-muted/60' : ''}`}
                                     />
                                 </div>
                                 <div>
@@ -620,15 +639,15 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
                     <Button
                         type="submit"
-                        className={cn("w-full", isFreeAppointment && "bg-primary/85 hover:bg-primary/75")}
+                        className="w-full"
                         disabled={!canSubmit}
                     >
                         {submitting ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
                         ) : formState === 'found' ? (
-                            isFreeAppointment ? 'Free Appointment' : 'Book Appointment'
+                            'Book Appointment'
                         ) : (
-                            isFreeAppointment ? 'Create Patient & Free Appointment' : 'Create Patient & Book'
+                            'Create Patient & Book'
                         )}
                     </Button>
                     </div>
