@@ -343,16 +343,16 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             ) : (
                                 <div className="divide-y divide-border/50">
                                     {patientVisits.map(v => (
-                                        <div key={v.visit_id} className="flex items-start justify-between px-3 py-2 text-xs gap-2">
+                                        <div key={v.visit_id} className="flex items-center justify-between px-3 py-2 text-xs gap-2">
                                             <div className="min-w-0">
-                                                <p className="text-muted-foreground font-mono">
-                                                    {v.visit_date}
-                                                    {getVisitAge(v.visit_date) && (
-                                                        <span className="text-muted-foreground/70"> · {getVisitAge(v.visit_date)}</span>
-                                                    )}
-                                                </p>
+                                                <p className="text-muted-foreground font-mono">{v.visit_date}</p>
                                                 <p className="truncate text-foreground/80">{v.reason || '—'}</p>
                                             </div>
+                                            {getVisitAge(v.visit_date) && (
+                                                <span className="shrink-0 text-sm font-semibold text-foreground/80 tabular-nums text-center">
+                                                    {getVisitAge(v.visit_date)}
+                                                </span>
+                                            )}
                                             <div className="flex flex-col items-end gap-1 shrink-0">
                                                 <VisitFee visit={v} />
                                                 <span className={cn(
