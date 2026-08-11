@@ -285,8 +285,8 @@ export default function DoctorDashboard() {
 
     return (
         <div>
-            {/* ── MOBILE LAYOUT (hidden md+) ── */}
-            <div className="md:hidden flex flex-col">
+            {/* ── MOBILE LAYOUT (hidden lg+) ── */}
+            <div className="lg:hidden flex flex-col">
 
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 py-3 bg-card border-b">
@@ -498,9 +498,9 @@ export default function DoctorDashboard() {
             </div>
 
             {/* ── DESKTOP LAYOUT (hidden on mobile) ── */}
-            <div className="hidden md:flex md:flex-col gap-4 h-[calc(100vh-100px)] overflow-hidden relative">
+            <div className="hidden lg:flex lg:flex-col gap-4 h-[calc(100vh-100px)] overflow-hidden relative">
             {/* Header */}
-            <div className="flex items-center justify-between shrink-0">
+            <div className="flex items-center justify-between flex-wrap gap-y-2 shrink-0">
                 <div className="flex items-center gap-3">
                     <button
                         type="button"

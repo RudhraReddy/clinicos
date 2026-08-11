@@ -157,7 +157,7 @@ export function AddPatientDialog({ open, onOpenChange, onSuccess, trigger }: Add
 
                             {/* Suggestions Bubble - Left Side (Restored) */}
                             {showSuggestions && suggestions.length > 0 && (
-                                <div className="absolute right-[102%] top-0 mr-2 w-64 bg-popover text-popover-foreground rounded-md border shadow-md p-2 z-50 animate-in fade-in zoom-in-95 slide-in-from-right-2 block">
+                                <div className="absolute z-50 w-64 top-full left-0 mt-2 sm:top-0 sm:left-auto sm:right-[102%] sm:mt-0 sm:mr-2 bg-popover text-popover-foreground rounded-md border shadow-md p-2 animate-in fade-in zoom-in-95 slide-in-from-top-2 sm:slide-in-from-right-2 block">
                                     <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
                                         Found {suggestions.length} matches
                                     </div>

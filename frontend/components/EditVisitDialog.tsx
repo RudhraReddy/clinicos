@@ -137,7 +137,7 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col items-center justify-center">
+            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col items-center justify-center overflow-y-auto">
                 <form onSubmit={handleSubmit} className="w-full max-w-[500px]">
                     <DialogHeader>
                         <DialogTitle>{visit.patient_name}</DialogTitle>

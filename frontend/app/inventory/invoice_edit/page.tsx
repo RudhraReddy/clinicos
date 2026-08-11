@@ -289,7 +289,7 @@ export default function InvoiceEditPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-y-3">
                 <div className="flex items-center gap-4">
                     <button
                         type="button"
@@ -304,7 +304,7 @@ export default function InvoiceEditPage() {
                     </Button>
                     <h1 className="text-2xl font-bold">Edit Invoice Details</h1>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     {/* Replaced Dialog with ImagePreviewDialog */}
                     {imagePath && (
                         <ImagePreviewDialog

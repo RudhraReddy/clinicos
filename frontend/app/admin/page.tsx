@@ -1126,6 +1126,7 @@ export default function AdminPage() {
   const router = useRouter()
   const { openMenu } = useMenu()
   const [allUsers, setAllUsers] = useState<AdminUser[]>([])
+  const [adminTab, setAdminTab] = useState("overview")
 
   useEffect(() => {
     if (!isLoading && role !== 'admin') {
@@ -1160,13 +1161,27 @@ export default function AdminPage() {
         <h1 className="text-3xl font-bold tracking-tight">Admin Panel</h1>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
+      <Tabs value={adminTab} onValueChange={setAdminTab}>
+        <TabsList className="hidden lg:inline-flex">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="activity">Activity Log</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        <div className="block lg:hidden">
+          <Select value={adminTab} onValueChange={setAdminTab}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="overview">Overview</SelectItem>
+              <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="activity">Activity Log</SelectItem>
+              <SelectItem value="settings">Settings</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <TabsContent value="overview" className="mt-4">
           <OverviewTab />

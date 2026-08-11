@@ -266,7 +266,7 @@ function DashboardContent() {
     return (
         <div className="space-y-6 h-[calc(100vh-100px)] flex flex-col">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden gap-4">
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
                     <button
                         type="button"
                         onClick={openMenu}

@@ -252,7 +252,7 @@ export default function PatientsPage() {
             )}
 
             <Card className="flex-1 flex flex-col overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 shrink-0">
+                <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-y-2 space-y-0 pb-4 shrink-0">
                     <CardTitle className="text-lg font-medium">Patient List ({filteredPatients.length})</CardTitle>
                     <div className="relative w-72">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

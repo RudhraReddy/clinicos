@@ -134,8 +134,8 @@ export function AddVisitDialog({ open, onOpenChange, onSuccess, trigger, initial
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent className="sm:max-w-[900px] gap-0 p-0 overflow-hidden">
-                <div className="grid grid-cols-1 md:grid-cols-2 h-[600px]">
+            <DialogContent className="sm:max-w-[900px] max-h-[90vh] gap-0 p-0 overflow-y-auto overflow-x-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-2 min-h-[600px] md:h-full">
                     {/* Left Column: Form */}
                     <div className="p-6 overflow-y-auto flex flex-col">
                         <DialogHeader className="mb-4">

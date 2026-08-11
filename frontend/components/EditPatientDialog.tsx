@@ -85,7 +85,7 @@ export function EditPatientDialog({ patient, open, onOpenChange, onSuccess, trig
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col items-center justify-center">
+            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col items-center justify-center overflow-y-auto">
                 <form onSubmit={handleSubmit} className="w-full max-w-[500px]">
                     <DialogHeader>
                         <DialogTitle>Edit Patient</DialogTitle>

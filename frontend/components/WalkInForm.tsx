@@ -511,7 +511,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-[1fr_72px_96px] gap-2">
+                    <div className="grid grid-cols-[1fr_minmax(64px,72px)_minmax(84px,96px)] gap-2">
                         <div>
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Address</label>
                             <Input
