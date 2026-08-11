@@ -279,6 +279,33 @@ These three strings are passed as props at two call sites and are currently hard
 
 ## Recent Changes / Notes
 
+- **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
+  browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons
+  off-screen with no way to reach them — root cause is `AppShell.tsx`'s `overflow-x-hidden` on
+  `<main>`, which clips instead of scrolling any row that doesn't fit. Fixed by adding `flex-wrap` to
+  the toolbar/header rows that were missing it (most of the app already used this pattern correctly):
+  `billing/page.tsx`'s Patient & Actions Row (previously could hide the **Create Bill** button — the
+  originally reported bug — including its inner left group, which needed its own `flex-wrap` since
+  outer wrapping alone only protects the boundary between the left and right groups, not the left
+  group's own contents), `inventory/invoice_edit/page.tsx`'s header (protects **Save to Inventory**),
+  `app/page.tsx`'s Dashboard header (protects the All Visits tab + date filter — this page previously
+  had no responsive treatment at all, unlike every sibling page), and `patients/page.tsx`'s list
+  header. `doctor/page.tsx`'s cramped 3-pane desktop layout (fixed `380px` sidebar + resizable
+  `180-500px` timeline) now only engages at `lg` (1024px) instead of `md` (768px), so tablets get the
+  page's existing simpler mobile/card layout instead of a crushed desktop one.
+  `AddPatientDialog.tsx`'s duplicate-phone-suggestions bubble (previously positioned 102% to the left
+  of its input, which had nowhere to go on a narrow dialog) now renders below the input by default and
+  only reverts to the left-side placement at `sm:` (640px) and up. `admin/page.tsx`'s top-level `Tabs`
+  was converted from uncontrolled to controlled state and gained a `Select` dropdown fallback below
+  `lg`, reusing the `hidden lg:flex` / `block lg:hidden` pattern already used well in `status/page.tsx`'s
+  Risk Matrix card. `AddVisitDialog.tsx`, `EditInventoryDialog.tsx`, `EditVisitDialog.tsx`, and
+  `EditPatientDialog.tsx` gained `max-h-[90vh]`/`overflow-y-auto` (or just `overflow-y-auto` where a
+  `max-w-[95vw] h-[95vh]` cap already existed) so tall dialog content scrolls instead of clipping on a
+  short/zoomed viewport. `WalkInForm.tsx`'s Address/Age/Sex row switched from fixed `72px`/`96px` grid
+  columns to `minmax()` tracks so they don't get crushed on narrow widths. Design/plan docs:
+  `docs/superpowers/specs/2026-08-11-responsive-ui-audit-design.md` and
+  `docs/superpowers/plans/2026-08-11-responsive-ui-audit.md`.
+
 - **Appointment Clinic Selector (2026-08-11):** The dashboard's Appointment form (`WalkInForm.tsx`,
   under the Search box) gained a "Clinic" dropdown on the same row as the "Appointment" header,
   populated from `GET /api/admin/locations` (active locations only, only rendered once at least one
