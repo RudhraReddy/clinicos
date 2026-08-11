@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, UserPlus, AlertCircle, Users, Check, Pencil, Save } from "lucide-react"
 import { api, type Patient, type Visit } from "@/lib/api"
-import { getTodayIST, cn } from "@/lib/utils"
+import { getTodayIST, cn, getVisitAge } from "@/lib/utils"
 import { toast } from "sonner"
 
 type FormState = 'idle' | 'searching' | 'found' | 'not_found' | 'new_patient'
@@ -345,7 +345,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                     {patientVisits.map(v => (
                                         <div key={v.visit_id} className="flex items-start justify-between px-3 py-2 text-xs gap-2">
                                             <div className="min-w-0">
-                                                <p className="text-muted-foreground font-mono">{v.visit_date}</p>
+                                                <p className="text-muted-foreground font-mono">
+                                                    {v.visit_date}
+                                                    {getVisitAge(v.visit_date) && (
+                                                        <span className="text-muted-foreground/70"> · {getVisitAge(v.visit_date)}</span>
+                                                    )}
+                                                </p>
                                                 <p className="truncate text-foreground/80">{v.reason || '—'}</p>
                                             </div>
                                             <div className="flex flex-col items-end gap-1 shrink-0">
