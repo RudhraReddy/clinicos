@@ -589,7 +589,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                     value={locationId != null ? locationId.toString() : undefined}
                                     onValueChange={v => setLocationId(parseInt(v))}
                                 >
-                                    <SelectTrigger className="h-6 w-auto min-w-[110px] gap-1 px-2 py-0 text-xs">
+                                    <SelectTrigger className="h-7 w-auto min-w-[110px] gap-1 px-2 py-0.5 mr-3 text-xs">
                                         <SelectValue placeholder="Select clinic" />
                                     </SelectTrigger>
                                     <SelectContent>
