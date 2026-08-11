@@ -585,23 +585,25 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                        Fee (₹)
-                                    </label>
-                                    <div className="flex items-center justify-center gap-1 mt-1">
-                                        <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={freeAppointment}
-                                                onChange={e => {
-                                                    const checked = e.target.checked
-                                                    setFreeAppointment(checked)
-                                                    if (checked) setVisit(v => ({ ...v, visiting_fee: '' }))
-                                                }}
-                                                className="h-3 w-3 accent-foreground"
-                                            />
-                                            Free
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Fee (₹)
                                         </label>
+                                        <div className="flex-1 flex justify-center">
+                                            <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={freeAppointment}
+                                                    onChange={e => {
+                                                        const checked = e.target.checked
+                                                        setFreeAppointment(checked)
+                                                        if (checked) setVisit(v => ({ ...v, visiting_fee: '' }))
+                                                    }}
+                                                    className="h-3 w-3 accent-foreground"
+                                                />
+                                                Free
+                                            </label>
+                                        </div>
                                     </div>
                                     <Input
                                         type="number"
