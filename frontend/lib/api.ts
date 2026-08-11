@@ -95,6 +95,7 @@ export interface CreateVisitData {
     amount_paid?: number;
     payment_status?: string;
     payment_mode?: string;
+    location_id?: number | null;
 }
 
 export interface InventorySearchResult {

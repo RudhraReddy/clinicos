@@ -42,9 +42,15 @@ def create_visit():
         payment_mode=data.get('payment_mode'),
         created_by_user_id=g.current_user.get('user_id')
     )
-    creator = db.session.get(User, g.current_user.get('user_id'))
-    if creator and creator.location_id:
-        new_visit.location_id = creator.location_id
+    # The clinic a visit is billed to is explicitly selectable from the
+    # dashboard (money-related records must be linked to a clinic); fall
+    # back to the creating user's own clinic when none is chosen.
+    if data.get('location_id'):
+        new_visit.location_id = data['location_id']
+    else:
+        creator = db.session.get(User, g.current_user.get('user_id'))
+        if creator and creator.location_id:
+            new_visit.location_id = creator.location_id
     db.session.add(new_visit)
     db.session.commit()
 

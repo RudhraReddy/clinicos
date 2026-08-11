@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, UserPlus, AlertCircle, Users, Check, Pencil, Save } from "lucide-react"
-import { api, type Patient, type Visit } from "@/lib/api"
+import { api, type Patient, type Visit, type Location } from "@/lib/api"
 import { getTodayIST, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { toast } from "sonner"
+import { useAuth } from "@/lib/auth_context"
 
 type FormState = 'idle' | 'searching' | 'found' | 'not_found' | 'new_patient'
 
@@ -58,6 +59,9 @@ function looksLikePhone(s: string) {
 }
 
 export function WalkInForm({ onSuccess }: WalkInFormProps) {
+    const { user } = useAuth()
+    const [locations, setLocations] = useState<Location[]>([])
+    const [locationId, setLocationId] = useState<number | null>(null)
     const [phone, setPhone] = useState('')
     const [formState, setFormState] = useState<FormState>('idle')
     const [matchedPatient, setMatchedPatient] = useState<Patient | null>(null)
@@ -109,6 +113,18 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         }
         setPickerOpen(false)
     }
+
+    // Fetch active clinics once on mount, defaulting the appointment to the
+    // logged-in user's own clinic (still overridable per-visit).
+    useEffect(() => {
+        api.getLocations()
+            .then(locs => setLocations(locs.filter(l => l.is_active)))
+            .catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (user?.location_id != null) setLocationId(user.location_id)
+    }, [user?.location_id])
 
     // Close the match picker on outside click
     useEffect(() => {
@@ -294,6 +310,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                 amount_paid: feeAmount,
                 payment_status: 'full',
                 payment_mode: visit.payment_mode,
+                location_id: locationId,
             })
 
             toast.success(
@@ -318,7 +335,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const feeEntered = feeTrimmed !== '' && !isNaN(feeParsed) && feeParsed >= 0
     const feeValid = freeAppointment || feeEntered
     const feeAmount = freeAppointment ? 0 : (feeEntered ? feeParsed : 0)
-    const canSubmit = !submitting && feeValid && (
+    // Every visit (money-related) must be linked to a clinic once clinics exist.
+    const clinicValid = locations.length === 0 || locationId != null
+    const canSubmit = !submitting && feeValid && clinicValid && (
         formState === 'found' ||
         (isNewPatientMode && name.trim() !== '' && phoneNumber.trim() !== '')
     )
@@ -565,6 +584,26 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                     <div className="border-t pt-2.5">
                         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Appointment</label>
                         <div className="flex flex-col gap-2 mt-2">
+                            {locations.length > 0 && (
+                                <div>
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                        Clinic
+                                    </label>
+                                    <Select
+                                        value={locationId != null ? locationId.toString() : undefined}
+                                        onValueChange={v => setLocationId(parseInt(v))}
+                                    >
+                                        <SelectTrigger className="mt-1">
+                                            <SelectValue placeholder="Select clinic" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {locations.map(l => (
+                                                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                             <Input
                                 value={visit.reason}
                                 onChange={e => setVisit(v => ({ ...v, reason: e.target.value }))}
