@@ -311,7 +311,10 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     const patientBlank = formState === 'idle' || formState === 'searching'
     const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
     const fieldsLocked = formState === 'found' && !editMode
-    const feeValid = visit.visiting_fee.trim() !== '' && parseFloat(visit.visiting_fee) > 0
+    const feeTrimmed = visit.visiting_fee.trim()
+    const feeAmount = feeTrimmed === '' ? 0 : parseFloat(feeTrimmed)
+    const feeValid = feeTrimmed === '' || !isNaN(feeAmount)
+    const isFreeAppointment = feeAmount === 0
     const canSubmit = !submitting && feeValid && (
         formState === 'found' ||
         (isNewPatientMode && name.trim() !== '' && phoneNumber.trim() !== '')
@@ -580,7 +583,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                        Fee (₹)<span className="text-destructive ml-0.5">*</span>
+                                        Fee (₹)
                                     </label>
                                     <Input
                                         type="number"
@@ -589,7 +592,6 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                         onChange={e => setVisit(v => ({ ...v, visiting_fee: e.target.value }))}
                                         placeholder="0"
                                         className="mt-1"
-                                        required
                                     />
                                 </div>
                                 <div>
@@ -616,13 +618,17 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         </div>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={!canSubmit}>
+                    <Button
+                        type="submit"
+                        className={cn("w-full", isFreeAppointment && "bg-primary/70 hover:bg-primary/60")}
+                        disabled={!canSubmit}
+                    >
                         {submitting ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
                         ) : formState === 'found' ? (
-                            'Book Appointment'
+                            isFreeAppointment ? 'Free Appointment' : 'Book Appointment'
                         ) : (
-                            'Create Patient & Book'
+                            isFreeAppointment ? 'Create Patient & Free Appointment' : 'Create Patient & Book'
                         )}
                     </Button>
                     </div>
