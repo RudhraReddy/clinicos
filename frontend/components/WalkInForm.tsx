@@ -582,28 +582,25 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
                     {/* Appointment */}
                     <div className="border-t pt-2.5">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Appointment</label>
-                        <div className="flex flex-col gap-2 mt-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Appointment</label>
                             {locations.length > 0 && (
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                        Clinic
-                                    </label>
-                                    <Select
-                                        value={locationId != null ? locationId.toString() : undefined}
-                                        onValueChange={v => setLocationId(parseInt(v))}
-                                    >
-                                        <SelectTrigger className="mt-1">
-                                            <SelectValue placeholder="Select clinic" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {locations.map(l => (
-                                                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                <Select
+                                    value={locationId != null ? locationId.toString() : undefined}
+                                    onValueChange={v => setLocationId(parseInt(v))}
+                                >
+                                    <SelectTrigger className="h-6 w-auto min-w-[110px] gap-1 px-2 py-0 text-xs">
+                                        <SelectValue placeholder="Select clinic" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {locations.map(l => (
+                                            <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             )}
+                        </div>
+                        <div className="flex flex-col gap-2 mt-2">
                             <Input
                                 value={visit.reason}
                                 onChange={e => setVisit(v => ({ ...v, reason: e.target.value }))}
