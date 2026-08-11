@@ -140,7 +140,7 @@ Hardcoded admin accounts: `saivelapati`, `tejavelapati` (TOTP-gated, auto-provis
 - `PUT /api/patients/<id>` — update
 
 ### Visits `/api/visits`
-- `POST /api/visits` — create
+- `POST /api/visits` — create (optional `location_id` in body explicitly picks the clinic; falls back to the creating user's own `location_id` when omitted)
 - `GET /api/visits` — last 50
 - `GET /api/visits/patient/<patient_id>` — patient's visits
 - `GET /api/visits/<id>` — get one
@@ -199,7 +199,9 @@ Hardcoded admin accounts: `saivelapati`, `tejavelapati` (TOTP-gated, auto-provis
 - **Per-location stock:** `inventory_batches.location_id` tracks which clinic holds each batch. `GET /api/inventory?location_id=N` returns only that clinic's stock. The inventory page has a location pill-switcher.
 - **FIFO billing:** `POST /api/billing` deducts from batches ordered by `expiry_date ASC`.
 - **Visit status flow:** `in_progress` → `done` → (billing creates bill, sets `visit.invoice_id`) | `cancelled`
-- **Auto-location tagging:** New `Visit`, `Bill`, `PurchaseInvoice`, and `InventoryBatch` records are automatically tagged with the creating user's `location_id`.
+- **Auto-location tagging:** New `Visit`, `Bill`, `PurchaseInvoice`, and `InventoryBatch` records are automatically tagged with the creating user's `location_id`. `Visit` creation is the one exception with an explicit override: the dashboard's Appointment form (`WalkInForm.tsx`) has a Clinic dropdown (defaults to the user's own clinic, only shown once clinics exist) that sends `location_id` directly, and the booking button is disabled until a clinic is chosen. `Patient` deliberately carries no `location_id` — a patient can be seen across clinics; only money/stock-related records are clinic-scoped.
+- **Zero-fee ("free") visits:** A visit's `visiting_fee`/`amount_paid` can be explicitly `0` — this is a deliberate free appointment, not missing data. In `WalkInForm.tsx`, checking the "Free" checkbox next to the Fee field disables/clears the fee input and forces `0` on submit; otherwise a fee must be entered or the Book button stays disabled. Anywhere a visit fee is displayed, use `formatVisitFee(fee)` (`frontend/lib/utils.ts`) — it renders `null`/`undefined` as `—`, exactly `0` as `FREE`, and any other number as `₹{amount}`. Rolled out to `WalkInForm.tsx`, `app/page.tsx`, `app/doctor/page.tsx`, `VisitsTab.tsx`, `PatientDetailsView.tsx`, `VisitDetailsDialog.tsx` — use it in any new fee display too instead of a raw `₹{fee}` template.
+- **Visit age display:** `getVisitAge(visitDate)` (`frontend/lib/utils.ts`) returns `"{days}d"` up to 90 days old, then `"{months}mo"`. Used wherever a past visit's age needs to show next to its date (e.g. `WalkInForm.tsx`'s Past Visits panel, `VisitsTab.tsx`).
 - **Location management:** Admin creates `Location` records in Admin → Settings → Locations card. Users are assigned to a location via dropdown (saves `location_id`; syncs `location_label` string for backward compat). Old string `location` columns are preserved on all tables but ignored by new code.
 - **CSV export — two modes:** "Total Inventory" = full batch-level dump (19 columns). "Edit Inventory" = one-row-per-product with per-clinic qty columns, suitable for round-trip import to adjust stock.
 - **CSV import — header mapping:** `parse-headers` classifies each column first. Unknown columns trigger a mapping step in the dialog where the user assigns them to a known field or a clinic. The import then applies `field_mapping` and `clinic_mapping` JSON.

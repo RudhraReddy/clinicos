@@ -80,6 +80,8 @@ The frontend never calls the backend directly by hostname. `next.config.ts` rewr
 - **UI stack:** Tailwind CSS 4 + shadcn/ui (Radix UI) + lucide-react icons. Toast notifications via `sonner`.
 - **All API calls** go through `frontend/lib/api.ts`. This is the only place to add/modify API interaction.
 - **IST date helper:** `frontend/lib/utils.ts` exports `getTodayIST()` — returns today's date as `YYYY-MM-DD` in IST. Use this wherever you need today's date on the frontend.
+- **Visit age helper:** `frontend/lib/utils.ts` exports `getVisitAge(visitDate)` — `"{days}d"` up to 90 days, then `"{months}mo"`. Use wherever a past visit's age is shown next to its date.
+- **Visit fee display helper:** `frontend/lib/utils.ts` exports `formatVisitFee(fee)` — `null`/`undefined` → `—`, exactly `0` → `FREE` (a deliberate zero-fee visit, not missing data), any other number → `₹{amount}`. Always use this instead of a raw `₹{fee}` template so free appointments render consistently everywhere.
 
 ### Page Map
 
@@ -131,7 +133,7 @@ Patient → Visit → Bill → BillItem → ProductMaster
 
 Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `PrescriptionItem` (linked to visits), `UploadSession` (QR mobile uploads), `Location` (clinic branches).
 
-**Multi-location model:** `Location` (id int PK, name string unique, is_active bool) — managed in Admin → Settings. A nullable `location_id` FK to `Location` exists on `User`, `Visit`, `Bill`, `PurchaseInvoice`, `ExpenseLedger`, and `InventoryBatch`. New records are auto-tagged with the creating user's `location_id`. Old rows keep their legacy `location` string column for backward compat.
+**Multi-location model:** `Location` (id int PK, name string unique, is_active bool) — managed in Admin → Settings. A nullable `location_id` FK to `Location` exists on `User`, `Visit`, `Bill`, `PurchaseInvoice`, `ExpenseLedger`, and `InventoryBatch`. New records are auto-tagged with the creating user's `location_id`. `Visit` creation additionally accepts an explicit `location_id` override — the dashboard's Appointment form (`WalkInForm.tsx`) has a Clinic dropdown (defaults to the user's own clinic, only rendered once clinics exist) that lets frontdesk pick the clinic per visit instead of always inheriting the logged-in user's clinic; booking is blocked until a clinic is selected. Old rows keep their legacy `location` string column for backward compat. `Patient` intentionally has no `location_id` — only money/stock-related records are clinic-scoped; a patient can be seen at any clinic.
 
 ### Key Business Logic
 
@@ -161,7 +163,7 @@ Production stack, projected ~$15/month (Render Hobby workspace):
 | `clinicos-db` | Render | **Free** PostgreSQL (256MB, 1GB storage) | — | $0 → **must upgrade to $7/mo** |
 | `clinic-uploads` disk | Render | 10GB persistent (attached to clinicos-api) | — | $1/mo |
 
-> **URGENT:** `clinicos-db` is on the **Free plan** and will be **auto-deleted on 2026-05-29** (~22 days). Upgrade to Starter ($7/mo) at the Render dashboard before that date to preserve all data.
+> **URGENT — action needed:** `clinicos-db` was on the **Free plan** with an auto-deletion date of **2026-05-29**, which has now passed. Whether it was upgraded to Starter ($7/mo) before that date or the database (and all data) was actually deleted has **not been verified** — check the live Render dashboard before assuming either outcome, and upgrade immediately if it's still on Free.
 
 ### Render
 
@@ -276,6 +278,41 @@ These three strings are passed as props at two call sites and are currently hard
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **Appointment Clinic Selector (2026-08-11):** The dashboard's Appointment form (`WalkInForm.tsx`,
+  under the Search box) gained a "Clinic" dropdown on the same row as the "Appointment" header,
+  populated from `GET /api/admin/locations` (active locations only, only rendered once at least one
+  exists). Defaults to the logged-in user's own `location_id` but is overridable per visit. Booking is
+  blocked (Book button stays disabled) until a clinic is chosen, same as the existing fee requirement.
+  Backend `POST /api/visits` now accepts an explicit `location_id` in the body and uses it when
+  present, falling back to the creating user's own `location_id` when omitted (old auto-tag behavior
+  preserved for any other caller). Rationale: every money/stock-related record (`Visit`, `Bill`,
+  `PurchaseInvoice`, `ExpenseLedger`, `InventoryBatch`) must be linked to a clinic; `Patient` stays
+  clinic-agnostic since the same patient can be seen at multiple clinics.
+
+- **Free (Zero-Fee) Appointments (2026-08-11):** Walk-in visits can now be explicitly booked with a
+  ₹0 fee. `WalkInForm.tsx`'s Fee field has a small "Free" checkbox next to it (same row, matching font
+  size) — checking it disables/clears the fee input and forces `visiting_fee`/`amount_paid` to `0` on
+  submit. Without it checked, a fee must be entered or the Book button stays disabled (an earlier
+  iteration that changed the button's label/color to "Free Appointment" based on an empty fee field was
+  tried and then reverted in favor of this explicit checkbox, since an empty field silently defaulting
+  to free was too easy to trigger by accident). New `formatVisitFee(fee)` helper in
+  `frontend/lib/utils.ts` renders `null`/`undefined` as `—`, exactly `0` as `FREE`, anything else as
+  `₹{amount}` — rolled out to every fee display in the app: `WalkInForm.tsx` (Past Visits panel and
+  Today's queue), `app/page.tsx`, `app/doctor/page.tsx` (queue row, visit timeline header, main visit
+  card), `VisitsTab.tsx`, `PatientDetailsView.tsx`, `VisitDetailsDialog.tsx`.
+
+- **Visit Age in Past Visits Panel (2026-08-11):** `WalkInForm.tsx`'s Past Visits panel (left side of
+  the Appointment form) now shows each visit's age via the pre-existing `getVisitAge()` helper — it
+  had been rolled out everywhere else but was missed in this one panel. Displayed as its own centered
+  column (`grid grid-cols-[1fr_auto_1fr]`, not `flex justify-between`, which only wedges an element
+  between unequal-width siblings instead of truly centering it) between the date/reason block and the
+  fee/status block, non-bold.
+
+- **Payment Mode Toggle Inversion (2026-08-11):** The Cash/UPI toggle in `WalkInForm.tsx`'s Appointment
+  section now inverts colors on selection instead of only graying out the unselected option — the
+  selected mode gets `bg-foreground text-background` (solid, high-contrast), the unselected one stays
+  `text-muted-foreground`.
 
 - **Inventory Rack Location Field (2026-08-08):** Added `rack_location` (nullable `VARCHAR(50)`) to
   `ProductMaster` — a free-text physical rack/shelf position (e.g. "C2", "H1"), distinct from the

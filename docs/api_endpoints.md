@@ -64,9 +64,11 @@ Create a new visit for a patient.
   "visit_time": "10:30",       // optional, HH:MM
   "reason": "Fever",           // optional
   "status": "in_progress",     // optional, default: in_progress
-  "visiting_fee": 300,         // optional, default: 0
+  "visiting_fee": 300,         // optional, default: 0 (0 is a valid explicit "free appointment", not missing data)
   "amount_paid": 300,          // optional, default: 0
-  "payment_status": "full"     // optional, default: unpaid
+  "payment_status": "full",    // optional, default: unpaid
+  "location_id": 14            // optional int — explicitly picks the clinic this visit belongs to;
+                                // falls back to the creating user's own location_id when omitted
 }
 ```
 **Response:** `201 { "message": "Visit logged", "visit_id": "A1B2C3D4-280424-AB-CD" }`
