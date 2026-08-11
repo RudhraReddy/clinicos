@@ -585,12 +585,12 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                    <div className="flex items-center h-4 gap-2">
+                                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide leading-none">
                                             Fee (₹)
                                         </label>
                                         <div className="flex-1 flex justify-center">
-                                            <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide select-none">
+                                            <label className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide leading-none select-none">
                                                 <input
                                                     type="checkbox"
                                                     checked={freeAppointment}
@@ -616,7 +616,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</label>
+                                    <label className="flex items-center h-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide leading-none">Payment</label>
                                     <div className="inline-flex items-center rounded-md border bg-muted p-0.5 h-9 w-full mt-1">
                                         {(['cash', 'upi'] as const).map(mode => (
                                             <button
