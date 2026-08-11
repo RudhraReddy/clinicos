@@ -348,7 +348,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                                 <p className="text-muted-foreground font-mono">{v.visit_date}</p>
                                                 <p className="truncate text-foreground/80">{v.reason || '—'}</p>
                                             </div>
-                                            <span className="text-sm font-semibold text-foreground/80 tabular-nums text-center">
+                                            <span className="text-sm text-foreground/80 tabular-nums text-center">
                                                 {getVisitAge(v.visit_date)}
                                             </span>
                                             <div className="flex flex-col items-end gap-1 shrink-0 justify-self-end">
