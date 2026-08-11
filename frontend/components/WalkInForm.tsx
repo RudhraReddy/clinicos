@@ -600,7 +600,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                                 className={cn(
                                                     "flex-1 h-full rounded-sm text-xs font-medium transition-colors",
                                                     visit.payment_mode === mode
-                                                        ? "bg-background text-foreground shadow-sm"
+                                                        ? "bg-foreground text-background shadow-sm"
                                                         : "text-muted-foreground hover:text-foreground"
                                                 )}
                                             >
