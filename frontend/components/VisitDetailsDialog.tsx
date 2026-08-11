@@ -8,6 +8,7 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
+import { formatVisitFee } from "@/lib/utils"
 import { Loader2, AlertCircle, Image as ImageIcon, FileText, Maximize2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
@@ -107,7 +108,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange }: VisitDetailsDi
                             {visit.phone_number && <span>{visit.phone_number}</span>}
                             {typeof visit.visiting_fee === 'number' && (
                                 <span>
-                                    Fee: ₹{visit.visiting_fee}
+                                    Fee: {formatVisitFee(visit.visiting_fee)}
                                     {!!visit.refund_amount && (
                                         <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>
                                     )}

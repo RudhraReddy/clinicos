@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, UserPlus, AlertCircle, Users, Check, Pencil, Save } from "lucide-react"
 import { api, type Patient, type Visit } from "@/lib/api"
-import { getTodayIST, cn, getVisitAge } from "@/lib/utils"
+import { getTodayIST, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { toast } from "sonner"
 
 type FormState = 'idle' | 'searching' | 'found' | 'not_found' | 'new_patient'
@@ -29,18 +29,18 @@ function VisitFee({ visit }: { visit: Visit }) {
         const refund = visit.refund_amount ?? 0
         return (
             <span className="font-semibold tabular-nums">
-                ₹{fee}
+                {formatVisitFee(fee)}
                 {refund > 0 && <span className="text-red-600 dark:text-red-400">/₹{refund}</span>}
             </span>
         )
     }
     if (visit.payment_status === 'full') {
-        return <span className="font-semibold tabular-nums">₹{fee}</span>
+        return <span className="font-semibold tabular-nums">{formatVisitFee(fee)}</span>
     }
     if (visit.payment_status === 'partial') {
-        return <span className="font-semibold tabular-nums">₹{paid}/₹{fee}</span>
+        return <span className="font-semibold tabular-nums">₹{paid}/{formatVisitFee(fee)}</span>
     }
-    return <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">₹{fee}</span>
+    return <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">{formatVisitFee(fee)}</span>
 }
 
 const emptyVisit = () => ({
@@ -620,7 +620,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
 
                     <Button
                         type="submit"
-                        className={cn("w-full", isFreeAppointment && "bg-primary/70 hover:bg-primary/60")}
+                        className={cn("w-full", isFreeAppointment && "bg-primary/85 hover:bg-primary/75")}
                         disabled={!canSubmit}
                     >
                         {submitting ? (

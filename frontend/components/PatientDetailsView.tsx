@@ -10,6 +10,7 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog"
 import { api, Patient, API_BASE_URL } from "@/lib/api"
+import { formatVisitFee } from "@/lib/utils"
 import { Loader2, X, AlertCircle, Image as ImageIcon, FileText, Maximize2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
@@ -189,7 +190,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                                                                 <Badge variant="outline" className="text-[10px] h-5 capitalize shrink-0">{visit.status}</Badge>
                                                                 {viewMode === 'full' && (
                                                                     <span className="text-sm font-semibold tabular-nums shrink-0">
-                                                                        ₹{visit.visiting_fee ?? 0}
+                                                                        {formatVisitFee(visit.visiting_fee)}
                                                                         {!!visit.refund_amount && (
                                                                             <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>
                                                                         )}

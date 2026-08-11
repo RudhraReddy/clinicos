@@ -23,6 +23,15 @@ export function getVisitAge(visitDate: string | null | undefined): string | null
     return `${Math.floor(days / 30)}mo`
 }
 
+// A visit fee stored as exactly 0 is a deliberate free appointment, not a
+// missing value — display it distinctly rather than a blank "—" or "₹0"
+// that reads as unset data.
+export function formatVisitFee(fee: number | null | undefined): string {
+    if (fee == null) return '—'
+    if (fee === 0) return 'FREE'
+    return `₹${fee}`
+}
+
 // Not-done visits stay sorted by time; done visits sink below them, most
 // recently completed first, so a just-finished appointment appears right
 // under the pending list instead of staying in its original time slot.

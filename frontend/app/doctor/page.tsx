@@ -6,7 +6,7 @@ import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
-import { getTodayIST, orderTodayVisits, cn, getVisitAge } from "@/lib/utils"
+import { getTodayIST, orderTodayVisits, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -474,7 +474,7 @@ export default function DoctorDashboard() {
                                         {getVisitAge(visit.visit_date)}
                                     </span>
                                     <span className="text-xs font-medium tabular-nums text-muted-foreground min-w-[3.5rem] flex-shrink-0">
-                                        {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
+                                        {visit.visiting_fee != null ? (<>{formatVisitFee(visit.visiting_fee)}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                     </span>
                                     <p className="flex-1 min-w-0 font-semibold text-sm truncate">{visit.patient_name}</p>
                                     {visit.billed_amount != null && (
@@ -798,7 +798,7 @@ export default function DoctorDashboard() {
                                                                             )}
                                                                             {typeof visitForDate.visiting_fee === 'number' && (
                                                                                 <span className="text-xs font-semibold tabular-nums ml-auto">
-                                                                                    ₹{visitForDate.visiting_fee}
+                                                                                    {formatVisitFee(visitForDate.visiting_fee)}
                                                                                     {!!visitForDate.refund_amount && (
                                                                                         <span className="text-red-600 dark:text-red-400">/₹{visitForDate.refund_amount}</span>
                                                                                     )}
@@ -1056,7 +1056,7 @@ export default function DoctorDashboard() {
                                     {/* Fee/Refund on top, Time below — stacked instead of side by side */}
                                     <div className="flex flex-col min-w-[3.5rem] flex-shrink-0">
                                         <span className="text-sm font-semibold tabular-nums">
-                                            {visit.visiting_fee ? (<>₹{visit.visiting_fee}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
+                                            {visit.visiting_fee != null ? (<>{formatVisitFee(visit.visiting_fee)}{!!visit.refund_amount && <span className="text-red-600 dark:text-red-400">/₹{visit.refund_amount}</span>}</>) : '—'}
                                         </span>
                                         <span className="text-xs text-muted-foreground">{visit.visit_time?.substring(0, 5) || "ASAP"}</span>
                                         <span className="text-[10px] text-muted-foreground/70 tabular-nums">{getVisitAge(visit.visit_date)}</span>

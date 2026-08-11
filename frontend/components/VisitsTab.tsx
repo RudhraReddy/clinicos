@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table"
 import { Calendar, Loader2, X } from "lucide-react"
 import { type Visit } from "@/lib/api"
-import { getVisitAge } from "@/lib/utils"
+import { getVisitAge, formatVisitFee } from "@/lib/utils"
 import { VisitDetailsDialog } from "@/components/VisitDetailsDialog"
 import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
 import { DataTableRangeFilter } from "@/components/DataTableRangeFilter"
@@ -231,7 +231,7 @@ export function VisitsTab({ visits, loading }: VisitsTabProps) {
                                             <TableCell className="tabular-nums">
                                                 {typeof visit.visiting_fee === 'number' ? (
                                                     <div className="flex items-center gap-1.5">
-                                                        <span>₹{visit.visiting_fee}</span>
+                                                        <span>{formatVisitFee(visit.visiting_fee)}</span>
                                                         <ModeBadge mode={visit.payment_mode} />
                                                     </div>
                                                 ) : '-'}
