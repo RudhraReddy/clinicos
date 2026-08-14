@@ -331,6 +331,7 @@ function BillingContent() {
 
         setSubmitting(true)
         try {
+            const submittedRefund = refundLine
             const payload = {
                 patient_id: walkInMode ? undefined : patientId,
                 walk_in_name: walkInMode ? walkInName.trim() : undefined,
@@ -367,8 +368,16 @@ function BillingContent() {
                 setWalkInAge("")
                 setWalkInSex("")
             }
-            if (data.visit_refund_applied) {
-                toast.success(`Bill created! Invoice #${data.invoice_id} — ₹${data.visit_refund_applied.toFixed(2)} pending refund applied`)
+            const applied = data.visit_refund_applied || 0
+            const overflow = submittedRefund ? submittedRefund.amount - applied : 0
+            if (applied > 0 && overflow > 0) {
+                toast.success(`Bill created! Invoice #${data.invoice_id} — ₹${applied.toFixed(2)} applied to bill, ₹${overflow.toFixed(2)} paid out via ${submittedRefund!.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'}`)
+                loadLinkedVisit()
+            } else if (applied > 0) {
+                toast.success(`Bill created! Invoice #${data.invoice_id} — ₹${applied.toFixed(2)} pending refund applied`)
+                loadLinkedVisit()
+            } else if (overflow > 0) {
+                toast.success(`Bill created! Invoice #${data.invoice_id} — ₹${overflow.toFixed(2)} refund paid out via ${submittedRefund!.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'}`)
                 loadLinkedVisit()
             } else {
                 toast.success(`Bill created! Invoice #${data.invoice_id}`)
@@ -750,12 +759,17 @@ function BillingContent() {
                                                 <TableCell>{billItems.length + 1}</TableCell>
                                                 <TableCell className="font-medium text-destructive">
                                                     Refund ({refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'})
+                                                    {refundLine.amount > preRefundTotal && (
+                                                        <div className="text-xs font-normal text-muted-foreground mt-0.5">
+                                                            +₹{(refundLine.amount - preRefundTotal).toFixed(2)} paid out directly via {refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'}
+                                                        </div>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell />
                                                 <TableCell />
                                                 <TableCell />
                                                 <TableCell />
-                                                <TableCell className="text-destructive">−{refundLine.amount.toFixed(2)}</TableCell>
+                                                <TableCell className="text-destructive">−{refundToApply.toFixed(2)}</TableCell>
                                                 <TableCell>
                                                     <Button variant="ghost" size="sm" onClick={removeRefundLine}>
                                                         <Trash2 className="h-4 w-4 text-destructive" />

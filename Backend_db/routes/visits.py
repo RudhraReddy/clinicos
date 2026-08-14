@@ -1,4 +1,5 @@
 
+import math
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
 from models import Visit, Patient, ProductMaster, User, Bill, VisitRefund, PatientImage
@@ -277,6 +278,12 @@ def refund_visit(visit_id):
         amount = float(data.get('amount'))
     except (TypeError, ValueError):
         return jsonify({'error': 'A refund amount is required'}), 400
+
+    if not math.isfinite(amount):
+        return jsonify({'error': 'A finite refund amount is required'}), 400
+
+    if amount != int(amount):
+        return jsonify({'error': 'Refund amount must be a whole number of rupees'}), 400
 
     if amount <= 0:
         return jsonify({'error': 'Refund amount must be positive'}), 400

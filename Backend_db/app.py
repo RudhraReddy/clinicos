@@ -82,11 +82,14 @@ def _apply_migrations(db):
         "ALTER TABLE visit_refunds ALTER COLUMN mode TYPE VARCHAR(20)",
         "ALTER TABLE bills ADD COLUMN IF NOT EXISTS visit_refund_applied NUMERIC(10, 2)",
         # Pre-existing refunds were always visit-side payouts (billing/apply_to_bill
-        # didn't exist yet) — remap their old generic 'cash'/'upi' values onto the
-        # new explicit codes. Idempotent: matches nothing once already remapped.
-        "UPDATE visits SET refund_mode = 'visit_cash' WHERE refund_mode = 'cash'",
+        # didn't exist yet) — remap their old generic 'upi' value onto the new
+        # explicit code. Idempotent: matches nothing once already remapped. The
+        # 'cash' -> 'visit_cash' remaps that used to live here were removed
+        # (2026-08-14): 'cash' is now itself a live, actively-written mode (see
+        # routes/visits.py and routes/billing.py) — remapping it on every boot
+        # would silently corrupt freshly written refund data back to a mode
+        # Daily Summary no longer recognizes.
         "UPDATE visits SET refund_mode = 'visit_upi' WHERE refund_mode = 'upi'",
-        "UPDATE visit_refunds SET mode = 'visit_cash' WHERE mode = 'cash'",
         "UPDATE visit_refunds SET mode = 'visit_upi' WHERE mode = 'upi'",
         # 2026-08-14: refund redesign — 5 modes collapse to 3 (visit_upi,
         # billing_upi, cash). Historical visit_refunds.mode only ever held

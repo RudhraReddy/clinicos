@@ -214,6 +214,10 @@ def create_bill():
             refund_requested = float(refund_payload.get('amount'))
         except (TypeError, ValueError):
             return jsonify({'error': 'refund.amount must be a number'}), 400
+        if not math.isfinite(refund_requested):
+            return jsonify({'error': 'refund.amount must be a finite number'}), 400
+        if refund_requested != int(refund_requested):
+            return jsonify({'error': 'refund.amount must be a whole number of rupees'}), 400
         if refund_requested <= 0:
             return jsonify({'error': 'refund.amount must be positive'}), 400
         refund_mode = (refund_payload.get('mode') or '').strip().lower()
