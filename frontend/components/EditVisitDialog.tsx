@@ -34,12 +34,9 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
         payment_mode: "" as "" | "cash" | "upi",
         status: "scheduled"
     })
-    // Refund reflects the visit's current total refund and is directly editable —
-    // reopening a visit that already has a refund pre-checks the box and pre-fills
-    // the existing amount/mode, so increasing or decreasing it is just editing the
-    // number and saving again. Unchecking the box means "don't touch the refund
-    // this save" (not "clear it") — to remove a refund entirely, edit it down to 0.
-    const [refundChecked, setRefundChecked] = useState(false)
+    // A fresh refund event on top of whatever's already been refunded —
+    // purely additive, there's no "edit the running total" concept anymore.
+    // Left blank, no refund is issued on this save.
     const [refundInput, setRefundInput] = useState("")
     const [refundMode, setRefundMode] = useState<"" | RefundMode>("")
 
@@ -53,10 +50,8 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 payment_mode: (visit.payment_mode as "cash" | "upi") || "",
                 status: visit.status
             })
-            const existingRefund = visit.refund_amount || 0
-            setRefundChecked(existingRefund > 0)
-            setRefundInput(existingRefund > 0 ? existingRefund.toString() : "")
-            setRefundMode(visit.refund_mode || "")
+            setRefundInput("")
+            setRefundMode("")
         }
     }, [visit, open])
 
@@ -77,14 +72,13 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
             return
         }
 
-        let newRefundTotal: number | null = null
-        if (refundChecked) {
-            newRefundTotal = parseFloat(refundInput || '0')
-            if (!(newRefundTotal >= 0) || newRefundTotal > visitingFee) {
-                alert(`Enter a refund amount between ₹0 and ₹${visitingFee.toFixed(2)}`)
+        const refundIncrement = parseFloat(refundInput || '0')
+        if (refundIncrement > 0) {
+            if (refundedSoFar + refundIncrement > visitingFee) {
+                alert(`Enter a refund amount up to ₹${(visitingFee - refundedSoFar).toFixed(2)} (already refunded ₹${refundedSoFar.toFixed(2)})`)
                 return
             }
-            if (newRefundTotal > 0 && !refundMode) {
+            if (!refundMode) {
                 alert("Select how this refund is being settled")
                 return
             }
@@ -104,8 +98,8 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                 status: formData.status
             })
 
-            if (newRefundTotal !== null) {
-                await api.refundVisit(visit.visit_id, newRefundTotal, refundMode || undefined)
+            if (refundIncrement > 0) {
+                await api.refundVisit(visit.visit_id, refundIncrement, refundMode)
             }
 
             // Close dialog and notify success
@@ -241,18 +235,9 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
 
                         {canRefund && (
                             <div className="space-y-2">
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="edit-refund-check"
-                                        checked={refundChecked}
-                                        onChange={(e) => setRefundChecked(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <label htmlFor="edit-refund-check" className="text-sm font-medium cursor-pointer select-none">
-                                        Refund
-                                    </label>
-                                </div>
+                                <label htmlFor="edit-refund-amount" className="text-sm font-medium">
+                                    Issue a refund
+                                </label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <Input
                                         id="edit-refund-amount"
@@ -260,21 +245,17 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
                                         value={refundInput}
                                         onChange={(e) => setRefundInput(e.target.value)}
                                         placeholder="0"
-                                        disabled={!refundChecked}
                                     />
                                     <select
                                         id="edit-refund-mode"
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         value={refundMode}
                                         onChange={(e) => setRefundMode(e.target.value as RefundMode)}
-                                        disabled={!refundChecked}
                                     >
                                         <option value="" disabled>Settle via...</option>
-                                        <option value="visit_cash">Visit Cash</option>
                                         <option value="visit_upi">Visit UPI</option>
-                                        <option value="billing_cash">Billing Cash</option>
                                         <option value="billing_upi">Billing UPI</option>
-                                        <option value="apply_to_bill">Apply to Bill</option>
+                                        <option value="cash">Cash</option>
                                     </select>
                                 </div>
                             </div>
