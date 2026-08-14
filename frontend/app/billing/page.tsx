@@ -117,13 +117,14 @@ function BillingContent() {
     // (visit_id in the URL, e.g. the dashboard's "Go to Billing" action). A plain
     // patient search doesn't point at any one visit, so there's nothing to refund.
     const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null)
-    const [refundChecked, setRefundChecked] = useState(false)
-    const [refundValue, setRefundValue] = useState("")
-    const [refundMode, setRefundMode] = useState<"" | RefundMode>("")
-    const [refundSubmitting, setRefundSubmitting] = useState(false)
-    // Only offered when the linked visit has a pending 'apply_to_bill' refund —
-    // folds whatever's left of it into this new bill instead of paying it out.
-    const [applyRefundToBill, setApplyRefundToBill] = useState(false)
+    // A refund entered while building this bill. Only meaningful for a
+    // visit's first bill — see the "Add Refund" control, which is only
+    // rendered when linkedVisit.has_bill is false. Staged client-side only:
+    // nothing is sent to the backend until "Create Bill" is clicked, so
+    // deleting it before then discards it silently. At most one at a time.
+    const [refundLine, setRefundLine] = useState<{ amount: number; mode: RefundMode } | null>(null)
+    const [refundDraftAmount, setRefundDraftAmount] = useState("")
+    const [refundDraftMode, setRefundDraftMode] = useState<"" | RefundMode>("")
 
     // Clinic assignment — every bill is tagged to a clinic, same as the visit it may
     // be linked to. A visit-linked bill is locked to that visit's own clinic (can't
@@ -177,21 +178,19 @@ function BillingContent() {
 
     useEffect(() => { loadLinkedVisit() }, [loadLinkedVisit])
 
-    // Refund reflects the visit's current total refund and is directly editable —
-    // whenever the linked visit (re)loads, pre-check the box and pre-fill the
-    // existing amount/mode if one exists, so increasing/decreasing it is just
-    // editing the number and resubmitting.
+    // Whenever the linked visit (re)loads, clear any staged refund draft —
+    // it belonged to whatever visit was linked before.
     useEffect(() => {
-        const existingRefund = linkedVisit?.refund_amount || 0
-        setRefundChecked(existingRefund > 0)
-        setRefundValue(existingRefund > 0 ? existingRefund.toString() : "")
-        setRefundMode(linkedVisit?.refund_mode || "")
-        setApplyRefundToBill(false)
+        setRefundLine(null)
+        setRefundDraftAmount("")
+        setRefundDraftMode("")
     }, [linkedVisit])
 
-    // How much of a pending 'apply_to_bill' refund is still unconsumed —
-    // drives the "Apply pending refund" checkbox and the live total preview.
-    const pendingBillRefund = linkedVisit?.refund_mode === 'apply_to_bill' ? (linkedVisit.refund_remaining || 0) : 0
+    // The "Add Refund" control only makes sense while building a visit's
+    // first bill — once a bill exists, folding a refund into it is no
+    // longer possible (see the backend's is_first_bill check), so offering
+    // the control at all would be misleading.
+    const canAddRefund = !walkInMode && !!linkedVisit && !linkedVisit.has_bill && !refundLine
 
     const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
@@ -308,6 +307,16 @@ function BillingContent() {
         setBillItems(billItems.filter((_, i) => i !== index))
     }
 
+    const addRefundLine = () => {
+        const amount = parseFloat(refundDraftAmount || '0')
+        if (!(amount > 0) || !refundDraftMode) return
+        setRefundLine({ amount, mode: refundDraftMode })
+        setRefundDraftAmount("")
+        setRefundDraftMode("")
+    }
+
+    const removeRefundLine = () => setRefundLine(null)
+
     const handleCreateBill = async () => {
         if (walkInMode ? !walkInName.trim() : !patientId) return
         if (billItems.length === 0) return
@@ -332,7 +341,7 @@ function BillingContent() {
                 payment_type: paymentType,
                 discount_type: parsedDiscountValue > 0 ? discountType : undefined,
                 discount_value: parsedDiscountValue > 0 ? parsedDiscountValue : undefined,
-                apply_visit_refund: (!walkInMode && pendingBillRefund > 0 && applyRefundToBill) || undefined,
+                refund: refundLine ? { amount: refundLine.amount, mode: refundLine.mode } : undefined,
                 items_used: billItems.map(i => {
                     const qty = i.qty === '' ? 0 : i.qty
                     const multiplier = getPackMultiplier(i.pack_size)
@@ -351,7 +360,7 @@ function BillingContent() {
             const data = await api.createBill(payload)
             setBillItems([])
             setDiscountValue("")
-            setApplyRefundToBill(false)
+            setRefundLine(null)
             if (walkInMode) {
                 setWalkInMode(false)
                 setWalkInName("")
@@ -384,41 +393,6 @@ function BillingContent() {
         }
     }
 
-    const handleRefund = async () => {
-        if (!linkedVisit) return
-        const amount = parseFloat(refundValue || '0')
-        const cap = linkedVisit.amount_paid || 0
-        if (!(amount >= 0) || amount > cap) {
-            toast.error(`Enter a refund amount between ₹0 and ₹${cap.toFixed(2)}`)
-            return
-        }
-        if (amount > 0 && !refundMode) {
-            toast.error("Select how this refund is being settled")
-            return
-        }
-
-        setRefundSubmitting(true)
-        try {
-            await api.refundVisit(linkedVisit.visit_id, amount, refundMode || undefined)
-            toast.success("Refund recorded")
-            loadLinkedVisit()
-        } catch (e: unknown) {
-            console.error(e)
-            let errorMessage = "Failed to record refund"
-            if (e instanceof Error) {
-                try {
-                    const parsed = JSON.parse(e.message) as { error?: string }
-                    if (parsed?.error) errorMessage = parsed.error
-                } catch {
-                    errorMessage = e.message
-                }
-            }
-            toast.error(errorMessage)
-        } finally {
-            setRefundSubmitting(false)
-        }
-    }
-
     const calculateTotal = () => {
         return billItems.reduce((acc, item) => acc + (item.total || 0), 0)
     }
@@ -431,9 +405,10 @@ function BillingContent() {
         ? subtotal * Math.min(Math.max(parsedDiscountValue, 0), 100) / 100
         : Math.min(Math.max(parsedDiscountValue, 0), subtotal)
     const preRefundTotal = subtotal - discountAmount
-    // Never more than what's left of the pending refund, and never more than
-    // the bill itself — any excess simply stays unconsumed for a later bill.
-    const refundToApply = applyRefundToBill ? Math.min(pendingBillRefund, preRefundTotal) : 0
+    // Mirrors the backend: capped at the bill's own total, never negative —
+    // any excess becomes a direct payout server-side instead of a bill
+    // deduction (see routes/billing.py create_bill).
+    const refundToApply = refundLine ? Math.min(refundLine.amount, preRefundTotal) : 0
     const finalTotal = preRefundTotal - refundToApply
 
     // Clinic resolution — mirrors the backend's own resolution order exactly, so the
@@ -587,58 +562,6 @@ function BillingContent() {
                                     >
                                         Walk-in Bill
                                     </Button>
-                                    {linkedVisit && !walkInMode && (
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <div className="flex items-center space-x-2">
-                                                <input
-                                                    type="checkbox"
-                                                    id="billing-refund-check"
-                                                    checked={refundChecked}
-                                                    onChange={(e) => {
-                                                        setRefundChecked(e.target.checked)
-                                                        if (!e.target.checked) {
-                                                            setRefundValue("")
-                                                            setRefundMode("")
-                                                        }
-                                                    }}
-                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                />
-                                                <label htmlFor="billing-refund-check" className="text-sm font-medium cursor-pointer select-none">
-                                                    Refund
-                                                </label>
-                                            </div>
-                                            <Input
-                                                type="number"
-                                                placeholder="Value"
-                                                className="w-24 h-10"
-                                                value={refundValue}
-                                                onChange={(e) => setRefundValue(e.target.value)}
-                                                disabled={!refundChecked}
-                                            />
-                                            <Select value={refundMode} onValueChange={(v) => setRefundMode(v as RefundMode)} disabled={!refundChecked}>
-                                                <SelectTrigger className="w-36 h-10">
-                                                    <SelectValue placeholder="Settle via..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="visit_cash">Visit Cash</SelectItem>
-                                                    <SelectItem value="visit_upi">Visit UPI</SelectItem>
-                                                    <SelectItem value="billing_cash">Billing Cash</SelectItem>
-                                                    <SelectItem value="billing_upi">Billing UPI</SelectItem>
-                                                    <SelectItem value="apply_to_bill">Apply to Bill</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="h-10 shrink-0"
-                                                disabled={!refundChecked || refundSubmitting}
-                                                onClick={handleRefund}
-                                            >
-                                                {refundSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                Submit Refund
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "UPI")}>
@@ -663,7 +586,39 @@ function BillingContent() {
 
                             {/* Items */}
                             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                                <h3 className="font-semibold text-base mb-3 shrink-0">Items</h3>
+                                <div className="flex items-center justify-between mb-3 shrink-0 flex-wrap gap-2">
+                                    <h3 className="font-semibold text-base">Items</h3>
+                                    {canAddRefund && (
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                placeholder="Refund value"
+                                                className="w-32 h-8"
+                                                value={refundDraftAmount}
+                                                onChange={(e) => setRefundDraftAmount(e.target.value)}
+                                            />
+                                            <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
+                                                <SelectTrigger className="w-32 h-8">
+                                                    <SelectValue placeholder="Settle via..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="billing_upi">Billing UPI</SelectItem>
+                                                    <SelectItem value="cash">Cash</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8"
+                                                disabled={!(parseFloat(refundDraftAmount || '0') > 0) || !refundDraftMode}
+                                                onClick={addRefundLine}
+                                            >
+                                                Add Refund
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="flex-1 overflow-auto border rounded-md min-h-0">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-background z-10">
@@ -789,7 +744,24 @@ function BillingContent() {
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                        {billItems.length === 0 && (
+                                        {refundLine && (
+                                            <TableRow>
+                                                <TableCell>{billItems.length + 1}</TableCell>
+                                                <TableCell className="font-medium text-destructive">
+                                                    Refund ({refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'})
+                                                </TableCell>
+                                                <TableCell />
+                                                <TableCell />
+                                                <TableCell />
+                                                <TableCell className="text-destructive">−{refundLine.amount.toFixed(2)}</TableCell>
+                                                <TableCell>
+                                                    <Button variant="ghost" size="sm" onClick={removeRefundLine}>
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {billItems.length === 0 && !refundLine && (
                                             <TableRow>
                                                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                                     Search and add items to bill.
@@ -801,81 +773,51 @@ function BillingContent() {
                                 </div>
                             </div>
 
-                            {billItems.length > 0 && (
-                                <div className="flex justify-end mt-4 shrink-0">
-                                    <div className="flex flex-col items-end gap-2 min-w-[260px]">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-muted-foreground">Discount</span>
-                                            <div className="flex rounded-md border overflow-hidden">
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={discountType === "percent" ? "default" : "ghost"}
-                                                    className="rounded-none h-8 px-2.5"
-                                                    onClick={() => setDiscountType("percent")}
-                                                >
-                                                    %
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={discountType === "flat" ? "default" : "ghost"}
-                                                    className="rounded-none h-8 px-2.5"
-                                                    onClick={() => setDiscountType("flat")}
-                                                >
-                                                    ₹
-                                                </Button>
-                                            </div>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                max={discountType === "percent" ? 100 : subtotal}
-                                                value={discountValue}
-                                                onChange={(e) => setDiscountValue(e.target.value)}
-                                                placeholder="0"
-                                                className="w-24 h-8"
-                                            />
+                            <div className="flex justify-end mt-4 shrink-0">
+                                <div className="flex flex-col items-end gap-2 min-w-[260px]">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">Discount</span>
+                                        <div className="flex rounded-md border overflow-hidden">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={discountType === "percent" ? "default" : "ghost"}
+                                                className="rounded-none h-8 px-2.5"
+                                                onClick={() => setDiscountType("percent")}
+                                            >
+                                                %
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={discountType === "flat" ? "default" : "ghost"}
+                                                className="rounded-none h-8 px-2.5"
+                                                onClick={() => setDiscountType("flat")}
+                                            >
+                                                ₹
+                                            </Button>
                                         </div>
-                                        {!walkInMode && pendingBillRefund > 0 && (
-                                            <div className="flex items-center gap-2 w-full">
-                                                <input
-                                                    type="checkbox"
-                                                    id="apply-refund-check"
-                                                    checked={applyRefundToBill}
-                                                    onChange={(e) => setApplyRefundToBill(e.target.checked)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                />
-                                                <label htmlFor="apply-refund-check" className="text-sm text-muted-foreground cursor-pointer select-none">
-                                                    Apply ₹{pendingBillRefund.toFixed(2)} pending refund to this bill
-                                                </label>
-                                            </div>
-                                        )}
-                                        {(discountAmount > 0 || refundToApply > 0) && (
-                                            <>
-                                                <div className="flex justify-between w-full text-sm text-muted-foreground">
-                                                    <span>Subtotal</span>
-                                                    <span>₹{subtotal.toFixed(2)}</span>
-                                                </div>
-                                                {discountAmount > 0 && (
-                                                    <div className="flex justify-between w-full text-sm text-muted-foreground">
-                                                        <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
-                                                        <span>−₹{discountAmount.toFixed(2)}</span>
-                                                    </div>
-                                                )}
-                                                {refundToApply > 0 && (
-                                                    <div className="flex justify-between w-full text-sm text-muted-foreground">
-                                                        <span>Refund Applied</span>
-                                                        <span>−₹{refundToApply.toFixed(2)}</span>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                        <span className="text-lg font-bold">
-                                            Total: ₹{finalTotal.toFixed(2)}
-                                        </span>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={discountType === "percent" ? 100 : subtotal}
+                                            value={discountValue}
+                                            onChange={(e) => setDiscountValue(e.target.value)}
+                                            placeholder="0"
+                                            className="w-24 h-8"
+                                        />
                                     </div>
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                            <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
+                                            <span>−₹{discountAmount.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <span className="text-lg font-bold">
+                                        Total: ₹{finalTotal.toFixed(2)}
+                                    </span>
                                 </div>
-                            )}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
