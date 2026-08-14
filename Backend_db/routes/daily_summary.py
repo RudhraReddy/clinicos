@@ -176,17 +176,17 @@ def get_daily_summary():
 
     # ── Refunds issued today (may belong to visits from any earlier day) ──────
     # Payout refunds are tagged with exactly which till they came out of —
-    # subtract from that bucket directly (so "Visit Cash"/"Billing UPI" etc.
+    # subtract from that bucket directly (so "Visit Fee"/"Billing Fee" etc.
     # are true net-of-refunds tally figures), while still logging into the
     # info-only 'refund' bucket (split by cash/upi regardless of source) for
-    # at-a-glance reconciliation. 'apply_to_bill' refunds never reach this log
-    # at all — see routes/visits.py — they're accounted for via billing_refund
-    # above instead, since they never left any till.
+    # at-a-glance reconciliation. Cash refunds always debit Billing Cash —
+    # Visit Cash is never touched by a refund. A refund folded into a bill
+    # never reaches this log at all (see routes/billing.py) — it's accounted
+    # for via billing_refund above instead, since it never left any till.
     REFUND_BUCKET_MAP = {
-        'visit_cash': ('visit_fee', 'cash'),
         'visit_upi': ('visit_fee', 'upi'),
-        'billing_cash': ('billing_fee', 'cash'),
         'billing_upi': ('billing_fee', 'upi'),
+        'cash': ('billing_fee', 'cash'),
     }
     refund_q = VisitRefund.query.filter(func.date(VisitRefund.created_at) == date_str)
     if filter_location_id is not None:
