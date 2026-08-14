@@ -207,6 +207,8 @@ def create_bill():
     # billing_refund bucket, not logged again here.
     refund_applied = None
     refund_payload = data.get('refund')
+    if refund_payload and g.current_user.get('role') == 'doctor':
+        return jsonify({'error': 'Not authorized to issue refunds'}), 403
     if refund_payload and visit:
         try:
             refund_requested = float(refund_payload.get('amount'))
