@@ -558,6 +558,7 @@ function BillingContent() {
                                             setWalkInName("")
                                             setWalkInAge("")
                                             setWalkInSex("")
+                                            setRefundLine(null)
                                         }}
                                     >
                                         Walk-in Bill
@@ -750,6 +751,7 @@ function BillingContent() {
                                                 <TableCell className="font-medium text-destructive">
                                                     Refund ({refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'})
                                                 </TableCell>
+                                                <TableCell />
                                                 <TableCell />
                                                 <TableCell />
                                                 <TableCell />
