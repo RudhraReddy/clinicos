@@ -88,6 +88,16 @@ def _apply_migrations(db):
         "UPDATE visits SET refund_mode = 'visit_upi' WHERE refund_mode = 'upi'",
         "UPDATE visit_refunds SET mode = 'visit_cash' WHERE mode = 'cash'",
         "UPDATE visit_refunds SET mode = 'visit_upi' WHERE mode = 'upi'",
+        # 2026-08-14: refund redesign — 5 modes collapse to 3 (visit_upi,
+        # billing_upi, cash). Historical visit_refunds.mode only ever held
+        # the 4 old payout codes (apply_to_bill was deliberately never
+        # logged there), so merging the two cash variants is a full
+        # backfill. visits.refund_mode is a live "most recent mode" display
+        # column and can hold 'apply_to_bill' historically — remapped to
+        # 'billing_upi' as the closest equivalent (display-only, nothing
+        # financial reads this column for old visits). Both idempotent.
+        "UPDATE visit_refunds SET mode = 'cash' WHERE mode IN ('visit_cash', 'billing_cash')",
+        "UPDATE visits SET refund_mode = 'billing_upi' WHERE refund_mode = 'apply_to_bill'",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
