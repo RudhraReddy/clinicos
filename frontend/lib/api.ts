@@ -16,10 +16,12 @@ export interface Patient {
     created_at?: string;
 }
 
-// The 4 payout codes each name exactly one till the money physically came
-// out of; apply_to_bill means the refund is still pending, to be folded into
-// a future bill's total instead of paid out directly.
-export type RefundMode = 'visit_cash' | 'visit_upi' | 'billing_cash' | 'billing_upi' | 'apply_to_bill' | string;
+// Visit UPI is always a direct payout; Billing UPI and Cash apply to a
+// visit's first bill (if one's being created right now) before falling
+// back to a direct payout — same rule everywhere this type is used, see
+// docs/superpowers/specs/2026-08-14-refund-redesign-design.md. Cash always
+// debits Billing Cash, never Visit Cash.
+export type RefundMode = 'visit_upi' | 'billing_upi' | 'cash';
 
 export interface Visit {
     visit_id: string;
@@ -37,9 +39,10 @@ export interface Visit {
     amount_paid?: number;
     refund_amount?: number;
     refund_mode?: RefundMode;
-    // Only meaningful when refund_mode is 'apply_to_bill' — how much of the
-    // pending refund hasn't yet been folded into a bill.
-    refund_remaining?: number;
+    // Whether this visit already has at least one bill — drives the Billing
+    // page's "Add Refund" control, which only folds into a bill when it's
+    // the visit's first one.
+    has_bill?: boolean;
     payment_status?: string;
     payment_mode?: string;
     billed_amount?: number | null;
@@ -487,8 +490,8 @@ export const api = {
         });
     },
 
-    // `amount` is the visit's total desired refund (not a delta) — editing an
-    // existing refund up or down is just resubmitting a different number.
+    // `amount` is an increment on top of whatever's already been refunded on
+    // this visit, not a new total — call again for a second refund event.
     // `mode` is only required when amount > 0.
     async refundVisit(id: string, amount: number, mode?: RefundMode | ''): Promise<{ refund_amount: number; payment_status: string; refund_mode: string; refund_remaining: number }> {
         return fetchApi(`/api/visits/${id}/refund`, {

@@ -3,12 +3,17 @@ import math
 
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
-from models import Bill, BillItem, Patient, Visit, ProductMaster, InventoryBatch, InventoryHistory, User, Location
+from models import Bill, BillItem, Patient, Visit, VisitRefund, ProductMaster, InventoryBatch, InventoryHistory, User, Location
 from sqlalchemy import func
 from utils import generate_invoice_id
 from .auth import require_auth, log_activity
 
 billing = Blueprint('billing', __name__)
+
+# Kept in sync with routes/visits.py's REFUND_MODES by hand (duplicated
+# rather than cross-imported to avoid coupling the billing and visits
+# blueprints together).
+REFUND_MODES = ('visit_upi', 'billing_upi', 'cash')
 
 @billing.route('/billing', methods=['POST'])
 @require_auth
@@ -189,19 +194,60 @@ def create_bill():
 
     final_total = subtotal_amount - discount_amount
 
-    # Fold in a pending 'apply_to_bill' visit refund, if the caller opted in.
-    # Applies against whatever's left unconsumed (a visit can have several
-    # bills — the refund is always spent against the first one(s) created,
-    # never split evenly). Floors this bill at ₹0 rather than going negative;
-    # any excess simply stays unconsumed for the next bill on this visit.
+    # A refund entered while creating this bill. Visit UPI is always a pure
+    # payout (never touches the bill). Billing UPI and Cash apply to this
+    # bill's total first — but only if this is the visit's *first* bill; a
+    # bill's total is only ever touched live, at its own creation, so a 2nd+
+    # bill never has a refund folded into it even if one is submitted here.
+    # Any amount beyond what the bill absorbs (or the whole amount, for a
+    # non-first bill or visit_upi) is a direct payout, logged the same way
+    # /visits/<id>/refund would log it — only the payout portion gets a
+    # VisitRefund row; the applied portion never left a till, so it's
+    # accounted for purely via visit_refund_applied + Daily Summary's
+    # billing_refund bucket, not logged again here.
     refund_applied = None
-    if visit and data.get('apply_visit_refund') and visit.refund_mode == 'apply_to_bill':
-        already_applied = float(db.session.query(func.coalesce(func.sum(Bill.visit_refund_applied), 0))
-                                 .filter(Bill.visit_id == visit_id).scalar() or 0)
-        remaining = float(visit.refund_amount or 0) - already_applied
-        if remaining > 0:
-            refund_applied = min(remaining, final_total)
-            final_total -= refund_applied
+    refund_payload = data.get('refund')
+    if refund_payload and g.current_user.get('role') == 'doctor':
+        return jsonify({'error': 'Not authorized to issue refunds'}), 403
+    if refund_payload and visit:
+        try:
+            refund_requested = float(refund_payload.get('amount'))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'refund.amount must be a number'}), 400
+        if not math.isfinite(refund_requested):
+            return jsonify({'error': 'refund.amount must be a finite number'}), 400
+        if refund_requested != int(refund_requested):
+            return jsonify({'error': 'refund.amount must be a whole number of rupees'}), 400
+        if refund_requested <= 0:
+            return jsonify({'error': 'refund.amount must be positive'}), 400
+        refund_mode = (refund_payload.get('mode') or '').strip().lower()
+        if refund_mode not in REFUND_MODES:
+            return jsonify({'error': 'A valid refund settlement type is required'}), 400
+
+        previous_refund_total = float(visit.refund_amount or 0)
+        amount_paid = float(visit.amount_paid or 0)
+        new_refund_total = previous_refund_total + refund_requested
+        if new_refund_total > amount_paid:
+            return jsonify({'error': f'Cannot refund more than the ₹{amount_paid:.2f} collected for this visit'}), 400
+
+        is_first_bill = db.session.query(Bill.invoice_id).filter(
+            Bill.visit_id == visit_id, Bill.invoice_id != invoice_id
+        ).first() is None
+
+        applied = 0.0
+        if is_first_bill and refund_mode in ('billing_upi', 'cash'):
+            applied = min(refund_requested, final_total)
+            final_total -= applied
+        payout = refund_requested - applied
+
+        visit.refund_amount = new_refund_total
+        visit.refund_mode = refund_mode
+        visit.payment_status = 'refunded'
+        visit.updated_at = get_ist_now()
+        if payout > 0:
+            db.session.add(VisitRefund(visit_id=visit_id, amount=payout, mode=refund_mode))
+        if applied > 0:
+            refund_applied = applied
 
     new_bill.subtotal_amount = subtotal_amount
     new_bill.discount_type = discount_type
