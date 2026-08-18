@@ -310,18 +310,18 @@ export default function DailySummaryPage() {
                                 No income to chart for this day
                             </div>
                         ) : (
-                            <div className="flex flex-wrap items-center justify-center gap-6">
+                            <div className="flex flex-col items-center gap-5 py-2">
                                 {/* Donut: outer ring = Cash/UPI split, inner pie = the full
                                     Visit/Billing x Cash/UPI cross-tab in matching shades. */}
-                                <div className="w-40 h-40 shrink-0">
+                                <div className="w-44 h-44 shrink-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RePie>
                                             <Pie
                                                 data={paymentSplitData}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={62}
-                                                outerRadius={78}
+                                                innerRadius={68}
+                                                outerRadius={86}
                                                 paddingAngle={2}
                                                 dataKey="value"
                                                 animationDuration={600}
@@ -335,7 +335,7 @@ export default function DailySummaryPage() {
                                                 cx="50%"
                                                 cy="50%"
                                                 innerRadius={0}
-                                                outerRadius={58}
+                                                outerRadius={62}
                                                 paddingAngle={2}
                                                 dataKey="value"
                                                 animationDuration={600}
@@ -350,12 +350,12 @@ export default function DailySummaryPage() {
                                     </ResponsiveContainer>
                                 </div>
 
-                                <div className="flex flex-wrap items-stretch gap-6">
+                                <div className="flex items-stretch justify-center gap-5 w-full border-t pt-4">
                                     {/* Cash/UPI totals, matching the outer ring */}
                                     <table className="text-sm">
                                         <thead>
                                             <tr className="border-b">
-                                                <th className="text-left font-medium text-muted-foreground pr-6 pb-1.5">Fee Type</th>
+                                                <th className="text-left font-medium text-muted-foreground pr-4 pb-1.5">Fee Type</th>
                                                 <th className="text-right font-medium pb-1.5">
                                                     <span className="inline-flex items-center gap-1.5">
                                                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: CASH_COLOR }} />
@@ -366,11 +366,11 @@ export default function DailySummaryPage() {
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td className="text-muted-foreground pr-6 py-1">Cash</td>
+                                                <td className="text-muted-foreground pr-4 py-1">Cash</td>
                                                 <td className="text-right tabular-nums font-semibold py-1">₹{summary.total.cash}</td>
                                             </tr>
                                             <tr>
-                                                <td className="text-muted-foreground pr-6 py-1">
+                                                <td className="text-muted-foreground pr-4 py-1">
                                                     <span className="inline-flex items-center gap-1.5">
                                                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: UPI_COLOR }} />
                                                         UPI
@@ -379,18 +379,20 @@ export default function DailySummaryPage() {
                                                 <td className="text-right tabular-nums font-semibold py-1">₹{summary.total.upi}</td>
                                             </tr>
                                             <tr className="border-t">
-                                                <td className="font-bold pr-6 pt-1.5">Total</td>
+                                                <td className="font-bold pr-4 pt-1.5">Total</td>
                                                 <td className="text-right tabular-nums font-bold pt-1.5">₹{summary.total.total}</td>
                                             </tr>
                                         </tbody>
                                     </table>
 
+                                    <div className="w-px bg-border shrink-0" />
+
                                     {/* Full Visit Fee / Billing Fee x Cash / UPI cross-tab */}
-                                    <table className="text-sm sm:border-l sm:pl-6">
+                                    <table className="text-sm">
                                         <thead>
                                             <tr className="border-b">
-                                                <th className="text-left font-medium text-muted-foreground pr-6 pb-1.5">Fee Type</th>
-                                                <th className="text-right font-medium pr-6 pb-1.5">
+                                                <th className="text-left font-medium text-muted-foreground pr-4 pb-1.5">Fee Type</th>
+                                                <th className="text-right font-medium px-3 pb-1.5">
                                                     <span className="inline-flex items-center gap-1.5">
                                                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: CASH_COLOR }} />
                                                         Cash
@@ -406,8 +408,8 @@ export default function DailySummaryPage() {
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td className="text-muted-foreground pr-6 py-1">Visit Fee</td>
-                                                <td className="text-right pr-6 py-1">
+                                                <td className="text-muted-foreground pr-4 py-1">Visit Fee</td>
+                                                <td className="text-right px-3 py-1">
                                                     <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
                                                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: VISIT_CASH_COLOR }} />
                                                         ₹{summary.visit_fee.cash}
@@ -421,8 +423,8 @@ export default function DailySummaryPage() {
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td className="text-muted-foreground pr-6 py-1">Billing Fee</td>
-                                                <td className="text-right pr-6 py-1">
+                                                <td className="text-muted-foreground pr-4 py-1">Billing Fee</td>
+                                                <td className="text-right px-3 py-1">
                                                     <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
                                                         <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: BILLING_CASH_COLOR }} />
                                                         ₹{summary.billing_fee.cash}
@@ -436,8 +438,8 @@ export default function DailySummaryPage() {
                                                 </td>
                                             </tr>
                                             <tr className="border-t">
-                                                <td className="font-bold pr-6 pt-1.5">Total</td>
-                                                <td className="text-right tabular-nums font-bold pr-6 pt-1.5">₹{summary.total.cash}</td>
+                                                <td className="font-bold pr-4 pt-1.5">Total</td>
+                                                <td className="text-right tabular-nums font-bold px-3 pt-1.5">₹{summary.total.cash}</td>
                                                 <td className="text-right tabular-nums font-bold pt-1.5">₹{summary.total.upi}</td>
                                             </tr>
                                         </tbody>
