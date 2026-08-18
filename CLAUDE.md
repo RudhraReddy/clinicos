@@ -352,11 +352,16 @@ rest of the scale changes:
    `getBoundingClientRect()` height (single line) against real invoice IDs, not just eyeballed.
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
-   a flex `space-between` row with one `<span>` per present field among MFG (abbrev, ≤4 letters) /
-   PACK / BATCH, spread across the full width rather than packed together with a fixed gap; likewise
-   a second row for HSN / GST / EXP; then a `{qty} × {mrp}` / `{amount}` row; then a divider. Any
-   missing field (no manufacturer, no HSN, etc.) simply isn't in that row's array, same idea as
-   before but expressed as an array of spans rather than a joined string.
+   a fixed 3-column CSS grid (`grid-template-columns: repeat(3, 1fr)`, **not** flex
+   `space-between`) with MFG (abbrev, ≤4 letters) / PACK / BATCH always in columns 1/2/3
+   respectively; likewise a second grid row for HSN / GST / EXP. Grid columns are a deliberate
+   choice over flex here — `space-between` anchors only the *last* item to the row's end, so each
+   row's column boundaries follow that row's own value lengths and don't line up with the row
+   below; a fixed grid keeps MFG/HSN, PACK/GST, and BATCH/EXP each starting at the same x position
+   regardless of value length (a long value like `BATCH: GD50506A` wraps within its own column
+   instead of dragging the row's alignment around). Then a `{qty} × {mrp}` / `{amount}` row; then a
+   divider. A missing field (no manufacturer, no HSN, etc.) renders as an empty grid cell — that
+   column stays reserved as blank space rather than the row collapsing to 2 columns.
 9. **Totals** — `SUBTOTAL` always shown. Discount and refund are each a bare right-aligned
    `-{amount}` line with **no label at all** (per clinic policy) and are omitted entirely — not
    shown as zero — when not applicable: discount only appears if `discountAmount > 0`, refund only
