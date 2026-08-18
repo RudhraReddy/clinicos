@@ -81,6 +81,19 @@ This only works against the local dev server, which uses the well-known dev secr
 work against Render, which uses a real, unknown `JWT_SECRET_KEY`. It's purely a shortcut to skip the
 TOTP flow when poking the live local app or API during testing/verification.
 
+### Git / GitHub
+
+- **Repo:** the project's actual GitHub repo is `RudhraReddy/clinicos` — `origin` should be
+  `git@github.com:RudhraReddy/clinicos.git`. (The local folder/working-copy on this machine is named
+  `clinic_related`, which is just the on-disk directory name and unrelated to the GitHub repo name —
+  don't infer one from the other.)
+- **Auth:** push/pull uses SSH, not HTTPS. An SSH key (`~/.ssh/id_ed25519`) is registered on the
+  GitHub account for this — `ssh -T git@github.com` should greet `Hi RudhraReddy!`. The HTTPS
+  credential helper in `~/.gitconfig` is stale (it shells out to a `gh` binary under `/tmp/...` that
+  doesn't persist across environment resets, since `/tmp` is ephemeral here) — don't rely on HTTPS
+  remotes or `gh` for auth in this environment; if `origin` is ever set to an `https://github.com/...`
+  URL, switch it back to the `git@github.com:...` SSH form.
+
 ## Architecture
 
 ### API Proxy
