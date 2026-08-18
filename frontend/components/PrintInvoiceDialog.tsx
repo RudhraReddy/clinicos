@@ -166,7 +166,13 @@ export function PrintInvoiceDialog({
                 )}
 
                 {!loading && invoiceData && (
-                    <div className="flex justify-center">
+                    // The padding/border live on this OUTER wrapper, not on InvoicePrint itself —
+                    // InvoicePrint's own element is width-constrained to 74mm to match the real
+                    // print output exactly; adding padding directly to it (as className) would
+                    // shrink its usable content width in this preview only, making the preview
+                    // wrap text that the actual print (which copies just its innerHTML, without
+                    // this dialog's styling) would not.
+                    <div className="flex justify-center p-3 bg-white border rounded-md">
                         <InvoicePrint
                             clinicName={clinicName}
                             clinicAddress={clinicAddress}
@@ -183,7 +189,7 @@ export function PrintInvoiceDialog({
                             visitRefundApplied={invoiceData.visitRefundApplied}
                             paymentType={invoiceData.paymentType}
                             date={invoiceData.date}
-                            className="bg-white p-3 text-black border"
+                            className="text-black"
                         />
                     </div>
                 )}

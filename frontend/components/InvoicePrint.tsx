@@ -123,16 +123,16 @@ export function InvoicePrint({
             <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
 
             {/* Pharmacy name */}
-            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11.5pt", textTransform: "uppercase" }}>
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12pt", textTransform: "uppercase" }}>
                 {clinicName}
             </div>
 
             {/* Pharmacy details */}
             {clinicAddress && (
-                <div style={{ textAlign: "center", fontSize: "8pt" }}>{clinicAddress}</div>
+                <div style={{ textAlign: "center", fontSize: "8.5pt" }}>{clinicAddress}</div>
             )}
             {(clinicPhone || clinicLicense) && (
-                <div style={{ ...row, fontSize: "8pt" }}>
+                <div style={{ ...row, fontSize: "7pt", whiteSpace: "nowrap" }}>
                     <span>{clinicPhone && `PH: ${clinicPhone}`}</span>
                     <span>{clinicLicense && `DL NO: ${clinicLicense}`}</span>
                 </div>
