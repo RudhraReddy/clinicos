@@ -838,12 +838,12 @@ function BillingContent() {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="history">
-                    <Card>
+                <TabsContent value="history" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+                    <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
                         <CardHeader>
                             <CardTitle>Billing History</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 flex-1 overflow-y-auto min-h-0">
                             {/* Filter bar */}
                             <div className="flex flex-wrap items-end gap-3">
                                 <div className="space-y-1">
