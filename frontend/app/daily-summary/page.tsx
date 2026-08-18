@@ -147,19 +147,31 @@ export default function DailySummaryPage() {
     const summary = data?.summary
     const rows = data?.rows ?? []
 
-    // Double pie: outer ring is the Cash/UPI payment-mode split (includes an "Other"
-    // slice for any amount in summary.total.total not accounted for by cash/upi,
-    // e.g. a stray CARD-mode bill). Inner pie is the Visit Fee/Billing Fee category
-    // split — a different breakdown of the same total, nested concentrically.
+    // Double pie: outer ring is the Cash/UPI payment-mode split across the whole
+    // day (includes an "Other" slice for any amount in summary.total.total not
+    // accounted for by cash/upi, e.g. a stray CARD-mode bill). Inner pie breaks
+    // the same total down into the full 4-way cross-tab (Visit/Billing x
+    // Cash/UPI) — each inner color is a shade of its matching outer color, so
+    // the two rings visually reconcile (green shades sum to the Cash slice,
+    // blue shades sum to the UPI slice).
+    const CASH_COLOR = '#22c55e'
+    const UPI_COLOR = '#2563eb'
+    const VISIT_CASH_COLOR = '#86efac'
+    const BILLING_CASH_COLOR = '#14532d'
+    const VISIT_UPI_COLOR = '#38bdf8'
+    const BILLING_UPI_COLOR = '#475569'
+
     const paymentSplitData = summary ? [
-        { name: 'Cash', value: summary.total.cash, fill: '#22c55e' },
-        { name: 'UPI', value: summary.total.upi, fill: '#3b82f6' },
+        { name: 'Cash', value: summary.total.cash, fill: CASH_COLOR },
+        { name: 'UPI', value: summary.total.upi, fill: UPI_COLOR },
         { name: 'Other', value: Math.max(0, Math.round((summary.total.total - summary.total.cash - summary.total.upi) * 100) / 100), fill: '#94a3b8' },
     ].filter(d => d.value > 0) : []
 
-    const categorySplitData = summary ? [
-        { name: 'Visit Fee', value: summary.visit_fee.total, fill: '#8b5cf6' },
-        { name: 'Billing Fee', value: summary.billing_fee.total, fill: '#f59e0b' },
+    const crossTabData = summary ? [
+        { name: 'Visit Fee (Cash)', value: summary.visit_fee.cash, fill: VISIT_CASH_COLOR },
+        { name: 'Visit Fee (UPI)', value: summary.visit_fee.upi, fill: VISIT_UPI_COLOR },
+        { name: 'Billing Fee (Cash)', value: summary.billing_fee.cash, fill: BILLING_CASH_COLOR },
+        { name: 'Billing Fee (UPI)', value: summary.billing_fee.upi, fill: BILLING_UPI_COLOR },
     ].filter(d => d.value > 0) : []
 
     return (
@@ -287,26 +299,29 @@ export default function DailySummaryPage() {
                 </Card>
 
                 <Card>
-                    <CardContent className="p-4 h-full flex flex-col items-center justify-center min-h-[180px]">
+                    <CardContent className="p-4">
                         {loading || !summary ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <div className="flex items-center justify-center py-10">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            </div>
                         ) : summary.total.total === 0 ? (
-                            <div className="text-center text-muted-foreground text-sm">
+                            <div className="text-center text-muted-foreground text-sm py-6">
                                 <PieChartIcon className="h-8 w-8 mx-auto mb-2 opacity-40" />
                                 No income to chart for this day
                             </div>
                         ) : (
-                            <div className="w-full flex items-center gap-5">
-                                <div className="w-36 h-36 shrink-0">
+                            <div className="flex flex-wrap items-center justify-center gap-6">
+                                {/* Donut: outer ring = Cash/UPI split, inner pie = the full
+                                    Visit/Billing x Cash/UPI cross-tab in matching shades. */}
+                                <div className="w-40 h-40 shrink-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <RePie>
-                                            {/* Outer tube: Cash/UPI payment-mode split */}
                                             <Pie
                                                 data={paymentSplitData}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={46}
-                                                outerRadius={64}
+                                                innerRadius={62}
+                                                outerRadius={78}
                                                 paddingAngle={2}
                                                 dataKey="value"
                                                 animationDuration={600}
@@ -315,18 +330,17 @@ export default function DailySummaryPage() {
                                                     <Cell key={`outer-cell-${index}`} fill={entry.fill} stroke="none" />
                                                 ))}
                                             </Pie>
-                                            {/* Inner pie: Visit Fee/Billing Fee category split */}
                                             <Pie
-                                                data={categorySplitData}
+                                                data={crossTabData}
                                                 cx="50%"
                                                 cy="50%"
                                                 innerRadius={0}
-                                                outerRadius={38}
+                                                outerRadius={58}
                                                 paddingAngle={2}
                                                 dataKey="value"
                                                 animationDuration={600}
                                             >
-                                                {categorySplitData.map((entry, index) => (
+                                                {crossTabData.map((entry, index) => (
                                                     <Cell key={`inner-cell-${index}`} fill={entry.fill} stroke="none" />
                                                 ))}
                                             </Pie>
@@ -335,32 +349,99 @@ export default function DailySummaryPage() {
                                         </RePie>
                                     </ResponsiveContainer>
                                 </div>
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Payment Mode</p>
-                                        {paymentSplitData.map(entry => (
-                                            <div key={entry.name} className="flex items-center gap-2 text-sm">
-                                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
-                                                <span className="text-muted-foreground">{entry.name}</span>
-                                                <span className="font-semibold tabular-nums">₹{entry.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Fee Type</p>
-                                        {categorySplitData.map(entry => (
-                                            <div key={entry.name} className="flex items-center gap-2 text-sm">
-                                                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
-                                                <span className="text-muted-foreground">{entry.name}</span>
-                                                <span className="font-semibold tabular-nums">₹{entry.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm pt-1 border-t">
-                                        <span className="h-2.5 w-2.5 shrink-0" />
-                                        <span className="text-muted-foreground">Total</span>
-                                        <span className="font-bold tabular-nums">₹{summary.total.total}</span>
-                                    </div>
+
+                                <div className="flex flex-wrap items-stretch gap-6">
+                                    {/* Cash/UPI totals, matching the outer ring */}
+                                    <table className="text-sm">
+                                        <thead>
+                                            <tr className="border-b">
+                                                <th className="text-left font-medium text-muted-foreground pr-6 pb-1.5">Fee Type</th>
+                                                <th className="text-right font-medium pb-1.5">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: CASH_COLOR }} />
+                                                        Cash
+                                                    </span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="text-muted-foreground pr-6 py-1">Cash</td>
+                                                <td className="text-right tabular-nums font-semibold py-1">₹{summary.total.cash}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="text-muted-foreground pr-6 py-1">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: UPI_COLOR }} />
+                                                        UPI
+                                                    </span>
+                                                </td>
+                                                <td className="text-right tabular-nums font-semibold py-1">₹{summary.total.upi}</td>
+                                            </tr>
+                                            <tr className="border-t">
+                                                <td className="font-bold pr-6 pt-1.5">Total</td>
+                                                <td className="text-right tabular-nums font-bold pt-1.5">₹{summary.total.total}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {/* Full Visit Fee / Billing Fee x Cash / UPI cross-tab */}
+                                    <table className="text-sm sm:border-l sm:pl-6">
+                                        <thead>
+                                            <tr className="border-b">
+                                                <th className="text-left font-medium text-muted-foreground pr-6 pb-1.5">Fee Type</th>
+                                                <th className="text-right font-medium pr-6 pb-1.5">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: CASH_COLOR }} />
+                                                        Cash
+                                                    </span>
+                                                </th>
+                                                <th className="text-right font-medium pb-1.5">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: UPI_COLOR }} />
+                                                        UPI
+                                                    </span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="text-muted-foreground pr-6 py-1">Visit Fee</td>
+                                                <td className="text-right pr-6 py-1">
+                                                    <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: VISIT_CASH_COLOR }} />
+                                                        ₹{summary.visit_fee.cash}
+                                                    </span>
+                                                </td>
+                                                <td className="text-right py-1">
+                                                    <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: VISIT_UPI_COLOR }} />
+                                                        ₹{summary.visit_fee.upi}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td className="text-muted-foreground pr-6 py-1">Billing Fee</td>
+                                                <td className="text-right pr-6 py-1">
+                                                    <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: BILLING_CASH_COLOR }} />
+                                                        ₹{summary.billing_fee.cash}
+                                                    </span>
+                                                </td>
+                                                <td className="text-right py-1">
+                                                    <span className="inline-flex items-center gap-1.5 tabular-nums font-semibold">
+                                                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: BILLING_UPI_COLOR }} />
+                                                        ₹{summary.billing_fee.upi}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr className="border-t">
+                                                <td className="font-bold pr-6 pt-1.5">Total</td>
+                                                <td className="text-right tabular-nums font-bold pr-6 pt-1.5">₹{summary.total.cash}</td>
+                                                <td className="text-right tabular-nums font-bold pt-1.5">₹{summary.total.upi}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         )}
