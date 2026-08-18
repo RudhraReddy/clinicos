@@ -69,7 +69,7 @@ def get_all_visits():
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
 
-    query = Visit.query.order_by(Visit.created_at.desc())
+    query = Visit.query.filter(Visit.status != 'deleted').order_by(Visit.created_at.desc())
 
     if created_by and created_by != 'all':
         # Doctor filtering by a specific staff member
@@ -164,7 +164,7 @@ def get_all_visits():
 @require_auth
 def get_patient_visits(patient_id):
     patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
-    visits_list = Visit.query.filter_by(patient_id=patient.patient_id).order_by(Visit.visit_date.desc(), Visit.created_at.desc()).all()
+    visits_list = Visit.query.filter_by(patient_id=patient.patient_id).filter(Visit.status != 'deleted').order_by(Visit.visit_date.desc(), Visit.created_at.desc()).all()
     
     results = []
     for v in visits_list:
@@ -326,18 +326,53 @@ def refund_visit(visit_id):
 @visits.route('/visits/<visit_id>', methods=['DELETE'])
 @require_auth
 def delete_visit(visit_id):
+    """Soft-deletes a visit (status='deleted') rather than removing the row —
+    a hard delete risks a foreign-key error the moment any Bill, PatientImage,
+    or VisitRefund row points at it, and daily_summary/inventory analytics
+    already filter on status != 'deleted' in anticipation of this. Blocked
+    entirely once a bill exists: that money is already accounted for through
+    the bill, and letting the visit disappear would silently drop its bills
+    out of Daily Summary (which keys billing_fee rows off the visit row)."""
     visit = Visit.query.get_or_404(visit_id)
-    db.session.delete(visit)
+
+    has_bill = db.session.query(Bill.invoice_id).filter(Bill.visit_id == visit_id).first() is not None
+    if has_bill:
+        return jsonify({'error': 'Cannot delete a visit that already has a bill — resolve the bill first.'}), 400
+
+    data = request.get_json(silent=True) or {}
+    refunded_amount = 0.0
+    refund_mode_used = None
+    if data.get('refund'):
+        amount_paid = float(visit.amount_paid or 0)
+        already_refunded = float(visit.refund_amount or 0)
+        unrefunded = amount_paid - already_refunded
+        if unrefunded > 0:
+            # Same settlement rule as the manual refund flow: UPI pays out of
+            # Visit UPI, anything else (cash, or an unset legacy mode) debits
+            # Billing Cash — Visit Cash is never touched.
+            refund_mode_used = 'visit_upi' if visit.payment_mode == 'upi' else 'cash'
+            visit.refund_amount = already_refunded + unrefunded
+            visit.refund_mode = refund_mode_used
+            visit.payment_status = 'refunded'
+            db.session.add(VisitRefund(visit_id=visit_id, amount=unrefunded, mode=refund_mode_used))
+            refunded_amount = unrefunded
+
+    visit.status = 'deleted'
+    visit.updated_at = get_ist_now()
     db.session.commit()
 
     log_activity(
         action='DELETE',
         resource_type='visit',
         resource_id=visit_id,
-        resource_label=visit_id,
+        resource_label=visit_id + (f" — refunded ₹{refunded_amount:.2f} via {refund_mode_used}" if refunded_amount else ""),
         user_id=g.current_user.get('user_id'),
         username=g.current_user.get('username'),
         ip_address=request.remote_addr,
     )
 
-    return jsonify({'message': 'Visit deleted successfully'}), 200
+    return jsonify({
+        'message': 'Visit deleted successfully',
+        'refunded_amount': refunded_amount,
+        'refund_mode': refund_mode_used,
+    }), 200

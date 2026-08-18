@@ -484,9 +484,13 @@ export const api = {
         });
     },
 
-    async deleteVisit(id: string): Promise<void> {
+    // `refund` requests a payout of whatever's still unrefunded on the visit
+    // fee — mode is picked server-side from the visit's own payment_mode
+    // (upi -> Visit UPI, anything else -> Billing Cash), not passed in.
+    async deleteVisit(id: string, refund?: boolean): Promise<{ message: string; refunded_amount: number; refund_mode: string | null }> {
         return fetchApi(`/api/visits/${id}`, {
             method: 'DELETE',
+            body: JSON.stringify({ refund: !!refund }),
         });
     },
 

@@ -113,15 +113,24 @@ export function EditVisitDialog({ open, onOpenChange, visit, onSuccess }: EditVi
     }
 
     const handleDelete = async () => {
-        if (!visit || !confirm("Are you sure you want to delete this visit?")) return
+        if (!visit) return
+
+        // Same rule as the manual refund flow: UPI pays out of Visit UPI,
+        // anything else (cash, or an unset legacy mode) debits Billing Cash.
+        const unrefunded = Math.max(0, (visit.amount_paid || 0) - (visit.refund_amount || 0))
+        const bucket = visit.payment_mode === 'upi' ? 'Visit UPI' : 'Billing Cash'
+        const refundNote = unrefunded > 0 ? ` This will also refund ₹${unrefunded.toFixed(2)} via ${bucket}.` : ''
+        if (!confirm(`Are you sure you want to delete this visit?${refundNote}`)) return
 
         setSubmitting(true)
         try {
-            await api.updateVisit(visit.visit_id, { status: 'deleted' })
+            await api.deleteVisit(visit.visit_id, unrefunded > 0)
             onOpenChange(false)
             onSuccess?.()
         } catch (err) {
-            alert(`Failed to delete visit: ${err instanceof Error ? err.message : "Unknown error"}`)
+            let message = err instanceof Error ? err.message : "Unknown error"
+            try { message = JSON.parse(message).error || message } catch { /* not JSON, use as-is */ }
+            alert(`Failed to delete visit: ${message}`)
         } finally {
             setSubmitting(false)
         }

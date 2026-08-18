@@ -201,7 +201,8 @@ def admin_stats():
     ).count()
 
     visits_today = Visit.query.filter(
-        Visit.created_at >= today_ist
+        Visit.created_at >= today_ist,
+        Visit.status != 'deleted',
     ).count()
 
     bills_today = Bill.query.filter(

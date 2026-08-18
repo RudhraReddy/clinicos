@@ -6,6 +6,7 @@ import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
+import { DeleteVisitDialog } from "@/components/DeleteVisitDialog"
 import { getTodayIST, orderTodayVisits, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { api, type Visit, API_BASE_URL } from "@/lib/api"
@@ -23,6 +24,7 @@ export default function DoctorDashboard() {
     const [loading, setLoading] = useState(true)
     const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
     const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+    const [visitToDelete, setVisitToDelete] = useState<Visit | null>(null)
 
     // Active Console State
     // const [rxHistory, setRxHistory] = useState<any[]>([]) // Removed
@@ -186,19 +188,12 @@ export default function DoctorDashboard() {
         }
     }
 
-    const handleDeleteVisit = async (visitId: string) => {
-        try {
-            await api.deleteVisit(visitId)
-            if (selectedVisitId === visitId) {
-                setSelectedVisitId(null)
-                setMobileDetailOpen(false)
-            }
-            setVisits(prev => prev.filter(v => v.visit_id !== visitId))
-            toast.success("Visit deleted")
-        } catch (err) {
-            console.error(err)
-            toast.error("Failed to delete visit")
+    const handleVisitDeleted = (visitId: string) => {
+        if (selectedVisitId === visitId) {
+            setSelectedVisitId(null)
+            setMobileDetailOpen(false)
         }
+        setVisits(prev => prev.filter(v => v.visit_id !== visitId))
     }
 
     const getDaysAgo = (isoString: string): string => {
@@ -486,7 +481,7 @@ export default function DoctorDashboard() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8 flex-shrink-0"
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
+                                        onClick={(e) => { e.stopPropagation(); setVisitToDelete(visit) }}
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
@@ -1082,7 +1077,7 @@ export default function DoctorDashboard() {
                                     )}
                                     <button
                                         type="button"
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteVisit(visit.visit_id) }}
+                                        onClick={(e) => { e.stopPropagation(); setVisitToDelete(visit) }}
                                         className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
                                         title={`Delete visit ${visit.visit_id}`}
                                     >
@@ -1098,6 +1093,13 @@ export default function DoctorDashboard() {
 
             </div>
             </div>
+
+            <DeleteVisitDialog
+                open={!!visitToDelete}
+                onOpenChange={(open) => { if (!open) setVisitToDelete(null) }}
+                visit={visitToDelete}
+                onDeleted={handleVisitDeleted}
+            />
         </div>
     )
 }
