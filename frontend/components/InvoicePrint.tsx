@@ -81,8 +81,10 @@ const row: React.CSSProperties = {
 // `width`, when given, right-pads the label with spaces (monospace, so this
 // is a real fixed-width column) so a stack of labels of different lengths
 // still lines up its colons — e.g. NAME/PH/REF all landing on the same column.
+// whiteSpace: "pre" is required here — plain HTML collapses runs of spaces
+// down to one, which would otherwise silently erase the padding.
 function Label({ children, width }: { children: string; width?: number }) {
-    return <span style={{ fontWeight: 600 }}>{width ? children.padEnd(width) : children}</span>
+    return <span style={{ fontWeight: 600, whiteSpace: "pre" }}>{width ? children.padEnd(width) : children}</span>
 }
 
 export function InvoicePrint({
