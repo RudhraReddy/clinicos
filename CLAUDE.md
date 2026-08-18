@@ -243,20 +243,28 @@ Notes:
 
 ### Overview
 
-The invoice print flow uses a popup window (`window.open`) to render and print. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses **100% inline CSS** — no Tailwind class names inside the invoice markup.
+The invoice print flow uses a popup window (`window.open`) to render and print, targeting an **80mm
+dot-matrix/thermal receipt printer** (not a full-page printer) — the sole invoice format, no A4/A5
+alternative. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses
+**100% inline CSS** — no Tailwind class names inside the invoice markup. Layout is monospace
+(`"Courier New", Courier, monospace`), single-column, pure black on white, with literal repeated-`-`/`=`
+characters as dividers (not CSS borders) for an authentic receipt look.
 
 ### Files
 
 - `frontend/components/InvoicePrint.tsx` — the invoice layout component
 - `frontend/components/PrintInvoiceDialog.tsx` — the dialog that fetches bill data and hosts the print trigger
-- `frontend/app/globals.css` — contains the `@page` rule for print media
+- `frontend/app/globals.css` — contains the `@page` rule for print media (dead code in practice — the
+  popup window injects its own `<style>`, so this only matters if the page itself is ever printed
+  directly — kept in sync anyway)
 
 ### Page size
 
-All three files are aligned to **A5 portrait, 8mm margin**:
-- `InvoicePrint.tsx` injects `<style>{'@page { size: A5 portrait; margin: 8mm }'}</style>` inside `#invoice-print-region`
-- `printElement()` in `PrintInvoiceDialog.tsx` writes `@page{size:A5 portrait;margin:8mm}` into the popup's `<style>` block
-- `globals.css` `@page` rule: `size: A5 portrait; margin: 8mm`
+All three files are aligned to **80mm width, automatic (continuous) height, 2.5mm/3mm margin**:
+- `InvoicePrint.tsx` injects `<style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>` inside `#invoice-print-region`
+- `printElement()` in `PrintInvoiceDialog.tsx` writes `@page{size:80mm auto;margin:2.5mm 3mm}` into the popup's `<style>` block
+- `globals.css` `@page` rule: `size: 80mm auto; margin: 2.5mm 3mm`
+- Content itself is constrained to `width: 74mm` (usable width after margins)
 
 ### InvoicePrint props
 
@@ -265,28 +273,51 @@ interface InvoicePrintProps {
   clinicName: string
   clinicAddress: string
   clinicPhone: string
+  clinicLicense?: string
   patient: {
     name: string
     phone_number: string
     age?: number | null
     sex?: string | null
+    reference?: string | null  // fetched but not currently rendered
   }
-  billItems: { item_name: string; qty: number; mrp: number }[]
+  billItems: {
+    item_name: string; qty: number; mrp: number
+    hsn_code?: string | null; manufacturer?: string | null; batch_number?: string | null
+    expiry_date?: string | null; gst_rate?: number | null; unit?: string | null; pack_size?: string | null
+  }[]
   invoiceId?: string
   total: number
+  subtotal?: number
+  discountType?: "percent" | "flat" | null
+  visitRefundApplied?: number | null
+  paymentType?: string | null   // 'CASH' | 'UPI', from Bill.payment_type
   date?: Date
-  className?: string  // applied to outer wrapper only, for dialog preview styling
+  referenceDoctor?: string      // clinic-wide setting from useSettings(), not per-bill
+  className?: string            // applied to outer wrapper only, for dialog preview styling
 }
 ```
 
 ### Layout sections (top to bottom)
 
-1. **Header** — serif font (`Georgia`). Clinic name large+bold+uppercase left. "INVOICE" right-aligned, invoice ID and formatted date below it. 2px solid black bottom border.
-2. **Patient row** — single flex line, `justify-content: space-between`. Fields: name (bold 9.5pt), phone, sex, age — each only rendered if the value is present. 1px `#ccc` bottom border.
-3. **Items table** — sans-serif. Headers ALL CAPS, 6.5pt, 0.6px letter-spacing, 2px black bottom border. Columns: `#` | `Item` | `Qty` | `MRP (₹)` | `Total (₹)`. Row dividers 1px `#ddd`. Row numbers in `#999`. **No batch number rendered.**
-4. **Totals** — right-aligned, 46% width. Subtotal: 7pt, `#555`, 1px `#ddd` bottom. Total: 10pt, bold 800, 2px black top border.
-5. **Follow-up strip** — commented out block labeled `{/* FOLLOW-UP: uncomment when follow_up_date is wired up */}` between totals and footer.
-6. **Footer** — "Thank you for visiting {clinicName}." left + "Authorised Signature ___________" right. 1px `#bbb` top border, 6.5pt, `#888`.
+1. **Pharmacy name** — centered, bold, uppercase, 14pt.
+2. **Pharmacy details** — centered, 8.5pt: address line, then `PH: {phone}    DL NO: {license}`.
+3. Divider.
+4. **Patient details** — `NAME : {NAME}` and `AGE:{age}` on one flex row, then `PH   : {phone}`, then
+   `REF  : {referenceDoctor}` (only if set). `sex` is fetched but not rendered here.
+5. Divider.
+6. **Invoice details** — `INV`, `DATE` (short `dd/MM/yy` + time), and `PAYMENT` each on their own
+   line. (Deliberately *not* on one flex row with the date — real invoice IDs are
+   `DDMMYY-XXX-XXX`, ~15 chars, and wrap badly when squeezed next to a date/time on an 80mm line.)
+7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
+8. **Items**, one block per line item: `{n}. {ITEM NAME}` (bold 10.5pt, hanging-indent wrap, never
+   shrunk to fit); `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN:
+   {hsn_code}   GST: {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a
+   divider. Any missing field (no manufacturer, no HSN, etc.) is silently omitted from its line.
+9. **Totals** — `SUBTOTAL` always; `DISCOUNT` only if `discountAmount > 0`; `REFUND` only if
+   `visitRefundApplied` is set; divider; bold 13pt `NET TOTAL` with `₹`; heavy (`=`) divider.
+10. **Footer** — centered, 7.5pt, three lines: "GOODS ONCE SOLD WILL NOT BE" / "TAKEN BACK OR
+    EXCHANGED" / "SUBJECT TO HANAMKONDA JURISDICTION". No signature line.
 
 ### printElement function
 
@@ -294,10 +325,10 @@ interface InvoicePrintProps {
 function printElement(elementId: string) {
   const el = document.getElementById(elementId)
   if (!el) return
-  const win = window.open('', '_blank', 'width=600,height=850')
+  const win = window.open('', '_blank', 'width=380,height=700')
   if (!win) return
   win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
-    <style>body{margin:0;padding:0}@page{size:A5 portrait;margin:8mm}</style>
+    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm 3mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
   win.document.close()
   win.focus()
@@ -306,11 +337,13 @@ function printElement(elementId: string) {
 }
 ```
 
-### Clinic name / address / phone — current state (known gap)
+### Clinic name / address / phone / reference doctor
 
-These three strings are passed as props at two call sites and are currently hardcoded:
-- `frontend/app/billing/page.tsx` lines ~85–86, ~603 — `clinicName` and `clinicAddress` have local state; phone is hardcoded
-- `frontend/components/PatientDetailsView.tsx` lines ~388–390 — all three hardcoded
+Sourced from `frontend/lib/settings_context.tsx`'s `useSettings()` (backed by `GET`/`PATCH
+/api/settings`) — a single clinic-wide `ClinicSettings` row, fetched once and provided via context.
+Both call sites (`app/billing/page.tsx`, `components/PatientDetailsView.tsx`) read
+`clinicName`/`clinicAddress`/`clinicPhone`/`referenceDoctor` from this context rather than local state
+or hardcoded strings.
 
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 

@@ -31,9 +31,9 @@ interface InvoicePrintProps {
     subtotal?: number
     discountType?: "percent" | "flat" | null
     discountValue?: number | null
-    // Amount of a pending visit-fee refund folded into this bill's total —
-    // rendered as a bare "-₹amount" line with no label at all.
+    // Amount of a pending visit-fee refund folded into this bill's total.
     visitRefundApplied?: number | null
+    paymentType?: string | null
     date?: Date
     referenceDoctor?: string
     className?: string
@@ -51,6 +51,31 @@ function formatExpiry(dateStr: string | null | undefined): string {
     }
 }
 
+// "Eris Lifesciences" -> "ERIS", "Sun Pharma" -> "SUN" — first word, letters
+// only, capped at 4 chars. Keeps the MFG line compact on an 80mm receipt.
+function abbreviateManufacturer(name: string | null | undefined): string {
+    if (!name) return ""
+    const firstWord = name.trim().split(/\s+/)[0] || ""
+    return firstWord.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase()
+}
+
+// Dashed/solid text divider spanning the receipt width — printed as literal
+// repeated characters (not a CSS border) to match a classic receipt look.
+function Divider({ heavy = false }: { heavy?: boolean }) {
+    return (
+        <div style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
+            {(heavy ? "=" : "-").repeat(44)}
+        </div>
+    )
+}
+
+const row: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: "6px",
+}
+
 export function InvoicePrint({
     clinicName = "MediCare Clinic",
     clinicAddress = "",
@@ -62,8 +87,8 @@ export function InvoicePrint({
     total,
     subtotal,
     discountType = null,
-    discountValue = null,
     visitRefundApplied = null,
+    paymentType = null,
     date = new Date(),
     referenceDoctor,
     className,
@@ -71,214 +96,130 @@ export function InvoicePrint({
     if (!patient || billItems.length === 0) return null
 
     const printTime = format(date, "HH:mm")
-    const printDate = format(date, "dd/MM/yyyy")
+    const printDate = format(date, "dd/MM/yy")
     // total = subtotal − discount − visitRefundApplied, so back the refund out
     // before computing the discount amount — otherwise a refund-only bill (no
     // real discount) would misreport its refund as a "discount".
     const discountAmount = (subtotal ?? total) - total - (visitRefundApplied ?? 0)
     const hasDiscount = !!discountType && discountAmount > 0
-    const hasSubtotalBreakdown = hasDiscount || !!visitRefundApplied
-    const discountLabel = discountType === 'percent'
-        ? `Discount (${discountValue}%)`
-        : 'Discount'
 
     const hasAge = patient.age !== null && patient.age !== undefined
-    const hasSex = !!patient.sex
 
-    const cellStyle: React.CSSProperties = {
-        borderLeft: "1px solid black",
-        borderRight: "1px solid black",
-        padding: "4px 6px",
-        fontSize: "8pt",
-        fontFamily: "Arial, Helvetica, sans-serif",
-    }
-    const headerCellStyle: React.CSSProperties = {
-        ...cellStyle,
-        borderTop: "1px solid black",
-        borderBottom: "1px solid black",
-        fontWeight: "bold",
-        fontSize: "7.5pt",
-        textAlign: "center",
-        background: "#fff",
+    const base: React.CSSProperties = {
+        fontFamily: '"Courier New", Courier, monospace',
+        fontSize: "9.5pt",
+        lineHeight: 1.35,
+        color: "#000",
     }
 
     return (
-        <div id="invoice-print-region" className={className}>
-            <style>{'@page { size: A4 landscape; margin: 8mm }'}</style>
+        <div id="invoice-print-region" className={className} style={{ ...base, width: "74mm", maxWidth: "74mm" }}>
+            <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
 
-            {/* Clinic Name — centered */}
-            <div style={{
-                textAlign: "center",
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "16pt",
-                fontWeight: "bold",
-                letterSpacing: "0.5px",
-                marginBottom: "6px",
-            }}>
-                {clinicName.toUpperCase()}
+            {/* Pharmacy name */}
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "14pt", textTransform: "uppercase" }}>
+                {clinicName}
             </div>
 
-            {/* Sub-header: address | phone | DL + time */}
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "8pt",
-                marginBottom: "8px",
-            }}>
-                <div style={{ maxWidth: "38%", lineHeight: "1.5" }}>
-                    {clinicAddress}
+            {/* Pharmacy details */}
+            {clinicAddress && (
+                <div style={{ textAlign: "center", fontSize: "8.5pt" }}>{clinicAddress}</div>
+            )}
+            {(clinicPhone || clinicLicense) && (
+                <div style={{ textAlign: "center", fontSize: "8.5pt" }}>
+                    {clinicPhone && `PH: ${clinicPhone}`}
+                    {clinicPhone && clinicLicense && "    "}
+                    {clinicLicense && `DL NO: ${clinicLicense}`}
                 </div>
-                <div style={{ textAlign: "center" }}>
-                    {clinicPhone && `Ph. ${clinicPhone}`}
-                </div>
-                <div style={{ textAlign: "right", lineHeight: "1.5" }}>
-                    {clinicLicense && <div>D.L.No: {clinicLicense}</div>}
-                </div>
+            )}
+
+            <Divider />
+
+            {/* Patient details */}
+            <div style={row}>
+                <span>NAME : {patient.name.toUpperCase()}</span>
+                {hasAge && <span style={{ whiteSpace: "nowrap" }}>AGE:{patient.age}</span>}
             </div>
+            {patient.phone_number && <div>PH   : {patient.phone_number}</div>}
+            {referenceDoctor && <div>REF  : {referenceDoctor}</div>}
 
-            <hr style={{ border: "none", borderTop: "1px solid black", margin: "4px 0 8px 0" }} />
+            <Divider />
 
-            {/* Patient info row */}
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "8.5pt",
-                marginBottom: "8px",
-            }}>
-                <div style={{ lineHeight: "1.8" }}>
-                    <div><strong>Name:</strong>&nbsp;&nbsp;{patient.name}</div>
-                    {(hasAge || hasSex) && (
-                        <div>
-                            {hasAge && <><strong>Age:</strong>&nbsp;&nbsp;{patient.age}</>}
-                            {hasAge && hasSex && <>&nbsp;&nbsp;&nbsp;</>}
-                            {hasSex && <><strong>Gender:</strong>&nbsp;&nbsp;{patient.sex}</>}
+            {/* Invoice details — INV gets its own line since real invoice IDs
+                (DDMMYY-XXX-XXX, ~15 chars) don't fit alongside date/time. */}
+            <div>INV     : {invoiceId || "DRAFT"}</div>
+            <div>DATE    : {printDate}  {printTime}</div>
+            {paymentType && <div>PAYMENT : {paymentType.toUpperCase()}</div>}
+
+            <Divider />
+
+            {/* Price header — once, not per item */}
+            <div style={{ ...row, fontWeight: 700 }}>
+                <span>QTY &times; MRP</span>
+                <span>AMOUNT</span>
+            </div>
+            <Divider />
+
+            {/* Items */}
+            {billItems.map((item, idx) => {
+                const mfg = abbreviateManufacturer(item.manufacturer)
+                const detailLine1 = [
+                    mfg && `MFG: ${mfg}`,
+                    item.pack_size && `PACK: ${item.pack_size}`,
+                    item.batch_number && `BATCH: ${item.batch_number}`,
+                ].filter(Boolean).join("   ")
+                const detailLine2 = [
+                    item.hsn_code && `HSN: ${item.hsn_code}`,
+                    item.gst_rate ? `GST: ${item.gst_rate}%` : null,
+                    item.expiry_date && `EXP: ${formatExpiry(item.expiry_date)}`,
+                ].filter(Boolean).join("   ")
+                const amount = item.qty * item.mrp
+
+                return (
+                    <div key={idx}>
+                        <div style={{ fontWeight: 700, fontSize: "10.5pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
+                            {idx + 1}. {item.item_name.toUpperCase()}
                         </div>
-                    )}
-                </div>
-                <div style={{ textAlign: "center" }}>
-                    <strong>Ph:</strong>&nbsp;&nbsp;{patient.phone_number || ""}
-                </div>
-                <div style={{ textAlign: "right", lineHeight: "1.8" }}>
-                    <div><strong>Invoice No. :</strong>&nbsp;{invoiceId || "DRAFT"}</div>
-                    <div><strong>Date :</strong>&nbsp;{printDate}&nbsp;&nbsp;&nbsp;<strong>Time :</strong>&nbsp;{printTime}</div>
-                </div>
+                        {detailLine1 && <div style={{ fontSize: "8pt" }}>{detailLine1}</div>}
+                        {detailLine2 && <div style={{ fontSize: "8pt" }}>{detailLine2}</div>}
+                        <div style={row}>
+                            <span>{Math.round(item.qty)} &times; {item.mrp.toFixed(2)}</span>
+                            <span>{amount.toFixed(2)}</span>
+                        </div>
+                        <Divider />
+                    </div>
+                )
+            })}
+
+            {/* Totals */}
+            <div style={row}>
+                <span>SUBTOTAL</span>
+                <span>{(subtotal ?? total).toFixed(2)}</span>
             </div>
-
-            <hr style={{ border: "none", borderTop: "1px solid black", margin: "4px 0 8px 0" }} />
-
-            {/* Items table */}
-            <table style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontFamily: "Arial, Helvetica, sans-serif",
-                marginBottom: "12px",
-            }}>
-                <thead>
-                    <tr>
-                        <th style={{ ...headerCellStyle, width: "36px" }}>S. No.</th>
-                        <th style={{ ...headerCellStyle, textAlign: "left" }}>Item Name</th>
-                        <th style={{ ...headerCellStyle, width: "70px" }}>HSN Code</th>
-                        <th style={{ ...headerCellStyle, width: "50px" }}>MFR</th>
-                        <th style={{ ...headerCellStyle, width: "70px" }}>Batch No.</th>
-                        <th style={{ ...headerCellStyle, width: "46px" }}>Expiry</th>
-                        <th style={{ ...headerCellStyle, width: "55px" }}>MRP</th>
-                        <th style={{ ...headerCellStyle, width: "50px" }}>CGST%</th>
-                        <th style={{ ...headerCellStyle, width: "50px" }}>SGST%</th>
-                        <th style={{ ...headerCellStyle, width: "52px" }}>Quantity</th>
-                        <th style={{ ...headerCellStyle, width: "65px" }}>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {billItems.map((item, idx) => {
-                        const halfGst = item.gst_rate ? (item.gst_rate / 2).toFixed(2) + "%" : ""
-                        const amount = (item.qty * item.mrp).toFixed(2)
-                        return (
-                            <tr key={idx}>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{idx + 1}</td>
-                                <td style={{ ...cellStyle }}>{item.item_name}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.hsn_code || ""}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.manufacturer || ""}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{item.batch_number || ""}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{formatExpiry(item.expiry_date)}</td>
-                                <td style={{ ...cellStyle, textAlign: "right" }}>{item.mrp.toFixed(2)}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>{halfGst}</td>
-                                <td style={{ ...cellStyle, textAlign: "center" }}>
-                                    {Math.round(item.qty)}
-                                    {item.unit === 'ea' && item.pack_size && (item.pack_size.toLowerCase().includes('s') || item.pack_size.toLowerCase().includes('x')) ? ' ea' : ''}
-                                </td>
-                                <td style={{ ...cellStyle, textAlign: "right" }}>{amount}</td>
-                            </tr>
-                        )
-                    })}
-                    {/* Empty filler rows to pad the table (min 8 rows total) */}
-                    {Array.from({ length: Math.max(0, 8 - billItems.length) }).map((_, i) => (
-                        <tr key={`empty-${i}`}>
-                            {Array.from({ length: 11 }).map((_, j) => (
-                                <td key={j} style={{ ...cellStyle, height: "22px" }}>&nbsp;</td>
-                            ))}
-                        </tr>
-                    ))}
-                    {/* Subtotal row — shown whenever either a discount or a folded-in refund
-                        makes the Total differ from the sum of line items */}
-                    {hasSubtotalBreakdown && (
-                        <tr>
-                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>Subtotal</td>
-                            <td style={cellStyle}></td>
-                            <td style={{ ...cellStyle, textAlign: "right" }}>{(subtotal ?? total).toFixed(2)}</td>
-                        </tr>
-                    )}
-                    {hasDiscount && (
-                        <tr>
-                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}>{discountLabel}</td>
-                            <td style={cellStyle}></td>
-                            <td style={{ ...cellStyle, textAlign: "right" }}>−{discountAmount.toFixed(2)}</td>
-                        </tr>
-                    )}
-                    {/* Refund folded into this bill — no label, per clinic policy: just the bare amount */}
-                    {!!visitRefundApplied && (
-                        <tr>
-                            <td colSpan={9} style={{ ...cellStyle, textAlign: "right" }}></td>
-                            <td style={cellStyle}></td>
-                            <td style={{ ...cellStyle, textAlign: "right" }}>−{visitRefundApplied.toFixed(2)}</td>
-                        </tr>
-                    )}
-                    {/* Total row */}
-                    <tr>
-                        <td colSpan={9} style={{
-                            ...cellStyle,
-                            borderTop: "1px solid black",
-                            borderBottom: "1px solid black",
-                            textAlign: "right",
-                            fontWeight: "bold",
-                            fontSize: "9pt",
-                        }}>Total</td>
-                        <td style={{ ...cellStyle, borderTop: "1px solid black", borderBottom: "1px solid black" }}></td>
-                        <td style={{
-                            ...cellStyle,
-                            borderTop: "1px solid black",
-                            borderBottom: "1px solid black",
-                            textAlign: "right",
-                            fontWeight: "bold",
-                            fontSize: "9pt",
-                        }}>{total.toFixed(2)}</td>
-                    </tr>
-                </tbody>
-            </table>
+            {hasDiscount && (
+                <div style={row}>
+                    <span>DISCOUNT</span>
+                    <span>{discountAmount.toFixed(2)}</span>
+                </div>
+            )}
+            {!!visitRefundApplied && (
+                <div style={row}>
+                    <span>REFUND</span>
+                    <span>{visitRefundApplied.toFixed(2)}</span>
+                </div>
+            )}
+            <Divider />
+            <div style={{ ...row, fontWeight: 700, fontSize: "13pt" }}>
+                <span>NET TOTAL</span>
+                <span>&#8377; {total.toFixed(2)}</span>
+            </div>
+            <Divider heavy />
 
             {/* Footer */}
-            <div style={{
-                fontFamily: "Arial, Helvetica, sans-serif",
-                fontSize: "7.5pt",
-                color: "#333",
-                lineHeight: "1.6",
-            }}>
-                <div>Goods once sold will not be taken back or exchanged</div>
-                <div>Subject to Hanamkonda Jurisdiction</div>
+            <div style={{ textAlign: "center", fontSize: "7.5pt", lineHeight: 1.4 }}>
+                <div>GOODS ONCE SOLD WILL NOT BE</div>
+                <div>TAKEN BACK OR EXCHANGED</div>
+                <div>SUBJECT TO HANAMKONDA JURISDICTION</div>
             </div>
         </div>
     )

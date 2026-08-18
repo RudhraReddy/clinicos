@@ -28,20 +28,6 @@ interface PrintBillItem {
     pack_size?: string | null
 }
 
-const getPackMultiplier = (packSize?: string) => {
-    const pack = packSize?.toLowerCase() || ''
-    if (pack.includes('s') || pack.includes('x')) {
-        const match = pack.match(/(\d+)/)
-        if (match) {
-            const num = parseInt(match[0])
-            if (!isNaN(num) && num > 1) {
-                return num
-            }
-        }
-    }
-    return 1
-}
-
 interface PrintInvoicePatient {
     name: string
     phone_number: string
@@ -59,6 +45,7 @@ interface PrintInvoiceData {
     discountType: "percent" | "flat" | null
     discountValue: number | null
     visitRefundApplied: number | null
+    paymentType: string | null
     date: Date
 }
 
@@ -78,10 +65,10 @@ interface PrintInvoiceDialogProps {
 function printElement(elementId: string) {
     const el = document.getElementById(elementId)
     if (!el) return
-    const win = window.open('', '_blank', 'width=900,height=650')
+    const win = window.open('', '_blank', 'width=380,height=700')
     if (!win) return
     win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
-    <style>body{margin:0;padding:0}@page{size:A4 landscape;margin:8mm}</style>
+    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm 3mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
     win.document.close()
     win.focus()
@@ -149,6 +136,7 @@ export function PrintInvoiceDialog({
                     discountType: data.discount_type ?? null,
                     discountValue: data.discount_value ?? null,
                     visitRefundApplied: data.visit_refund_applied ?? null,
+                    paymentType: data.payment_type ?? null,
                     date: new Date(data.created_at),
                 })
             } catch (e) {
@@ -166,7 +154,7 @@ export function PrintInvoiceDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Invoice Preview</DialogTitle>
                 </DialogHeader>
@@ -178,23 +166,26 @@ export function PrintInvoiceDialog({
                 )}
 
                 {!loading && invoiceData && (
-                    <InvoicePrint
-                        clinicName={clinicName}
-                        clinicAddress={clinicAddress}
-                        clinicPhone={clinicPhone}
-                        clinicLicense={clinicLicense}
-                        referenceDoctor={referenceDoctor}
-                        patient={invoiceData.patient}
-                        billItems={invoiceData.billItems}
-                        invoiceId={invoiceData.invoiceId}
-                        total={invoiceData.total}
-                        subtotal={invoiceData.subtotal}
-                        discountType={invoiceData.discountType}
-                        discountValue={invoiceData.discountValue}
-                        visitRefundApplied={invoiceData.visitRefundApplied}
-                        date={invoiceData.date}
-                        className="bg-white p-6 text-black"
-                    />
+                    <div className="flex justify-center">
+                        <InvoicePrint
+                            clinicName={clinicName}
+                            clinicAddress={clinicAddress}
+                            clinicPhone={clinicPhone}
+                            clinicLicense={clinicLicense}
+                            referenceDoctor={referenceDoctor}
+                            patient={invoiceData.patient}
+                            billItems={invoiceData.billItems}
+                            invoiceId={invoiceData.invoiceId}
+                            total={invoiceData.total}
+                            subtotal={invoiceData.subtotal}
+                            discountType={invoiceData.discountType}
+                            discountValue={invoiceData.discountValue}
+                            visitRefundApplied={invoiceData.visitRefundApplied}
+                            paymentType={invoiceData.paymentType}
+                            date={invoiceData.date}
+                            className="bg-white p-3 text-black border"
+                        />
+                    </div>
                 )}
 
                 {!loading && invoiceData && photos.length > 0 && (

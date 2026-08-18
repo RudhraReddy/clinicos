@@ -143,7 +143,7 @@ body {
     z-index: 9999;
   }
   @page {
-    size: A5 portrait;
-    margin: 8mm;
+    size: 80mm auto;
+    margin: 2.5mm 3mm;
   }
 }
