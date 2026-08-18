@@ -336,22 +336,27 @@ rest of the scale changes:
    `space-between` row (each pinned to its own edge, spanning the full width — not centered as one
    block, which is what caused it to wrap awkwardly next to the clinic name above).
 3. Divider.
-4. **Patient details** — `NAME : {NAME}` alone on its own line, then `PH : {phone}` and
-   `AGE : {age}` sharing one flex row, then `REF : {referenceDoctor}` alone (only if set). `sex` is
-   fetched but not rendered here. `NAME`/`PH`/`REF` pass `width={4}` to `Label` (see Typography above)
-   so they right-pad to the same column width and their colons all line up vertically.
+4. **Patient details** — `NAME : {NAME}` alone on its own line (hanging-indent wrap via
+   `paddingLeft: "7ch", textIndent: "-7ch"` — a long name's continuation lines land under the value,
+   not back at column 0), then `PH : {phone}` and `AGE : {age}` sharing one flex row, then
+   `REF : {referenceDoctor}` alone (only if set). `sex` is fetched but not rendered here.
+   `NAME`/`PH`/`REF` pass `width={4}` to `Label` (see Typography above) so they right-pad to the
+   same column width and their colons all line up vertically.
 5. Divider.
-6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (deliberately *not*
-   sharing a row with anything else — real invoice IDs are `DDMMYY-XXX-XXX`, ~15 chars, and wrap
-   badly when squeezed next to a second field on an 80mm line, unlike the short mockup ID a physical
-   reference receipt used — these two also pass `width={12}` to `Label` so their colons align with
-   each other), then `DATE : {dd/MM/yyyy}` and `TIME : {HH:mm}` sharing one flex row (short enough
-   to fit safely together).
+6. **Invoice details** — `INVOICE NO` + `MODE` (shortened from "PAYMENT MODE" so it fits next to
+   the ID) share one flex row; `DATE` + `TIME` share the row below. `INVOICE NO`/`DATE` pass
+   `width={10}` to `Label` so their colons align down the left column too, across both rows, not
+   just within each one. The `INVOICE NO`/`MODE` row alone needs a smaller font (8pt vs. body's
+   9.5pt) plus `whiteSpace: "nowrap"` — a real invoice ID (`DDMMYY-XXX-XXX`, ~15 chars) plus
+   `MODE : CASH` doesn't fit at body size the way the mockup's short `AT5475` did; verified via
+   `getBoundingClientRect()` height (single line) against real invoice IDs, not just eyeballed.
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
-   `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN: {hsn_code}   GST:
-   {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a divider. Any missing
-   field (no manufacturer, no HSN, etc.) is silently omitted from its line.
+   a flex `space-between` row with one `<span>` per present field among MFG (abbrev, ≤4 letters) /
+   PACK / BATCH, spread across the full width rather than packed together with a fixed gap; likewise
+   a second row for HSN / GST / EXP; then a `{qty} × {mrp}` / `{amount}` row; then a divider. Any
+   missing field (no manufacturer, no HSN, etc.) simply isn't in that row's array, same idea as
+   before but expressed as an array of spans rather than a joined string.
 9. **Totals** — `SUBTOTAL` always shown. Discount and refund are each a bare right-aligned
    `-{amount}` line with **no label at all** (per clinic policy) and are omitted entirely — not
    shown as zero — when not applicable: discount only appears if `discountAmount > 0`, refund only

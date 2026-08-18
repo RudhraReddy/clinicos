@@ -148,7 +148,9 @@ export function InvoicePrint({
             {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone.
                 NAME/PH/REF share a padded label width (4 — "NAME" is the longest) so
                 their colons all land on the same column. */}
-            <div><Label width={4}>NAME</Label> : {patient.name.toUpperCase()}</div>
+            <div style={{ paddingLeft: "7ch", textIndent: "-7ch", wordBreak: "break-word" }}>
+                <Label width={4}>NAME</Label> : {patient.name.toUpperCase()}
+            </div>
             {(patient.phone_number || hasAge) && (
                 <div style={row}>
                     <span>{patient.phone_number && <><Label width={4}>PH</Label> : {patient.phone_number}</>}</span>
@@ -159,16 +161,19 @@ export function InvoicePrint({
 
             <Divider />
 
-            {/* Invoice details. INVOICE NO and PAYMENT MODE each get their own
-                line — real invoice IDs (DDMMYY-XXX-XXX, ~15 chars) don't fit
-                alongside a second field the way a short mockup ID would — and
-                share a padded label width (12 — "PAYMENT MODE" is the longest)
-                so their colons align. DATE/TIME are short enough to safely
-                share one row. */}
-            <div><Label width={12}>INVOICE NO</Label> : {invoiceId || "DRAFT"}</div>
-            <div><Label width={12}>PAYMENT MODE</Label> : {(paymentType || "CASH").toUpperCase()}</div>
+            {/* Invoice details: INVOICE NO + MODE (shortened from "PAYMENT MODE" so
+                it fits alongside the invoice ID on one row) share a row; DATE + TIME
+                share the row below. INVOICE NO/DATE share a padded label width (10 —
+                "INVOICE NO" is the longest) so their colons align down the left
+                column too, not just within each row. This row alone needs a smaller
+                font — a real invoice ID (DDMMYY-XXX-XXX, ~15 chars) plus "MODE : CASH"
+                doesn't fit at the body size the way the mockup's short "AT5475" did. */}
+            <div style={{ ...row, fontSize: "8pt", whiteSpace: "nowrap" }}>
+                <span><Label width={10}>INVOICE NO</Label> : {invoiceId || "DRAFT"}</span>
+                <span><Label>MODE</Label> : {(paymentType || "CASH").toUpperCase()}</span>
+            </div>
             <div style={row}>
-                <span><Label>DATE</Label> : {printDate}</span>
+                <span><Label width={10}>DATE</Label> : {printDate}</span>
                 <span style={{ whiteSpace: "nowrap" }}><Label>TIME</Label> : {printTime}</span>
             </div>
 
@@ -188,12 +193,12 @@ export function InvoicePrint({
                     mfg && `MFG: ${mfg}`,
                     item.pack_size && `PACK: ${item.pack_size}`,
                     item.batch_number && `BATCH: ${item.batch_number}`,
-                ].filter(Boolean).join("   ")
+                ].filter(Boolean)
                 const detailLine2 = [
                     item.hsn_code && `HSN: ${item.hsn_code}`,
                     item.gst_rate ? `GST: ${item.gst_rate}%` : null,
                     item.expiry_date && `EXP: ${formatExpiry(item.expiry_date)}`,
-                ].filter(Boolean).join("   ")
+                ].filter(Boolean)
                 const amount = item.qty * item.mrp
 
                 return (
@@ -201,8 +206,19 @@ export function InvoicePrint({
                         <div style={{ fontWeight: 700, fontSize: "10.5pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
                             {idx + 1}. {item.item_name.toUpperCase()}
                         </div>
-                        {detailLine1 && <div style={{ fontSize: "8.5pt" }}>{detailLine1}</div>}
-                        {detailLine2 && <div style={{ fontSize: "8.5pt" }}>{detailLine2}</div>}
+                        {/* Each present field gets its own column, spread across the
+                            full width (space-between) rather than packed together
+                            with a fixed gap — matches the QTY×MRP/AMOUNT pattern. */}
+                        {detailLine1.length > 0 && (
+                            <div style={{ ...row, fontSize: "8.5pt" }}>
+                                {detailLine1.map((f, i) => <span key={i}>{f}</span>)}
+                            </div>
+                        )}
+                        {detailLine2.length > 0 && (
+                            <div style={{ ...row, fontSize: "8.5pt" }}>
+                                {detailLine2.map((f, i) => <span key={i}>{f}</span>)}
+                            </div>
+                        )}
                         <div style={{ ...row, fontSize: "9.5pt", fontWeight: 500 }}>
                             <span>{Math.round(item.qty)} &times; {item.mrp.toFixed(2)}</span>
                             <span>{amount.toFixed(2)}</span>
