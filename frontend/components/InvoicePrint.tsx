@@ -154,12 +154,16 @@ export function InvoicePrint({
 
             <Divider />
 
-            {/* PAID stamp — only for a saved, actually-paid bill. Never shown
-                on a draft/preview print. */}
+            {/* PAID IN FULL stamp — only for a saved, actually-paid bill. Never
+                shown on a draft/preview print. Matches the divider style used
+                everywhere else on the receipt (plain dashes, no box). */}
             {paid && (
-                <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11pt", border: "1.5px solid #000", padding: "2px 0", margin: "3px 0" }}>
-                    PAID
-                </div>
+                <>
+                    <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11pt" }}>
+                        PAID IN FULL
+                    </div>
+                    <Divider />
+                </>
             )}
 
             {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone.
