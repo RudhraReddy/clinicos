@@ -843,228 +843,228 @@ function BillingContent() {
                         <CardHeader>
                             <CardTitle>Billing History</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4 flex-1 overflow-y-auto min-h-0">
-                            {/* Filter bar */}
-                            <div className="flex flex-wrap items-end gap-3">
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Date Range</Label>
-                                    <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-[260px]" />
+                        <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden min-h-0">
+                            {/* Filter bar + pagination — fixed at the top, doesn't scroll away.
+                                Filters auto-apply (loadHistory re-runs via the effect below
+                                whenever a filter value changes), so there's no separate Search
+                                button to click. */}
+                            <div className="flex flex-wrap items-end justify-between gap-3 shrink-0">
+                                <div className="flex flex-wrap items-end gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Date Range</Label>
+                                        <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-[260px]" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Payment Type</Label>
+                                        <Select value={filterPaymentType || "ALL"} onValueChange={(val) => setFilterPaymentType(val === "ALL" ? "" : val)}>
+                                            <SelectTrigger className="w-[140px]">
+                                                <SelectValue placeholder="All" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">All</SelectItem>
+                                                <SelectItem value="CASH">Cash</SelectItem>
+                                                <SelectItem value="UPI">UPI</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Patient Type</Label>
+                                        <Select value={filterIsWalkIn || "ALL"} onValueChange={(val) => setFilterIsWalkIn(val === "ALL" ? "" : val as 'true' | 'false')}>
+                                            <SelectTrigger className="w-[170px]">
+                                                <SelectValue placeholder="All" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">All</SelectItem>
+                                                <SelectItem value="false">Registered Patients</SelectItem>
+                                                <SelectItem value="true">Walk-in Only</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {(filterDateFrom || filterDateTo || filterPaymentType || filterIsWalkIn) && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setDateRange(undefined)
+                                                setFilterPaymentType('')
+                                                setFilterIsWalkIn('')
+                                            }}
+                                        >
+                                            Clear
+                                        </Button>
+                                    )}
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Payment Type</Label>
-                                    <Select value={filterPaymentType || "ALL"} onValueChange={(val) => setFilterPaymentType(val === "ALL" ? "" : val)}>
-                                        <SelectTrigger className="w-[140px]">
-                                            <SelectValue placeholder="All" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ALL">All</SelectItem>
-                                            <SelectItem value="CASH">Cash</SelectItem>
-                                            <SelectItem value="UPI">UPI</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+
+                                <div className="flex items-center gap-3">
+                                    <p className="text-sm text-muted-foreground whitespace-nowrap">{historyTotal} total bills</p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={historyPage <= 1 || loadingHistory}
+                                            onClick={() => loadHistory(historyPage - 1)}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            Previous
+                                        </Button>
+                                        <span className="text-sm whitespace-nowrap">Page {historyPage} of {historyTotalPages}</span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={historyPage >= historyTotalPages || loadingHistory}
+                                            onClick={() => loadHistory(historyPage + 1)}
+                                        >
+                                            Next
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Patient Type</Label>
-                                    <Select value={filterIsWalkIn || "ALL"} onValueChange={(val) => setFilterIsWalkIn(val === "ALL" ? "" : val as 'true' | 'false')}>
-                                        <SelectTrigger className="w-[170px]">
-                                            <SelectValue placeholder="All" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ALL">All</SelectItem>
-                                            <SelectItem value="false">Registered Patients</SelectItem>
-                                            <SelectItem value="true">Walk-in Only</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <Button onClick={() => { setHistoryPage(1); loadHistory(1) }}>
-                                    <Search className="h-4 w-4 mr-2" />
-                                    Search
-                                </Button>
-                                {(filterDateFrom || filterDateTo || filterPaymentType || filterIsWalkIn) && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setDateRange(undefined)
-                                            setFilterPaymentType('')
-                                            setFilterIsWalkIn('')
-                                            setHistoryPage(1)
-                                            loadHistory(1)
-                                        }}
-                                    >
-                                        Clear
-                                    </Button>
-                                )}
                             </div>
 
-                            {/* History table */}
-                            {loadingHistory ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Desktop table */}
-                                    <div className="hidden md:block">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Invoice ID</TableHead>
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Patient</TableHead>
-                                                    <TableHead>Amount</TableHead>
-                                                    <TableHead>Payment</TableHead>
-                                                    <TableHead>Action</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {history.map(bill => (
-                                                    <TableRow key={bill.invoice_id}>
-                                                        <TableCell className="font-mono">{bill.invoice_id}</TableCell>
-                                                        <TableCell>{bill.date}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2">
-                                                                {bill.patient_name}
-                                                                {bill.is_walk_in && (
-                                                                    <Badge variant="outline" className="text-[10px]">Walk-in</Badge>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
-                                                        <TableCell>{bill.payment_type}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-2">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        setPrintInvoiceId(bill.invoice_id)
-                                                                        setPrintDialogOpen(true)
-                                                                    }}
-                                                                >
-                                                                    <Printer className="h-4 w-4 mr-1" />
-                                                                    Print
-                                                                </Button>
-                                                                {role === 'admin' && (
+                            {/* History table — the only part that scrolls */}
+                            <div className="flex-1 overflow-y-auto min-h-0">
+                                {loadingHistory ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Desktop table */}
+                                        <div className="hidden md:block">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Invoice ID</TableHead>
+                                                        <TableHead>Date</TableHead>
+                                                        <TableHead>Patient</TableHead>
+                                                        <TableHead>Amount</TableHead>
+                                                        <TableHead>Payment</TableHead>
+                                                        <TableHead>Action</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {history.map(bill => (
+                                                        <TableRow key={bill.invoice_id}>
+                                                            <TableCell className="font-mono">{bill.invoice_id}</TableCell>
+                                                            <TableCell>{bill.date}</TableCell>
+                                                            <TableCell>
+                                                                <div className="flex items-center gap-2">
+                                                                    {bill.patient_name}
+                                                                    {bill.is_walk_in && (
+                                                                        <Badge variant="outline" className="text-[10px]">Walk-in</Badge>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>₹{bill.total_amount.toFixed(2)}</TableCell>
+                                                            <TableCell>{bill.payment_type}</TableCell>
+                                                            <TableCell>
+                                                                <div className="flex items-center gap-2">
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
-                                                                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/30 dark:border-rose-900/50"
-                                                                        onClick={async () => {
-                                                                            if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
-                                                                                try {
-                                                                                    await api.deleteBill(bill.invoice_id)
-                                                                                    toast.success("Bill successfully deleted and stock restored.")
-                                                                                    loadHistory(historyPage)
-                                                                                } catch (err) {
-                                                                                    console.error(err)
-                                                                                    toast.error("Failed to delete bill")
-                                                                                }
-                                                                            }
+                                                                        onClick={() => {
+                                                                            setPrintInvoiceId(bill.invoice_id)
+                                                                            setPrintDialogOpen(true)
                                                                         }}
                                                                     >
-                                                                        <Trash2 className="h-4 w-4 mr-1" />
-                                                                        Delete
+                                                                        <Printer className="h-4 w-4 mr-1" />
+                                                                        Print
                                                                     </Button>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                                {history.length === 0 && (
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                            No bills found.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
+                                                                    {role === 'admin' && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/30 dark:border-rose-900/50"
+                                                                            onClick={async () => {
+                                                                                if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
+                                                                                    try {
+                                                                                        await api.deleteBill(bill.invoice_id)
+                                                                                        toast.success("Bill successfully deleted and stock restored.")
+                                                                                        loadHistory(historyPage)
+                                                                                    } catch (err) {
+                                                                                        console.error(err)
+                                                                                        toast.error("Failed to delete bill")
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4 mr-1" />
+                                                                            Delete
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    {history.length === 0 && (
+                                                        <TableRow>
+                                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                                No bills found.
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
 
-                                    {/* Mobile cards */}
-                                    <div className="md:hidden divide-y border rounded-lg overflow-hidden">
-                                        {history.map(bill => (
-                                            <div key={bill.invoice_id} className="flex flex-col gap-1 p-3 bg-background">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-mono text-xs text-muted-foreground">{bill.invoice_id}</span>
-                                                    <span className="font-bold text-sm">₹{bill.total_amount.toFixed(2)}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="flex-1 text-xs text-muted-foreground">
-                                                        {bill.patient_name}
-                                                        {bill.is_walk_in && <Badge variant="outline" className="text-[10px] ml-1">Walk-in</Badge>}
-                                                        {' · '}{bill.date}
-                                                    </span>
-                                                    <Badge variant="outline" className="text-[10px]">{bill.payment_type}</Badge>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={() => {
-                                                            setPrintInvoiceId(bill.invoice_id)
-                                                            setPrintDialogOpen(true)
-                                                        }}
-                                                    >
-                                                        <Printer className="h-4 w-4" />
-                                                    </Button>
-                                                    {role === 'admin' && (
+                                        {/* Mobile cards */}
+                                        <div className="md:hidden divide-y border rounded-lg overflow-hidden">
+                                            {history.map(bill => (
+                                                <div key={bill.invoice_id} className="flex flex-col gap-1 p-3 bg-background">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-mono text-xs text-muted-foreground">{bill.invoice_id}</span>
+                                                        <span className="font-bold text-sm">₹{bill.total_amount.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="flex-1 text-xs text-muted-foreground">
+                                                            {bill.patient_name}
+                                                            {bill.is_walk_in && <Badge variant="outline" className="text-[10px] ml-1">Walk-in</Badge>}
+                                                            {' · '}{bill.date}
+                                                        </span>
+                                                        <Badge variant="outline" className="text-[10px]">{bill.payment_type}</Badge>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="h-8 w-8 text-destructive hover:text-destructive"
-                                                            onClick={async () => {
-                                                                if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
-                                                                    try {
-                                                                        await api.deleteBill(bill.invoice_id)
-                                                                        toast.success("Bill successfully deleted and stock restored.")
-                                                                        loadHistory(historyPage)
-                                                                    } catch (err) {
-                                                                        console.error(err)
-                                                                        toast.error("Failed to delete bill")
-                                                                    }
-                                                                }
+                                                            className="h-8 w-8"
+                                                            onClick={() => {
+                                                                setPrintInvoiceId(bill.invoice_id)
+                                                                setPrintDialogOpen(true)
                                                             }}
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
+                                                            <Printer className="h-4 w-4" />
                                                         </Button>
-                                                    )}
+                                                        {role === 'admin' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                onClick={async () => {
+                                                                    if (window.confirm(`Are you sure you want to delete invoice ${bill.invoice_id}? This will restore the deducted inventory stocks!`)) {
+                                                                        try {
+                                                                            await api.deleteBill(bill.invoice_id)
+                                                                            toast.success("Bill successfully deleted and stock restored.")
+                                                                            loadHistory(historyPage)
+                                                                        } catch (err) {
+                                                                            console.error(err)
+                                                                            toast.error("Failed to delete bill")
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                        {history.length === 0 && (
-                                            <div className="text-center py-8 text-sm text-muted-foreground">
-                                                No bills found.
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Pagination */}
-                            <div className="flex items-center justify-between mt-4">
-                                <p className="text-sm text-muted-foreground">{historyTotal} total bills</p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={historyPage <= 1 || loadingHistory}
-                                        onClick={() => loadHistory(historyPage - 1)}
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                        Previous
-                                    </Button>
-                                    <span className="text-sm">Page {historyPage} of {historyTotalPages}</span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={historyPage >= historyTotalPages || loadingHistory}
-                                        onClick={() => loadHistory(historyPage + 1)}
-                                    >
-                                        Next
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                                            ))}
+                                            {history.length === 0 && (
+                                                <div className="text-center py-8 text-sm text-muted-foreground">
+                                                    No bills found.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
