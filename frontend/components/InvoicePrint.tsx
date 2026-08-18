@@ -76,6 +76,12 @@ const row: React.CSSProperties = {
     gap: "6px",
 }
 
+// A field label (NAME, PH, INVOICE NO, ...) rendered slightly stronger than
+// the surrounding body text so it reads as a label rather than a value.
+function Label({ children }: { children: React.ReactNode }) {
+    return <span style={{ fontWeight: 600 }}>{children}</span>
+}
+
 export function InvoicePrint({
     clinicName = "MediCare Clinic",
     clinicAddress = "",
@@ -108,7 +114,7 @@ export function InvoicePrint({
     const base: React.CSSProperties = {
         fontFamily: '"Courier New", Courier, monospace',
         fontSize: "9.5pt",
-        lineHeight: 1.35,
+        lineHeight: 1.2,
         color: "#000",
     }
 
@@ -137,11 +143,11 @@ export function InvoicePrint({
 
             {/* Patient details */}
             <div style={row}>
-                <span>NAME : {patient.name.toUpperCase()}</span>
-                {hasAge && <span style={{ whiteSpace: "nowrap" }}>AGE : {patient.age}</span>}
+                <span><Label>NAME</Label> : {patient.name.toUpperCase()}</span>
+                {hasAge && <span style={{ whiteSpace: "nowrap" }}><Label>AGE</Label> : {patient.age}</span>}
             </div>
-            {patient.phone_number && <div>PH   : {patient.phone_number}</div>}
-            {referenceDoctor && <div>REF  : {referenceDoctor}</div>}
+            {patient.phone_number && <div><Label>PH</Label>   : {patient.phone_number}</div>}
+            {referenceDoctor && <div><Label>REF</Label>  : {referenceDoctor}</div>}
 
             <Divider />
 
@@ -149,11 +155,11 @@ export function InvoicePrint({
                 line — real invoice IDs (DDMMYY-XXX-XXX, ~15 chars) don't fit
                 alongside a second field the way a short mockup ID would.
                 DATE/TIME are short enough to safely share one row. */}
-            <div>INVOICE NO : {invoiceId || "DRAFT"}</div>
-            <div>PAYMENT MODE : {(paymentType || "CASH").toUpperCase()}</div>
+            <div><Label>INVOICE NO</Label> : {invoiceId || "DRAFT"}</div>
+            <div><Label>PAYMENT MODE</Label> : {(paymentType || "CASH").toUpperCase()}</div>
             <div style={row}>
-                <span>DATE : {printDate}</span>
-                <span style={{ whiteSpace: "nowrap" }}>TIME : {printTime}</span>
+                <span><Label>DATE</Label> : {printDate}</span>
+                <span style={{ whiteSpace: "nowrap" }}><Label>TIME</Label> : {printTime}</span>
             </div>
 
             <Divider />
@@ -185,9 +191,9 @@ export function InvoicePrint({
                         <div style={{ fontWeight: 700, fontSize: "10.5pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
                             {idx + 1}. {item.item_name.toUpperCase()}
                         </div>
-                        {detailLine1 && <div style={{ fontSize: "8pt" }}>{detailLine1}</div>}
-                        {detailLine2 && <div style={{ fontSize: "8pt" }}>{detailLine2}</div>}
-                        <div style={row}>
+                        {detailLine1 && <div style={{ fontSize: "8.5pt" }}>{detailLine1}</div>}
+                        {detailLine2 && <div style={{ fontSize: "8.5pt" }}>{detailLine2}</div>}
+                        <div style={{ ...row, fontSize: "9.5pt", fontWeight: 500 }}>
                             <span>{Math.round(item.qty)} &times; {item.mrp.toFixed(2)}</span>
                             <span>{amount.toFixed(2)}</span>
                         </div>
@@ -221,7 +227,7 @@ export function InvoicePrint({
             <Divider />
 
             {/* Footer */}
-            <div style={{ textAlign: "center", fontSize: "7.5pt", lineHeight: 1.4 }}>
+            <div style={{ textAlign: "center", fontSize: "8pt", lineHeight: 1.2 }}>
                 <div>GOODS ONCE SOLD WILL NOT BE</div>
                 <div>TAKEN BACK OR EXCHANGED</div>
                 <div>SUBJECT TO HANAMKONDA JURISDICTION</div>

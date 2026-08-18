@@ -298,10 +298,31 @@ interface InvoicePrintProps {
 }
 ```
 
+### Typography
+
+Base body text is 9.5pt/400 (`line-height: 1.2` throughout — tight spacing is a deliberate part of
+the compact receipt look, not just small font sizes). A `Label` helper component renders field labels
+(`NAME`, `PH`, `REF`, `AGE`, `INVOICE NO`, `PAYMENT MODE`, `DATE`, `TIME`) at `font-weight: 600` —
+slightly stronger than the 400-weight value that follows, but not as heavy as a true bold — so labels
+read distinctly without competing with the item name/NET TOTAL for attention. Full size/weight table:
+
+| Element | Size | Weight |
+|---|---|---|
+| Pharmacy name | 14pt | 700 |
+| Address / phone / DL | 8.5pt | 400 |
+| Body text (patient/invoice detail values, SUBTOTAL/DISCOUNT/REFUND) | 9.5pt | 400 |
+| Field labels (via `Label`) | 9.5pt | 600 |
+| `QTY × MRP` / `AMOUNT` header | 9.5pt | 700 |
+| Item name | 10.5pt | 700 |
+| Item detail lines (MFG/PACK/BATCH, HSN/GST/EXP) | 8.5pt | 400 |
+| Item price line (`qty × mrp` / `amount`) | 9.5pt | 500 |
+| NET TOTAL | 13pt | 700 |
+| Footer legal text | 8pt | 400 |
+
 ### Layout sections (top to bottom)
 
-1. **Pharmacy name** — centered, bold, uppercase, 14pt.
-2. **Pharmacy details** — centered, 8.5pt: address line, then `PH: {phone}    DL NO: {license}`.
+1. **Pharmacy name** — centered, uppercase.
+2. **Pharmacy details** — centered: address line, then `PH: {phone}    DL NO: {license}`.
 3. Divider.
 4. **Patient details** — `NAME : {NAME}` and `AGE : {age}` on one flex row, then `PH   : {phone}`, then
    `REF  : {referenceDoctor}` (only if set). `sex` is fetched but not rendered here.
@@ -312,15 +333,15 @@ interface InvoicePrintProps {
    reference receipt used), then `DATE : {dd/MM/yyyy}` and `TIME : {HH:mm}` sharing one flex row
    (short enough to fit safely together).
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
-8. **Items**, one block per line item: `{n}. {ITEM NAME}` (bold 10.5pt, hanging-indent wrap, never
-   shrunk to fit); `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN:
-   {hsn_code}   GST: {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a
-   divider. Any missing field (no manufacturer, no HSN, etc.) is silently omitted from its line.
+8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
+   `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN: {hsn_code}   GST:
+   {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a divider. Any missing
+   field (no manufacturer, no HSN, etc.) is silently omitted from its line.
 9. **Totals** — `SUBTOTAL` and `DISCOUNT` always shown (₹0.00 discount included, matching the
    reference receipt); `REFUND` only if `visitRefundApplied` is set (rarer, visit-specific — not a
-   routine per-bill field like discount); divider; bold 13pt `NET TOTAL` with `₹`; divider (plain
-   `-`, same weight as every other divider on the receipt — no heavier double-line style).
-10. **Footer** — centered, 7.5pt, three lines: "GOODS ONCE SOLD WILL NOT BE" / "TAKEN BACK OR
+   routine per-bill field like discount); divider; `NET TOTAL` with `₹`; divider (plain `-`, same
+   weight as every other divider on the receipt — no heavier double-line style).
+10. **Footer** — centered, three lines: "GOODS ONCE SOLD WILL NOT BE" / "TAKEN BACK OR
     EXCHANGED" / "SUBJECT TO HANAMKONDA JURISDICTION". No signature line.
 
 ### printElement function
