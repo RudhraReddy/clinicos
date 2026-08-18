@@ -14,6 +14,7 @@ import Link from "next/link"
 import { PatientSearch } from "@/components/PatientSearch"
 import { useAuth } from "@/lib/auth_context"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
+import { DraftInvoicePreviewDialog } from "@/components/DraftInvoicePreviewDialog"
 import {
     Table,
     TableBody,
@@ -57,6 +58,9 @@ export interface BillItem {
     // Deliberately never sent to the backend: see handleCreateBill's payload, which
     // maps billItems to an explicit field list that excludes it.
     rack_location?: string;
+    // Display-only, for the draft invoice preview (see DraftInvoicePreviewDialog) —
+    // also never sent to the backend, same reason as rack_location above.
+    manufacturer?: string;
 }
 
 const getPackMultiplier = (packSize?: string) => {
@@ -157,6 +161,7 @@ function BillingContent() {
     // Print dialog
     const [printDialogOpen, setPrintDialogOpen] = useState(false)
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
+    const [draftPreviewOpen, setDraftPreviewOpen] = useState(false)
 
     const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
 
@@ -277,6 +282,7 @@ function BillingContent() {
             pack_size: item.pack_size,
             unit: 'ea',
             rack_location: item.rack_location || undefined,
+            manufacturer: item.manufacturer || undefined,
         }
         setBillItems([...billItems, newItem])
         setItemQuery("")
@@ -577,6 +583,17 @@ function BillingContent() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="shrink-0 h-10 w-10"
+                                        title="Print draft invoice (no bill is created — nothing is saved)"
+                                        disabled={(walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0}
+                                        onClick={() => setDraftPreviewOpen(true)}
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                    </Button>
                                     <Button
                                         type="button"
                                         variant={walkInMode ? "default" : "outline"}
@@ -1143,6 +1160,40 @@ function BillingContent() {
                 clinicPhone={clinicPhone}
                 clinicLicense="TG/WLU/2025-140763"
                 referenceDoctor={referenceDoctor}
+            />
+
+            {/* Draft invoice preview — prints whatever is currently on-screen,
+                no bill is created and nothing is saved. */}
+            <DraftInvoicePreviewDialog
+                open={draftPreviewOpen}
+                onOpenChange={setDraftPreviewOpen}
+                clinicName={clinicName}
+                clinicAddress={clinicAddress}
+                clinicPhone={clinicPhone}
+                clinicLicense="TG/WLU/2025-140763"
+                referenceDoctor={referenceDoctor}
+                patient={walkInMode
+                    ? { name: walkInName || "Walk-in", phone_number: "", age: walkInAge ? parseInt(walkInAge) : null, sex: walkInSex || null }
+                    : { name: patient?.name || "", phone_number: patient?.phone_number || "", age: patient?.age ?? null, sex: patient?.sex ?? null }
+                }
+                billItems={billItems
+                    .filter(i => i.qty !== '' && i.qty > 0)
+                    .map(i => ({
+                        item_name: i.item_name,
+                        qty: i.qty as number,
+                        mrp: i.unit === 'packs' ? i.mrp * getPackMultiplier(i.pack_size) : i.mrp,
+                        manufacturer: i.manufacturer,
+                        gst_rate: i.gst,
+                        pack_size: i.pack_size,
+                    }))
+                }
+                total={finalTotal}
+                subtotal={subtotal}
+                discountType={parsedDiscountValue > 0 ? discountType : null}
+                discountValue={parsedDiscountValue > 0 ? parsedDiscountValue : null}
+                visitRefundApplied={refundLine ? refundToApply : null}
+                cashAmount={parsedCashAmount}
+                upiAmount={parsedUpiAmount}
             />
         </div>
     )

@@ -48,6 +48,7 @@ interface PrintInvoiceData {
     paymentType: string | null
     cashAmount: number | null
     upiAmount: number | null
+    paid: boolean
     date: Date
 }
 
@@ -64,7 +65,7 @@ interface PrintInvoiceDialogProps {
     photos?: any[]
 }
 
-function printElement(elementId: string) {
+export function printElement(elementId: string) {
     const el = document.getElementById(elementId)
     if (!el) return
     const win = window.open('', '_blank', 'width=380,height=700')
@@ -141,6 +142,10 @@ export function PrintInvoiceDialog({
                     paymentType: data.payment_type ?? null,
                     cashAmount: data.cash_amount ?? null,
                     upiAmount: data.upi_amount ?? null,
+                    // A saved bill was only ever creatable once Cash+UPI matched the
+                    // total (±₹1 tolerance) — computed rather than hardcoded true so
+                    // this stays correct if that validation ever loosens.
+                    paid: (data.cash_amount ?? 0) + (data.upi_amount ?? 0) >= data.total_amount - 1,
                     date: new Date(data.created_at),
                 })
             } catch (e) {
@@ -194,6 +199,7 @@ export function PrintInvoiceDialog({
                             paymentType={invoiceData.paymentType}
                             cashAmount={invoiceData.cashAmount}
                             upiAmount={invoiceData.upiAmount}
+                            paid={invoiceData.paid}
                             date={invoiceData.date}
                             className="text-black"
                         />

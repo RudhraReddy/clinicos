@@ -36,6 +36,10 @@ interface InvoicePrintProps {
     paymentType?: string | null
     cashAmount?: number | null
     upiAmount?: number | null
+    // Stamped between the pharmacy header and patient details when true — a
+    // saved, actually-paid bill. Never true on a draft/preview print (nothing
+    // has actually been paid or recorded yet).
+    paid?: boolean
     date?: Date
     referenceDoctor?: string
     className?: string
@@ -104,6 +108,7 @@ export function InvoicePrint({
     paymentType = null,
     cashAmount = null,
     upiAmount = null,
+    paid = false,
     date = new Date(),
     referenceDoctor,
     className,
@@ -148,6 +153,14 @@ export function InvoicePrint({
             )}
 
             <Divider />
+
+            {/* PAID stamp — only for a saved, actually-paid bill. Never shown
+                on a draft/preview print. */}
+            {paid && (
+                <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11pt", border: "1.5px solid #000", padding: "2px 0", margin: "3px 0" }}>
+                    PAID
+                </div>
+            )}
 
             {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone.
                 NAME/PH/REF share a padded label width (4 — "NAME" is the longest) so
