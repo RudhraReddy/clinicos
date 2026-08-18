@@ -324,7 +324,7 @@ rest of the scale changes:
 | Field labels (via `Label`) | 9.5pt | 600 |
 | `QTY × MRP` / `AMOUNT` header | 9.5pt | 700 |
 | Item name | 10.5pt | 700 |
-| Item detail lines (MFG/PACK/BATCH, HSN/GST/EXP) | 8.5pt | 400 |
+| Item detail lines (MFG/PACK/BATCH, HSN/GST/EXP) | 7.5pt | 400 |
 | Item price line (`qty × mrp` / `amount`) | 9.5pt | 500 |
 | NET TOTAL | 13pt | 700 |
 | Footer legal text | 8pt | 400 |
@@ -358,8 +358,10 @@ rest of the scale changes:
    choice over flex here — `space-between` anchors only the *last* item to the row's end, so each
    row's column boundaries follow that row's own value lengths and don't line up with the row
    below; a fixed grid keeps MFG/HSN, PACK/GST, and BATCH/EXP each starting at the same x position
-   regardless of value length (a long value like `BATCH: GD50506A` wraps within its own column
-   instead of dragging the row's alignment around). Then a `{qty} × {mrp}` / `{amount}` row; then a
+   regardless of value length. `wordBreak: "keep-all"` + `overflowWrap: "normal"` are set explicitly
+   on both grid rows so a value is never split mid-token (e.g. `GD50506A` breaking into `GD5` /
+   `0506A`) — if a value doesn't fit its column it wraps at the `LABEL:`/value space instead, or in
+   the worst case overflows cleanly, never garbles the token itself. Then a `{qty} × {mrp}` / `{amount}` row; then a
    divider. A missing field (no manufacturer, no HSN, etc.) renders as an empty grid cell — that
    column stays reserved as blank space rather than the row collapsing to 2 columns.
 9. **Totals** — `SUBTOTAL` always shown. Discount and refund are each a bare right-aligned

@@ -73,7 +73,7 @@ const row: React.CSSProperties = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "baseline",
-    gap: "6px",
+    gap: "4px",
 }
 
 // A field label (NAME, PH, INVOICE NO, ...) rendered slightly stronger than
@@ -214,14 +214,14 @@ export function InvoicePrint({
                             *last* item to the row's end, which follows each row's own
                             value lengths and misaligns the two rows against each other. */}
                         {hasLine1 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px", fontSize: "8.5pt" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "2px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
                                 <span>{mfgText}</span>
                                 <span>{packText}</span>
                                 <span>{batchText}</span>
                             </div>
                         )}
                         {hasLine2 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "4px", fontSize: "8.5pt" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "2px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
                                 <span>{hsnText}</span>
                                 <span>{gstText}</span>
                                 <span>{expText}</span>
