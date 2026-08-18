@@ -113,7 +113,7 @@ export function InvoicePrint({
 
     const base: React.CSSProperties = {
         fontFamily: '"Courier New", Courier, monospace',
-        fontSize: "9.5pt",
+        fontSize: "9pt",
         lineHeight: 1.2,
         color: "#000",
     }
@@ -123,16 +123,16 @@ export function InvoicePrint({
             <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
 
             {/* Pharmacy name */}
-            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12pt", textTransform: "uppercase" }}>
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11.5pt", textTransform: "uppercase" }}>
                 {clinicName}
             </div>
 
             {/* Pharmacy details */}
             {clinicAddress && (
-                <div style={{ textAlign: "center", fontSize: "8.5pt" }}>{clinicAddress}</div>
+                <div style={{ textAlign: "center", fontSize: "8pt" }}>{clinicAddress}</div>
             )}
             {(clinicPhone || clinicLicense) && (
-                <div style={{ ...row, fontSize: "8.5pt" }}>
+                <div style={{ ...row, fontSize: "8pt" }}>
                     <span>{clinicPhone && `PH: ${clinicPhone}`}</span>
                     <span>{clinicLicense && `DL NO: ${clinicLicense}`}</span>
                 </div>
@@ -189,12 +189,12 @@ export function InvoicePrint({
 
                 return (
                     <div key={idx}>
-                        <div style={{ fontWeight: 700, fontSize: "10.5pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
+                        <div style={{ fontWeight: 700, fontSize: "10pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
                             {idx + 1}. {item.item_name.toUpperCase()}
                         </div>
-                        {detailLine1 && <div style={{ fontSize: "8.5pt" }}>{detailLine1}</div>}
-                        {detailLine2 && <div style={{ fontSize: "8.5pt" }}>{detailLine2}</div>}
-                        <div style={{ ...row, fontSize: "9.5pt", fontWeight: 500 }}>
+                        {detailLine1 && <div style={{ fontSize: "8pt" }}>{detailLine1}</div>}
+                        {detailLine2 && <div style={{ fontSize: "8pt" }}>{detailLine2}</div>}
+                        <div style={{ ...row, fontSize: "9pt", fontWeight: 500 }}>
                             <span>{Math.round(item.qty)} &times; {item.mrp.toFixed(2)}</span>
                             <span>{amount.toFixed(2)}</span>
                         </div>
@@ -217,14 +217,14 @@ export function InvoicePrint({
                 <div style={{ textAlign: "right" }}>-{visitRefundApplied.toFixed(2)}</div>
             )}
             <Divider />
-            <div style={{ ...row, fontWeight: 700, fontSize: "13pt" }}>
+            <div style={{ ...row, fontWeight: 700, fontSize: "12.5pt" }}>
                 <span>NET TOTAL</span>
                 <span>&#8377; {total.toFixed(2)}</span>
             </div>
             <Divider />
 
             {/* Footer */}
-            <div style={{ textAlign: "center", fontSize: "8pt", lineHeight: 1.2 }}>
+            <div style={{ textAlign: "center", fontSize: "7.5pt", lineHeight: 1.2 }}>
                 <div>GOODS ONCE SOLD WILL NOT BE</div>
                 <div>TAKEN BACK OR EXCHANGED</div>
                 <div>SUBJECT TO HANAMKONDA JURISDICTION</div>

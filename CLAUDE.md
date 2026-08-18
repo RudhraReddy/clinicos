@@ -300,7 +300,7 @@ interface InvoicePrintProps {
 
 ### Typography
 
-Base body text is 9.5pt/400 (`line-height: 1.2` throughout — tight spacing is a deliberate part of
+Base body text is 9pt/400 (`line-height: 1.2` throughout — tight spacing is a deliberate part of
 the compact receipt look, not just small font sizes). A `Label` helper component renders field labels
 (`NAME`, `PH`, `REF`, `AGE`, `INVOICE NO`, `PAYMENT MODE`, `DATE`, `TIME`) at `font-weight: 600` —
 slightly stronger than the 400-weight value that follows, but not as heavy as a true bold — so labels
@@ -308,16 +308,16 @@ read distinctly without competing with the item name/NET TOTAL for attention. Fu
 
 | Element | Size | Weight |
 |---|---|---|
-| Pharmacy name | 12pt | 700 |
-| Address / phone / DL | 8.5pt | 400 |
-| Body text (patient/invoice detail values, SUBTOTAL and the bare discount/refund lines) | 9.5pt | 400 |
-| Field labels (via `Label`) | 9.5pt | 600 |
-| `QTY × MRP` / `AMOUNT` header | 9.5pt | 700 |
-| Item name | 10.5pt | 700 |
-| Item detail lines (MFG/PACK/BATCH, HSN/GST/EXP) | 8.5pt | 400 |
-| Item price line (`qty × mrp` / `amount`) | 9.5pt | 500 |
-| NET TOTAL | 13pt | 700 |
-| Footer legal text | 8pt | 400 |
+| Pharmacy name | 11.5pt | 700 |
+| Address / phone / DL | 8pt | 400 |
+| Body text (patient/invoice detail values, SUBTOTAL and the bare discount/refund lines) | 9pt | 400 |
+| Field labels (via `Label`) | 9pt | 600 |
+| `QTY × MRP` / `AMOUNT` header | 9pt | 700 |
+| Item name | 10pt | 700 |
+| Item detail lines (MFG/PACK/BATCH, HSN/GST/EXP) | 8pt | 400 |
+| Item price line (`qty × mrp` / `amount`) | 9pt | 500 |
+| NET TOTAL | 12.5pt | 700 |
+| Footer legal text | 7.5pt | 400 |
 
 ### Layout sections (top to bottom)
 
