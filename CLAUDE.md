@@ -303,19 +303,23 @@ interface InvoicePrintProps {
 1. **Pharmacy name** — centered, bold, uppercase, 14pt.
 2. **Pharmacy details** — centered, 8.5pt: address line, then `PH: {phone}    DL NO: {license}`.
 3. Divider.
-4. **Patient details** — `NAME : {NAME}` and `AGE:{age}` on one flex row, then `PH   : {phone}`, then
+4. **Patient details** — `NAME : {NAME}` and `AGE : {age}` on one flex row, then `PH   : {phone}`, then
    `REF  : {referenceDoctor}` (only if set). `sex` is fetched but not rendered here.
 5. Divider.
-6. **Invoice details** — `INV`, `DATE` (short `dd/MM/yy` + time), and `PAYMENT` each on their own
-   line. (Deliberately *not* on one flex row with the date — real invoice IDs are
-   `DDMMYY-XXX-XXX`, ~15 chars, and wrap badly when squeezed next to a date/time on an 80mm line.)
+6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (deliberately *not*
+   sharing a row with anything else — real invoice IDs are `DDMMYY-XXX-XXX`, ~15 chars, and wrap
+   badly when squeezed next to a second field on an 80mm line, unlike the short mockup ID a physical
+   reference receipt used), then `DATE : {dd/MM/yyyy}` and `TIME : {HH:mm}` sharing one flex row
+   (short enough to fit safely together).
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (bold 10.5pt, hanging-indent wrap, never
    shrunk to fit); `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN:
    {hsn_code}   GST: {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a
    divider. Any missing field (no manufacturer, no HSN, etc.) is silently omitted from its line.
-9. **Totals** — `SUBTOTAL` always; `DISCOUNT` only if `discountAmount > 0`; `REFUND` only if
-   `visitRefundApplied` is set; divider; bold 13pt `NET TOTAL` with `₹`; heavy (`=`) divider.
+9. **Totals** — `SUBTOTAL` and `DISCOUNT` always shown (₹0.00 discount included, matching the
+   reference receipt); `REFUND` only if `visitRefundApplied` is set (rarer, visit-specific — not a
+   routine per-bill field like discount); divider; bold 13pt `NET TOTAL` with `₹`; divider (plain
+   `-`, same weight as every other divider on the receipt — no heavier double-line style).
 10. **Footer** — centered, 7.5pt, three lines: "GOODS ONCE SOLD WILL NOT BE" / "TAKEN BACK OR
     EXCHANGED" / "SUBJECT TO HANAMKONDA JURISDICTION". No signature line.
 

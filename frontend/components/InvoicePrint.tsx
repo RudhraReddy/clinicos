@@ -59,12 +59,12 @@ function abbreviateManufacturer(name: string | null | undefined): string {
     return firstWord.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase()
 }
 
-// Dashed/solid text divider spanning the receipt width — printed as literal
+// Dashed text divider spanning the receipt width — printed as literal
 // repeated characters (not a CSS border) to match a classic receipt look.
-function Divider({ heavy = false }: { heavy?: boolean }) {
+function Divider() {
     return (
         <div style={{ whiteSpace: "nowrap", overflow: "hidden" }}>
-            {(heavy ? "=" : "-").repeat(44)}
+            {"-".repeat(44)}
         </div>
     )
 }
@@ -96,7 +96,7 @@ export function InvoicePrint({
     if (!patient || billItems.length === 0) return null
 
     const printTime = format(date, "HH:mm")
-    const printDate = format(date, "dd/MM/yy")
+    const printDate = format(date, "dd/MM/yyyy")
     // total = subtotal − discount − visitRefundApplied, so back the refund out
     // before computing the discount amount — otherwise a refund-only bill (no
     // real discount) would misreport its refund as a "discount".
@@ -138,18 +138,23 @@ export function InvoicePrint({
             {/* Patient details */}
             <div style={row}>
                 <span>NAME : {patient.name.toUpperCase()}</span>
-                {hasAge && <span style={{ whiteSpace: "nowrap" }}>AGE:{patient.age}</span>}
+                {hasAge && <span style={{ whiteSpace: "nowrap" }}>AGE : {patient.age}</span>}
             </div>
             {patient.phone_number && <div>PH   : {patient.phone_number}</div>}
             {referenceDoctor && <div>REF  : {referenceDoctor}</div>}
 
             <Divider />
 
-            {/* Invoice details — INV gets its own line since real invoice IDs
-                (DDMMYY-XXX-XXX, ~15 chars) don't fit alongside date/time. */}
-            <div>INV     : {invoiceId || "DRAFT"}</div>
-            <div>DATE    : {printDate}  {printTime}</div>
-            {paymentType && <div>PAYMENT : {paymentType.toUpperCase()}</div>}
+            {/* Invoice details. INVOICE NO and PAYMENT MODE each get their own
+                line — real invoice IDs (DDMMYY-XXX-XXX, ~15 chars) don't fit
+                alongside a second field the way a short mockup ID would.
+                DATE/TIME are short enough to safely share one row. */}
+            <div>INVOICE NO : {invoiceId || "DRAFT"}</div>
+            <div>PAYMENT MODE : {(paymentType || "CASH").toUpperCase()}</div>
+            <div style={row}>
+                <span>DATE : {printDate}</span>
+                <span style={{ whiteSpace: "nowrap" }}>TIME : {printTime}</span>
+            </div>
 
             <Divider />
 
@@ -191,17 +196,17 @@ export function InvoicePrint({
                 )
             })}
 
-            {/* Totals */}
+            {/* Totals — SUBTOTAL and DISCOUNT always shown (₹0.00 discount included),
+                matching the reference receipt; REFUND stays conditional since it's
+                a rarer, visit-specific line, not a routine per-bill field. */}
             <div style={row}>
                 <span>SUBTOTAL</span>
                 <span>{(subtotal ?? total).toFixed(2)}</span>
             </div>
-            {hasDiscount && (
-                <div style={row}>
-                    <span>DISCOUNT</span>
-                    <span>{discountAmount.toFixed(2)}</span>
-                </div>
-            )}
+            <div style={row}>
+                <span>DISCOUNT</span>
+                <span>{(hasDiscount ? discountAmount : 0).toFixed(2)}</span>
+            </div>
             {!!visitRefundApplied && (
                 <div style={row}>
                     <span>REFUND</span>
@@ -213,7 +218,7 @@ export function InvoicePrint({
                 <span>NET TOTAL</span>
                 <span>&#8377; {total.toFixed(2)}</span>
             </div>
-            <Divider heavy />
+            <Divider />
 
             {/* Footer */}
             <div style={{ textAlign: "center", fontSize: "7.5pt", lineHeight: 1.4 }}>
