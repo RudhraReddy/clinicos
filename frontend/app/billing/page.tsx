@@ -41,6 +41,8 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
 
+const HISTORY_PAGE_SIZE = 25
+
 export interface BillItem {
     item_id: string;
     item_name: string;
@@ -201,7 +203,7 @@ function BillingContent() {
                 payment_type: filterPaymentType || undefined,
                 is_walk_in: filterIsWalkIn || undefined,
                 page,
-                limit: 25,
+                limit: HISTORY_PAGE_SIZE,
             })
             setHistory(data.bills)
             setHistoryPage(data.page)
@@ -896,7 +898,7 @@ function BillingContent() {
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <p className="text-sm text-muted-foreground whitespace-nowrap">{historyTotal} total bills</p>
+                                    <p className="text-sm text-muted-foreground whitespace-nowrap">{(historyPage - 1) * HISTORY_PAGE_SIZE + history.length}/{historyTotal} total</p>
                                     <div className="flex items-center gap-2">
                                         <Button
                                             variant="outline"
