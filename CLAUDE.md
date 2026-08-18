@@ -308,9 +308,9 @@ read distinctly without competing with the item name/NET TOTAL for attention. Fu
 
 | Element | Size | Weight |
 |---|---|---|
-| Pharmacy name | 14pt | 700 |
+| Pharmacy name | 12pt | 700 |
 | Address / phone / DL | 8.5pt | 400 |
-| Body text (patient/invoice detail values, SUBTOTAL/DISCOUNT/REFUND) | 9.5pt | 400 |
+| Body text (patient/invoice detail values, SUBTOTAL and the bare discount/refund lines) | 9.5pt | 400 |
 | Field labels (via `Label`) | 9.5pt | 600 |
 | `QTY × MRP` / `AMOUNT` header | 9.5pt | 700 |
 | Item name | 10.5pt | 700 |
@@ -322,10 +322,13 @@ read distinctly without competing with the item name/NET TOTAL for attention. Fu
 ### Layout sections (top to bottom)
 
 1. **Pharmacy name** — centered, uppercase.
-2. **Pharmacy details** — centered: address line, then `PH: {phone}    DL NO: {license}`.
+2. **Pharmacy details** — address line centered; `PH: {phone}` / `DL NO: {license}` on a flex
+   `space-between` row (each pinned to its own edge, spanning the full width — not centered as one
+   block, which is what caused it to wrap awkwardly next to the clinic name above).
 3. Divider.
-4. **Patient details** — `NAME : {NAME}` and `AGE : {age}` on one flex row, then `PH   : {phone}`, then
-   `REF  : {referenceDoctor}` (only if set). `sex` is fetched but not rendered here.
+4. **Patient details** — `NAME : {NAME}` alone on its own line, then `PH : {phone}` and
+   `AGE : {age}` sharing one flex row, then `REF : {referenceDoctor}` alone (only if set). `sex` is
+   fetched but not rendered here.
 5. Divider.
 6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (deliberately *not*
    sharing a row with anything else — real invoice IDs are `DDMMYY-XXX-XXX`, ~15 chars, and wrap
@@ -337,10 +340,11 @@ read distinctly without competing with the item name/NET TOTAL for attention. Fu
    `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN: {hsn_code}   GST:
    {gst_rate}%   EXP: {MM/YY}`; then a `{qty} × {mrp}` / `{amount}` row; then a divider. Any missing
    field (no manufacturer, no HSN, etc.) is silently omitted from its line.
-9. **Totals** — `SUBTOTAL` and `DISCOUNT` always shown (₹0.00 discount included, matching the
-   reference receipt); `REFUND` only if `visitRefundApplied` is set (rarer, visit-specific — not a
-   routine per-bill field like discount); divider; `NET TOTAL` with `₹`; divider (plain `-`, same
-   weight as every other divider on the receipt — no heavier double-line style).
+9. **Totals** — `SUBTOTAL` always shown. Discount and refund are each a bare right-aligned
+   `-{amount}` line with **no label at all** (per clinic policy) and are omitted entirely — not
+   shown as zero — when not applicable: discount only appears if `discountAmount > 0`, refund only
+   if `visitRefundApplied` is set. Then a divider; `NET TOTAL` with `₹`; another divider (plain `-`,
+   same weight as every other divider on the receipt — no heavier double-line style).
 10. **Footer** — centered, three lines: "GOODS ONCE SOLD WILL NOT BE" / "TAKEN BACK OR
     EXCHANGED" / "SUBJECT TO HANAMKONDA JURISDICTION". No signature line.
 

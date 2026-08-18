@@ -123,7 +123,7 @@ export function InvoicePrint({
             <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
 
             {/* Pharmacy name */}
-            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "14pt", textTransform: "uppercase" }}>
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12pt", textTransform: "uppercase" }}>
                 {clinicName}
             </div>
 
@@ -132,22 +132,23 @@ export function InvoicePrint({
                 <div style={{ textAlign: "center", fontSize: "8.5pt" }}>{clinicAddress}</div>
             )}
             {(clinicPhone || clinicLicense) && (
-                <div style={{ textAlign: "center", fontSize: "8.5pt" }}>
-                    {clinicPhone && `PH: ${clinicPhone}`}
-                    {clinicPhone && clinicLicense && "    "}
-                    {clinicLicense && `DL NO: ${clinicLicense}`}
+                <div style={{ ...row, fontSize: "8.5pt" }}>
+                    <span>{clinicPhone && `PH: ${clinicPhone}`}</span>
+                    <span>{clinicLicense && `DL NO: ${clinicLicense}`}</span>
                 </div>
             )}
 
             <Divider />
 
-            {/* Patient details */}
-            <div style={row}>
-                <span><Label>NAME</Label> : {patient.name.toUpperCase()}</span>
-                {hasAge && <span style={{ whiteSpace: "nowrap" }}><Label>AGE</Label> : {patient.age}</span>}
-            </div>
-            {patient.phone_number && <div><Label>PH</Label>   : {patient.phone_number}</div>}
-            {referenceDoctor && <div><Label>REF</Label>  : {referenceDoctor}</div>}
+            {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone */}
+            <div><Label>NAME</Label> : {patient.name.toUpperCase()}</div>
+            {(patient.phone_number || hasAge) && (
+                <div style={row}>
+                    <span>{patient.phone_number && <><Label>PH</Label> : {patient.phone_number}</>}</span>
+                    {hasAge && <span style={{ whiteSpace: "nowrap" }}><Label>AGE</Label> : {patient.age}</span>}
+                </div>
+            )}
+            {referenceDoctor && <div><Label>REF</Label> : {referenceDoctor}</div>}
 
             <Divider />
 
@@ -202,22 +203,18 @@ export function InvoicePrint({
                 )
             })}
 
-            {/* Totals — SUBTOTAL and DISCOUNT always shown (₹0.00 discount included),
-                matching the reference receipt; REFUND stays conditional since it's
-                a rarer, visit-specific line, not a routine per-bill field. */}
+            {/* Totals — SUBTOTAL always; DISCOUNT/REFUND are bare "-amount" lines
+                with no label (per clinic policy) and are omitted entirely when
+                not applicable, rather than showing a zero. */}
             <div style={row}>
                 <span>SUBTOTAL</span>
                 <span>{(subtotal ?? total).toFixed(2)}</span>
             </div>
-            <div style={row}>
-                <span>DISCOUNT</span>
-                <span>{(hasDiscount ? discountAmount : 0).toFixed(2)}</span>
-            </div>
+            {hasDiscount && (
+                <div style={{ textAlign: "right" }}>-{discountAmount.toFixed(2)}</div>
+            )}
             {!!visitRefundApplied && (
-                <div style={row}>
-                    <span>REFUND</span>
-                    <span>{visitRefundApplied.toFixed(2)}</span>
-                </div>
+                <div style={{ textAlign: "right" }}>-{visitRefundApplied.toFixed(2)}</div>
             )}
             <Divider />
             <div style={{ ...row, fontWeight: 700, fontSize: "13pt" }}>
