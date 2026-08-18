@@ -343,13 +343,10 @@ rest of the scale changes:
    `NAME`/`PH`/`REF` pass `width={4}` to `Label` (see Typography above) so they right-pad to the
    same column width and their colons all line up vertically.
 5. Divider.
-6. **Invoice details** — `INVOICE NO` + `MODE` (shortened from "PAYMENT MODE" so it fits next to
-   the ID) share one flex row; `DATE` + `TIME` share the row below. `INVOICE NO`/`DATE` pass
-   `width={10}` to `Label` so their colons align down the left column too, across both rows, not
-   just within each one. The `INVOICE NO`/`MODE` row alone needs a smaller font (8pt vs. body's
-   9.5pt) plus `whiteSpace: "nowrap"` — a real invoice ID (`DDMMYY-XXX-XXX`, ~15 chars) plus
-   `MODE : CASH` doesn't fit at body size the way the mockup's short `AT5475` did; verified via
-   `getBoundingClientRect()` height (single line) against real invoice IDs, not just eyeballed.
+6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (a real invoice ID,
+   `DDMMYY-XXX-XXX` ~15 chars, doesn't fit alongside a second field on one row), passing
+   `width={12}` to `Label` (`PAYMENT MODE` is the longest) so their colons align with each other.
+   `DATE`/`TIME` are short enough to safely share one flex row below.
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
    a fixed 3-column CSS grid (`grid-template-columns: repeat(3, 1fr)`, **not** flex
