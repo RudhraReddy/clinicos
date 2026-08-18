@@ -78,8 +78,11 @@ const row: React.CSSProperties = {
 
 // A field label (NAME, PH, INVOICE NO, ...) rendered slightly stronger than
 // the surrounding body text so it reads as a label rather than a value.
-function Label({ children }: { children: React.ReactNode }) {
-    return <span style={{ fontWeight: 600 }}>{children}</span>
+// `width`, when given, right-pads the label with spaces (monospace, so this
+// is a real fixed-width column) so a stack of labels of different lengths
+// still lines up its colons — e.g. NAME/PH/REF all landing on the same column.
+function Label({ children, width }: { children: string; width?: number }) {
+    return <span style={{ fontWeight: 600 }}>{width ? children.padEnd(width) : children}</span>
 }
 
 export function InvoicePrint({
@@ -140,24 +143,28 @@ export function InvoicePrint({
 
             <Divider />
 
-            {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone */}
-            <div><Label>NAME</Label> : {patient.name.toUpperCase()}</div>
+            {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone.
+                NAME/PH/REF share a padded label width (4 — "NAME" is the longest) so
+                their colons all land on the same column. */}
+            <div><Label width={4}>NAME</Label> : {patient.name.toUpperCase()}</div>
             {(patient.phone_number || hasAge) && (
                 <div style={row}>
-                    <span>{patient.phone_number && <><Label>PH</Label> : {patient.phone_number}</>}</span>
+                    <span>{patient.phone_number && <><Label width={4}>PH</Label> : {patient.phone_number}</>}</span>
                     {hasAge && <span style={{ whiteSpace: "nowrap" }}><Label>AGE</Label> : {patient.age}</span>}
                 </div>
             )}
-            {referenceDoctor && <div><Label>REF</Label> : {referenceDoctor}</div>}
+            {referenceDoctor && <div><Label width={4}>REF</Label> : {referenceDoctor}</div>}
 
             <Divider />
 
             {/* Invoice details. INVOICE NO and PAYMENT MODE each get their own
                 line — real invoice IDs (DDMMYY-XXX-XXX, ~15 chars) don't fit
-                alongside a second field the way a short mockup ID would.
-                DATE/TIME are short enough to safely share one row. */}
-            <div><Label>INVOICE NO</Label> : {invoiceId || "DRAFT"}</div>
-            <div><Label>PAYMENT MODE</Label> : {(paymentType || "CASH").toUpperCase()}</div>
+                alongside a second field the way a short mockup ID would — and
+                share a padded label width (12 — "PAYMENT MODE" is the longest)
+                so their colons align. DATE/TIME are short enough to safely
+                share one row. */}
+            <div><Label width={12}>INVOICE NO</Label> : {invoiceId || "DRAFT"}</div>
+            <div><Label width={12}>PAYMENT MODE</Label> : {(paymentType || "CASH").toUpperCase()}</div>
             <div style={row}>
                 <span><Label>DATE</Label> : {printDate}</span>
                 <span style={{ whiteSpace: "nowrap" }}><Label>TIME</Label> : {printTime}</span>

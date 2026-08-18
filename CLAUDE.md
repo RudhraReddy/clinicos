@@ -304,7 +304,12 @@ Base body text is 9.5pt/400 (`line-height: 1.2` throughout — tight spacing is 
 the compact receipt look, not just small font sizes). A `Label` helper component renders field labels
 (`NAME`, `PH`, `REF`, `AGE`, `INVOICE NO`, `PAYMENT MODE`, `DATE`, `TIME`) at `font-weight: 600` —
 slightly stronger than the 400-weight value that follows, but not as heavy as a true bold — so labels
-read distinctly without competing with the item name/NET TOTAL for attention. Full size/weight table.
+read distinctly without competing with the item name/NET TOTAL for attention. `Label` also takes an
+optional `width` prop that right-pads the label text with spaces (`children.padEnd(width)`) — since
+the font is monospace, this is a real fixed-width column, so a stack of labels of different lengths
+(e.g. `NAME`/`PH`/`REF`, or `INVOICE NO`/`PAYMENT MODE`) still lands all its colons on the same
+column. Only pass `width` within a group of labels that are actually stacked vertically in the same
+column — `AGE`/`DATE`/`TIME` share a row with something else and don't need it. Full size/weight table.
 Two rows are deliberately smaller than the rest — not for visual hierarchy, but because the pharmacy
 name and the `PH`/`DL NO` line are the two lines most likely to overflow onto a second line at
 real (long) clinic data lengths on a 74mm line; keep them at these sizes (or smaller) even if the
@@ -333,13 +338,15 @@ rest of the scale changes:
 3. Divider.
 4. **Patient details** — `NAME : {NAME}` alone on its own line, then `PH : {phone}` and
    `AGE : {age}` sharing one flex row, then `REF : {referenceDoctor}` alone (only if set). `sex` is
-   fetched but not rendered here.
+   fetched but not rendered here. `NAME`/`PH`/`REF` pass `width={4}` to `Label` (see Typography above)
+   so they right-pad to the same column width and their colons all line up vertically.
 5. Divider.
 6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (deliberately *not*
    sharing a row with anything else — real invoice IDs are `DDMMYY-XXX-XXX`, ~15 chars, and wrap
    badly when squeezed next to a second field on an 80mm line, unlike the short mockup ID a physical
-   reference receipt used), then `DATE : {dd/MM/yyyy}` and `TIME : {HH:mm}` sharing one flex row
-   (short enough to fit safely together).
+   reference receipt used — these two also pass `width={12}` to `Label` so their colons align with
+   each other), then `DATE : {dd/MM/yyyy}` and `TIME : {HH:mm}` sharing one flex row (short enough
+   to fit safely together).
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
    `MFG: {abbrev, ≤4 letters}   PACK: {pack_size}   BATCH: {batch_number}`; `HSN: {hsn_code}   GST:
