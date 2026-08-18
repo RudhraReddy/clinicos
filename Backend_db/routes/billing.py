@@ -34,9 +34,15 @@ def create_bill():
     if not items_used:
         return jsonify({'error': 'No items in bill'}), 400
 
-    payment_type = (data.get('payment_type') or 'CASH').strip().upper()
-    if payment_type not in ('CASH', 'UPI'):
-        return jsonify({'error': "payment_type must be 'CASH' or 'UPI'"}), 400
+    try:
+        cash_amount = float(data.get('cash_amount', 0) or 0)
+        upi_amount = float(data.get('upi_amount', 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'cash_amount and upi_amount must be numbers'}), 400
+    if cash_amount < 0 or upi_amount < 0:
+        return jsonify({'error': 'cash_amount and upi_amount cannot be negative'}), 400
+    # Derived display label — real breakdown lives in cash_amount/upi_amount.
+    payment_type = 'CASH' if upi_amount == 0 else ('UPI' if cash_amount == 0 else 'SPLIT')
 
     discount_type = data.get('discount_type')
     discount_value = data.get('discount_value')
@@ -105,6 +111,8 @@ def create_bill():
         walk_in_sex=walk_in_sex,
         visit_id=visit_id,
         payment_type=payment_type,
+        cash_amount=cash_amount,
+        upi_amount=upi_amount,
         total_amount=0,
         location_id=resolved_location_id,
         created_by_user_id=g.current_user.get('user_id')
@@ -249,6 +257,12 @@ def create_bill():
         if applied > 0:
             refund_applied = applied
 
+    # cash_amount/upi_amount are what was actually collected — must match the
+    # bill's real final total (after discount and any folded-in refund), not
+    # what was true before those were applied. Small tolerance for rounding.
+    if abs(cash_amount + upi_amount - final_total) > 1:
+        return jsonify({'error': f'Cash + UPI (₹{cash_amount + upi_amount:.2f}) must add up to the bill total (₹{final_total:.2f})'}), 400
+
     new_bill.subtotal_amount = subtotal_amount
     new_bill.discount_type = discount_type
     new_bill.discount_value = discount_value
@@ -308,7 +322,13 @@ def get_billing_history():
             return jsonify({'error': 'Invalid date_to format, expected YYYY-MM-DD'}), 400
 
     if payment_type:
-        query = query.filter(Bill.payment_type == payment_type.upper())
+        pt = payment_type.upper()
+        if pt == 'CASH':
+            query = query.filter(Bill.cash_amount > 0)
+        elif pt == 'UPI':
+            query = query.filter(Bill.upi_amount > 0)
+        elif pt == 'SPLIT':
+            query = query.filter(Bill.cash_amount > 0, Bill.upi_amount > 0)
 
     if patient_id:
         query = query.filter(Bill.patient_id == patient_id)
@@ -343,6 +363,8 @@ def get_billing_history():
             'is_walk_in':   b.patient_id is None,
             'total_amount': float(b.total_amount),
             'payment_type': b.payment_type,
+            'cash_amount':  float(b.cash_amount) if b.cash_amount is not None else 0,
+            'upi_amount':   float(b.upi_amount) if b.upi_amount is not None else 0,
             'visit_id':     b.visit_id,
         })
 
@@ -365,7 +387,9 @@ def get_patient_billing_history(patient_id):
             'visit_id': b.visit_id,
             'date': b.created_at.strftime('%Y-%m-%d %H:%M'),
             'total_amount': float(b.total_amount),
-            'payment_type': b.payment_type
+            'payment_type': b.payment_type,
+            'cash_amount': float(b.cash_amount) if b.cash_amount is not None else 0,
+            'upi_amount': float(b.upi_amount) if b.upi_amount is not None else 0,
         })
     return jsonify(results), 200
 
@@ -417,6 +441,8 @@ def get_bill_details(invoice_id):
         },
         'is_walk_in': bill.patient_id is None,
         'payment_type': bill.payment_type,
+        'cash_amount': float(bill.cash_amount) if bill.cash_amount is not None else 0,
+        'upi_amount': float(bill.upi_amount) if bill.upi_amount is not None else 0,
         'subtotal_amount': float(bill.subtotal_amount) if bill.subtotal_amount is not None else float(bill.total_amount),
         'discount_type': bill.discount_type,
         'discount_value': float(bill.discount_value) if bill.discount_value is not None else None,

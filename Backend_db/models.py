@@ -189,7 +189,12 @@ class Bill(db.Model):
     discount_type = db.Column(db.String(10), nullable=True) # 'percent' | 'flat' | null
     discount_value = db.Column(db.Numeric(10, 2), nullable=True) # raw entered number (e.g. 10 for 10%, or 50 for a flat ₹50)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False) # final payable amount (post-discount, post-refund)
-    payment_type = db.Column(db.String(50)) # CASH, UPI — legacy rows may still hold CARD
+    # Derived display label — 'CASH' if upi_amount==0, 'UPI' if cash_amount==0,
+    # else 'SPLIT'. Legacy rows may still hold 'CARD'. Anything that needs the
+    # real cash/UPI breakdown should read cash_amount/upi_amount directly.
+    payment_type = db.Column(db.String(50))
+    cash_amount = db.Column(db.Numeric(10, 2), nullable=True) # portion of total_amount paid via Billing Cash
+    upi_amount = db.Column(db.Numeric(10, 2), nullable=True) # portion of total_amount paid via Billing UPI
     # How much of a refund was folded into this bill's total at creation time
     # — only ever set on a visit's first bill (see routes/billing.py).
     # total_amount already has this subtracted; this column exists purely so

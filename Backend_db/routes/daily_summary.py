@@ -110,12 +110,21 @@ def get_daily_summary():
 
         # One entry per bill on this visit, so the row can show "200/300/400"
         # instead of only ever the single bill the old code assumed existed.
+        # A split bill (cash_amount and upi_amount both > 0) contributes up to
+        # two entries here instead of one, so the existing per-row badge
+        # rendering (already a loop over this array) shows both portions with
+        # no frontend change needed.
         billing_fees = []
         for bill in visit_bills:
-            amount = float(bill.total_amount)
-            mode = _norm_mode(bill.payment_type)
-            billing_fees.append({'amount': amount, 'mode': mode})
-            add('billing_fee', mode, amount)
+            cash_portion = float(bill.cash_amount or 0)
+            upi_portion = float(bill.upi_amount or 0)
+            mode = _norm_mode(bill.payment_type)  # still used for discount/refund info-bucket tagging below
+            if cash_portion:
+                billing_fees.append({'amount': cash_portion, 'mode': 'cash'})
+            if upi_portion:
+                billing_fees.append({'amount': upi_portion, 'mode': 'upi'})
+            add('billing_fee', 'cash', cash_portion)
+            add('billing_fee', 'upi', upi_portion)
             if bill.subtotal_amount is not None:
                 # visit_refund_applied is already netted out of total_amount too —
                 # back it out here so 'discount' only ever reflects an actual
@@ -155,8 +164,14 @@ def get_daily_summary():
     walkin_bills = walkin_q.all()
 
     for b in walkin_bills:
-        mode = _norm_mode(b.payment_type)
-        amount = float(b.total_amount)
+        mode = _norm_mode(b.payment_type)  # still used for discount info-bucket tagging below
+        cash_portion = float(b.cash_amount or 0)
+        upi_portion = float(b.upi_amount or 0)
+        billing_fees = []
+        if cash_portion:
+            billing_fees.append({'amount': cash_portion, 'mode': 'cash'})
+        if upi_portion:
+            billing_fees.append({'amount': upi_portion, 'mode': 'upi'})
         rows.append({
             'type': 'walkin',
             'invoice_id': b.invoice_id,
@@ -167,9 +182,10 @@ def get_daily_summary():
             'time': b.created_at.strftime('%H:%M') if b.created_at else '00:00',
             'visit_fee': None,
             'visit_fee_mode': None,
-            'billing_fees': [{'amount': amount, 'mode': mode}],
+            'billing_fees': billing_fees,
         })
-        add('billing_fee', mode, amount)
+        add('billing_fee', 'cash', cash_portion)
+        add('billing_fee', 'upi', upi_portion)
         if b.subtotal_amount is not None:
             discount_amount = float(b.subtotal_amount) - float(b.total_amount)
             add_info('discount', mode, discount_amount)

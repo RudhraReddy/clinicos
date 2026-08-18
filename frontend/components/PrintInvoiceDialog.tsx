@@ -46,6 +46,8 @@ interface PrintInvoiceData {
     discountValue: number | null
     visitRefundApplied: number | null
     paymentType: string | null
+    cashAmount: number | null
+    upiAmount: number | null
     date: Date
 }
 
@@ -137,6 +139,8 @@ export function PrintInvoiceDialog({
                     discountValue: data.discount_value ?? null,
                     visitRefundApplied: data.visit_refund_applied ?? null,
                     paymentType: data.payment_type ?? null,
+                    cashAmount: data.cash_amount ?? null,
+                    upiAmount: data.upi_amount ?? null,
                     date: new Date(data.created_at),
                 })
             } catch (e) {
@@ -188,6 +192,8 @@ export function PrintInvoiceDialog({
                             discountValue={invoiceData.discountValue}
                             visitRefundApplied={invoiceData.visitRefundApplied}
                             paymentType={invoiceData.paymentType}
+                            cashAmount={invoiceData.cashAmount}
+                            upiAmount={invoiceData.upiAmount}
                             date={invoiceData.date}
                             className="text-black"
                         />

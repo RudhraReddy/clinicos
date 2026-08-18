@@ -34,6 +34,8 @@ interface InvoicePrintProps {
     // Amount of a pending visit-fee refund folded into this bill's total.
     visitRefundApplied?: number | null
     paymentType?: string | null
+    cashAmount?: number | null
+    upiAmount?: number | null
     date?: Date
     referenceDoctor?: string
     className?: string
@@ -100,6 +102,8 @@ export function InvoicePrint({
     discountType = null,
     visitRefundApplied = null,
     paymentType = null,
+    cashAmount = null,
+    upiAmount = null,
     date = new Date(),
     referenceDoctor,
     className,
@@ -128,7 +132,7 @@ export function InvoicePrint({
             <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
 
             {/* Pharmacy name */}
-            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12pt", textTransform: "uppercase" }}>
+            <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", textTransform: "uppercase" }}>
                 {clinicName}
             </div>
 
@@ -168,6 +172,12 @@ export function InvoicePrint({
                 align. DATE/TIME are short enough to safely share one row. */}
             <div><Label width={12}>INVOICE NO</Label> : {invoiceId || "DRAFT"}</div>
             <div><Label width={12}>PAYMENT MODE</Label> : {(paymentType || "CASH").toUpperCase()}</div>
+            {paymentType === "SPLIT" && (
+                <div style={row}>
+                    <span>CASH : {(cashAmount ?? 0).toFixed(2)}</span>
+                    <span>UPI : {(upiAmount ?? 0).toFixed(2)}</span>
+                </div>
+            )}
             <div style={row}>
                 <span><Label>DATE</Label> : {printDate}</span>
                 <span style={{ whiteSpace: "nowrap" }}><Label>TIME</Label> : {printTime}</span>

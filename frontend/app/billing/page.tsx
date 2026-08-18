@@ -111,7 +111,8 @@ function BillingContent() {
     const [submitting, setSubmitting] = useState(false)
 
     // Payment type
-    const [paymentType, setPaymentType] = useState<"CASH" | "UPI">("CASH")
+    const [cashAmount, setCashAmount] = useState("")
+    const [upiAmount, setUpiAmount] = useState("")
     const [discountType, setDiscountType] = useState<"percent" | "flat">("percent")
     const [discountValue, setDiscountValue] = useState("")
 
@@ -330,6 +331,10 @@ function BillingContent() {
             toast.error(isAdminOrDoctor ? "Select a clinic for this bill" : "No clinic assigned to your account — contact an admin")
             return
         }
+        if (!paymentMatches) {
+            toast.error(`Cash + UPI (₹${(parsedCashAmount + parsedUpiAmount).toFixed(2)}) must add up to the total (₹${finalTotal.toFixed(2)})`)
+            return
+        }
 
         setSubmitting(true)
         try {
@@ -341,7 +346,8 @@ function BillingContent() {
                 walk_in_sex: walkInMode && walkInSex ? walkInSex : undefined,
                 visit_id: walkInMode ? undefined : (visitId || undefined),
                 location_id: resolvedLocationId,
-                payment_type: paymentType,
+                cash_amount: parsedCashAmount,
+                upi_amount: parsedUpiAmount,
                 discount_type: parsedDiscountValue > 0 ? discountType : undefined,
                 discount_value: parsedDiscountValue > 0 ? parsedDiscountValue : undefined,
                 refund: refundLine ? { amount: refundLine.amount, mode: refundLine.mode } : undefined,
@@ -364,6 +370,8 @@ function BillingContent() {
             setBillItems([])
             setDiscountValue("")
             setRefundLine(null)
+            setCashAmount("")
+            setUpiAmount("")
             if (walkInMode) {
                 setWalkInMode(false)
                 setWalkInName("")
@@ -421,6 +429,15 @@ function BillingContent() {
     // deduction (see routes/billing.py create_bill).
     const refundToApply = refundLine ? Math.min(refundLine.amount, preRefundTotal) : 0
     const finalTotal = preRefundTotal - refundToApply
+
+    // Split payment — Cash + UPI must add up to finalTotal, within a small
+    // rounding tolerance (mirrors the same ±₹1 check server-side).
+    const parsedCashAmount = parseFloat(cashAmount || '0') || 0
+    const parsedUpiAmount = parseFloat(upiAmount || '0') || 0
+    const paymentRemaining = finalTotal - parsedCashAmount - parsedUpiAmount
+    const paymentMatches = Math.abs(paymentRemaining) <= 1
+    const fillCashFull = () => { setCashAmount(finalTotal.toFixed(2)); setUpiAmount('0') }
+    const fillUpiFull = () => { setUpiAmount(finalTotal.toFixed(2)); setCashAmount('0') }
 
     // Clinic resolution — mirrors the backend's own resolution order exactly, so the
     // UI never shows/enables something the server would reject.
@@ -558,6 +575,8 @@ function BillingContent() {
                                             </Select>
                                         )}
                                     </div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
                                     <Button
                                         type="button"
                                         variant={walkInMode ? "default" : "outline"}
@@ -575,61 +594,12 @@ function BillingContent() {
                                         Walk-in Bill
                                     </Button>
                                 </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <Select value={paymentType} onValueChange={(val) => setPaymentType(val as "CASH" | "UPI")}>
-                                        <SelectTrigger id="payment-type" className="w-[140px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CASH">Cash</SelectItem>
-                                            <SelectItem value="UPI">UPI</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Button
-                                        size="lg"
-                                        disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty || !resolvedLocationId}
-                                        onClick={handleCreateBill}
-                                    >
-                                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Create Bill
-                                    </Button>
-                                </div>
                             </div>
 
                             {/* Items */}
                             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                                 <div className="flex items-center justify-between mb-3 shrink-0 flex-wrap gap-2">
                                     <h3 className="font-semibold text-base">Items</h3>
-                                    {canAddRefund && (
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                type="number"
-                                                placeholder="Refund value"
-                                                className="w-32 h-8"
-                                                value={refundDraftAmount}
-                                                onChange={(e) => setRefundDraftAmount(e.target.value)}
-                                            />
-                                            <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
-                                                <SelectTrigger className="w-32 h-8">
-                                                    <SelectValue placeholder="Settle via..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="billing_upi">Billing UPI</SelectItem>
-                                                    <SelectItem value="cash">Cash</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8"
-                                                disabled={!(parseFloat(refundDraftAmount || '0') > 0) || !refundDraftMode}
-                                                onClick={addRefundLine}
-                                            >
-                                                Add Refund
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="flex-1 overflow-auto border rounded-md min-h-0">
                                     <Table>
@@ -791,7 +761,88 @@ function BillingContent() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end mt-4 shrink-0">
+                            {/* Refund | Payment | Total — three columns at the bottom of the card */}
+                            <div className="flex flex-col md:flex-row items-stretch justify-between gap-6 mt-4 shrink-0">
+                                {/* Left: Refund (relocated from the Items header) */}
+                                <div className="flex-1 min-w-[220px]">
+                                    {canAddRefund && (
+                                        <div className="space-y-1.5">
+                                            <span className="text-sm text-muted-foreground">Refund</span>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Refund value"
+                                                    className="w-28 h-8"
+                                                    value={refundDraftAmount}
+                                                    onChange={(e) => setRefundDraftAmount(e.target.value)}
+                                                />
+                                                <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
+                                                    <SelectTrigger className="w-32 h-8">
+                                                        <SelectValue placeholder="Settle via..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="billing_upi">Billing UPI</SelectItem>
+                                                        <SelectItem value="cash">Cash</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    disabled={!(parseFloat(refundDraftAmount || '0') > 0) || !refundDraftMode}
+                                                    onClick={addRefundLine}
+                                                >
+                                                    Add Refund
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Center: split payment entry — Cash + UPI must add up to
+                                    the total (±₹1 rounding tolerance); "Full amount" covers
+                                    the single-mode case without a separate toggle. */}
+                                <div className="flex-1 min-w-[240px] space-y-1.5">
+                                    <span className="text-sm text-muted-foreground">Payment</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm w-9 shrink-0">Cash</span>
+                                        <span className="text-sm text-muted-foreground">₹</span>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            placeholder="0"
+                                            className="w-24 h-8"
+                                            value={cashAmount}
+                                            onChange={(e) => setCashAmount(e.target.value)}
+                                        />
+                                        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={fillCashFull}>
+                                            Full amount
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm w-9 shrink-0">UPI</span>
+                                        <span className="text-sm text-muted-foreground">₹</span>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            placeholder="0"
+                                            className="w-24 h-8"
+                                            value={upiAmount}
+                                            onChange={(e) => setUpiAmount(e.target.value)}
+                                        />
+                                        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={fillUpiFull}>
+                                            Full amount
+                                        </Button>
+                                    </div>
+                                    {(parsedCashAmount > 0 || parsedUpiAmount > 0) && (
+                                        <div className={cn("text-xs", paymentMatches ? "text-green-600" : "text-muted-foreground")}>
+                                            {paymentMatches ? "✓ Matches total" : `Remaining: ₹${paymentRemaining.toFixed(2)}`}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right: Discount + Total + Create Bill */}
                                 <div className="flex flex-col items-end gap-2 min-w-[260px]">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground">Discount</span>
@@ -834,6 +885,14 @@ function BillingContent() {
                                     <span className="text-lg font-bold">
                                         Total: ₹{finalTotal.toFixed(2)}
                                     </span>
+                                    <Button
+                                        size="lg"
+                                        disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty || !resolvedLocationId || !paymentMatches}
+                                        onClick={handleCreateBill}
+                                    >
+                                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Bill
+                                    </Button>
                                 </div>
                             </div>
                         </CardContent>
@@ -866,6 +925,7 @@ function BillingContent() {
                                                 <SelectItem value="ALL">All</SelectItem>
                                                 <SelectItem value="CASH">Cash</SelectItem>
                                                 <SelectItem value="UPI">UPI</SelectItem>
+                                                <SelectItem value="SPLIT">Split</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

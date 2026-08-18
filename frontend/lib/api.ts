@@ -139,6 +139,8 @@ export interface BillingHistoryEntry {
     is_walk_in?: boolean;
     total_amount: number;
     payment_type: string;
+    cash_amount: number;
+    upi_amount: number;
     visit_id?: string;
 }
 

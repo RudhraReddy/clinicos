@@ -1,7 +1,7 @@
 # Split Payment (Cash + UPI) — Design
 
 Date: 2026-08-18
-Status: Draft — pending review
+Status: Implemented
 
 ## Problem
 
@@ -156,12 +156,25 @@ purely an informational annotation.
 
 ## Open decisions for review
 
-1. **Legacy `CARD` / `NULL` `payment_type` rows backfill to `cash_amount =
-   total_amount`** (see Migration) — a judgment call since there's no real
-   cash/UPI split to recover for them; confirm this default is fine.
-2. **±₹1 tolerance**, both client- and server-side — confirm the number
-   itself (not just that a tolerance should exist).
-3. **Discount/refund info-bucket tagging on a split bill falls through to
-   "other" (untagged)** rather than being split proportionally between
-   cash/UPI — confirm this is acceptable for what's an informational
-   annotation only, not money the Total actually depends on.
+All three implemented as recommended, no pushback received:
+
+1. Legacy `CARD`/`NULL` `payment_type` rows backfill to `cash_amount = total_amount`.
+2. ±₹1 tolerance, enforced both client-side (Create Bill's disabled state) and
+   server-side (`routes/billing.py create_bill`).
+3. Discount/refund info-bucket tagging on a split bill falls through to
+   `_norm_mode`'s `'other'` (untagged in Daily Summary) rather than being
+   split proportionally.
+
+## Verification
+
+Implemented and verified end-to-end (2026-08-18): migration backfilled
+existing `CASH`/`UPI` rows correctly (checked via direct query); a real
+split bill created through the Billing page UI (Cash ₹30 + UPI ₹30.94 on a
+₹60.94 total) showed the "✓ Matches total" hint, enabled Create Bill, saved
+as `payment_type: 'SPLIT'`, and printed `PAYMENT MODE : SPLIT` /
+`CASH : 30.00   UPI : 30.94` on the invoice; `GET /billing/history`'s
+`CASH`/`UPI`/`SPLIT` filters all matched correctly against a split bill
+created via direct API call; Daily Summary correctly split the bill's
+`billing_fee` bucket across `cash`/`upi` and produced two `billing_fees`
+entries for the row; the ±₹1 tolerance was confirmed to accept a ₹0.94
+mismatch and reject a ₹5 mismatch with a clear error message.

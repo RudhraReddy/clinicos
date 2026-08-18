@@ -101,6 +101,20 @@ def _apply_migrations(db):
         # financial reads this column for old visits). Both idempotent.
         "UPDATE visit_refunds SET mode = 'cash' WHERE mode IN ('visit_cash', 'billing_cash')",
         "UPDATE visits SET refund_mode = 'billing_upi' WHERE refund_mode = 'apply_to_bill'",
+        # 2026-08-18: split payment (Cash + UPI on one bill) — payment_type
+        # becomes a derived display label; cash_amount/upi_amount hold the
+        # real breakdown. Backfill existing rows from their old single-mode
+        # payment_type (idempotent: only touches rows where both are still
+        # NULL, i.e. runs exactly once). 'UPI' rows backfill to upi_amount;
+        # everything else ('CASH', legacy 'CARD', or NULL) backfills to
+        # cash_amount — a judgment call for the ambiguous legacy CARD rows,
+        # since there's no real cash/UPI split to recover for those.
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS cash_amount NUMERIC(10, 2)",
+        "ALTER TABLE bills ADD COLUMN IF NOT EXISTS upi_amount NUMERIC(10, 2)",
+        "UPDATE bills SET cash_amount = 0, upi_amount = total_amount "
+        "WHERE cash_amount IS NULL AND upi_amount IS NULL AND payment_type = 'UPI'",
+        "UPDATE bills SET cash_amount = total_amount, upi_amount = 0 "
+        "WHERE cash_amount IS NULL AND upi_amount IS NULL AND COALESCE(payment_type, 'CASH') != 'UPI'",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

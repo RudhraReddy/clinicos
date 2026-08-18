@@ -176,6 +176,8 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 
 **FIFO Billing:** When creating a bill, batches are consumed oldest-expiry-first. `BillItem` stores a snapshot of product data at sale time (not a live FK to price).
 
+**Split payment (Billing Cash + Billing UPI):** `Bill.cash_amount`/`Bill.upi_amount` (both `Numeric(10,2)`) hold the real cash/UPI breakdown of a bill's payment — a bill no longer has to be paid entirely in one mode. `Bill.payment_type` is now a **derived display label** (`'CASH'` if `upi_amount == 0`, `'UPI'` if `cash_amount == 0`, else `'SPLIT'`) rather than something the frontend picks; anything needing the real breakdown reads the two amount columns directly, not `payment_type`. `POST /api/billing` takes `cash_amount`/`upi_amount` in the payload (not `payment_type`) and validates their sum is within **±₹1** of the bill's final total (post-discount, post-refund) — a small tolerance for rounding, matching the same check the Billing page UI runs client-side to gate the Create Bill button. `GET /api/billing/history`'s `payment_type` filter matches on `cash_amount > 0` / `upi_amount > 0` (so a split bill shows under both `CASH` and `UPI` individually — correct behavior for "show me everything with cash in it," not a bug) plus a `SPLIT` option (`cash_amount > 0 AND upi_amount > 0`). Daily Summary attributes a bill's `billing_fee` bucket by calling `add('billing_fee', 'cash', ...)`/`add('billing_fee', 'upi', ...)` separately from `cash_amount`/`upi_amount`, rather than inferring one mode for the bill's whole amount — a split bill contributes up to two entries to a row's `billing_fees` list instead of one. `InvoicePrint.tsx` prints an extra `CASH : ₹X   UPI : ₹Y` line under `PAYMENT MODE : SPLIT` when applicable. Design doc: `docs/superpowers/specs/2026-08-18-split-payment-design.md`.
+
 **Visit lifecycle:** `in_progress` → `done` → bill optionally created (sets `visit.invoice_id`). Payment status (`full`/`partial`/`unpaid`) tracked on the visit.
 
 **QR Mobile Upload:** Desktop creates session → mobile opens `/connect/[sessionId]` and uploads images → desktop polls and finalizes. Files move from temp dir to permanent storage on finalize.
@@ -291,7 +293,9 @@ interface InvoicePrintProps {
   subtotal?: number
   discountType?: "percent" | "flat" | null
   visitRefundApplied?: number | null
-  paymentType?: string | null   // 'CASH' | 'UPI', from Bill.payment_type
+  paymentType?: string | null   // 'CASH' | 'UPI' | 'SPLIT', from Bill.payment_type
+  cashAmount?: number | null    // from Bill.cash_amount, printed when paymentType is 'SPLIT'
+  upiAmount?: number | null     // from Bill.upi_amount, printed when paymentType is 'SPLIT'
   date?: Date
   referenceDoctor?: string      // clinic-wide setting from useSettings(), not per-bill
   className?: string            // applied to outer wrapper only, for dialog preview styling
@@ -317,7 +321,7 @@ rest of the scale changes:
 
 | Element | Size | Weight |
 |---|---|---|
-| Pharmacy name | 12pt | 700 |
+| Pharmacy name | 12.5pt | 700 |
 | Address | 8.5pt | 400 |
 | Phone / DL NO line | 7pt, `white-space: nowrap` | 400 |
 | Body text (patient/invoice detail values, SUBTOTAL and the bare discount/refund lines) | 9.5pt | 400 |
@@ -346,7 +350,8 @@ rest of the scale changes:
 6. **Invoice details** — `INVOICE NO` and `PAYMENT MODE` each on their own line (a real invoice ID,
    `DDMMYY-XXX-XXX` ~15 chars, doesn't fit alongside a second field on one row), passing
    `width={12}` to `Label` (`PAYMENT MODE` is the longest) so their colons align with each other.
-   `DATE`/`TIME` are short enough to safely share one flex row below.
+   When `paymentType === "SPLIT"`, one more row prints below: `CASH : ₹X   UPI : ₹Y`. `DATE`/`TIME`
+   are short enough to safely share one flex row below.
 7. **Price header**, once — `QTY × MRP` / `AMOUNT` — then a divider.
 8. **Items**, one block per line item: `{n}. {ITEM NAME}` (hanging-indent wrap, never shrunk to fit);
    a flex row (`flexWrap: "wrap"`, `columnGap: 14px`, **not** `space-between`, **not** a fixed
@@ -398,6 +403,18 @@ or hardcoded strings.
 **Planned fix:** Add a `ClinicSettings` table (one row), `GET /api/settings` + `PATCH /api/settings` endpoints, a `ClinicSettingsContext` in the frontend that fetches once on mount, and update both call sites to read from context.
 
 ## Recent Changes / Notes
+
+- **Split Payment + Billing Page Layout (2026-08-18):** A bill can now be paid Cash + UPI split
+  across a single transaction instead of always exactly one mode — see `Bill.cash_amount`/
+  `upi_amount` under Key Business Logic above for the full data-model/API/Daily-Summary/invoice
+  breakdown. The Billing page's "New Bill" tab was restructured to match: the top row's Payment
+  Type (Cash/UPI) selector is gone and **Create Bill** moved out of the top row entirely — **Walk-in
+  Bill** now sits top-right in its old spot. The bottom of the card is three columns: **Refund**
+  (left, relocated from the Items-header area, same "Add Refund" control as before) | **Payment**
+  (center, new — Cash ₹ / UPI ₹ rows, each with a "Full amount" quick-fill button covering the
+  single-mode case, plus a live "Remaining: ₹X" / "✓ Matches total" hint) | **Discount + Total +
+  Create Bill** (right, Create Bill moved here, disabled until Cash+UPI is within ±₹1 of the total).
+  Design doc: `docs/superpowers/specs/2026-08-18-split-payment-design.md`.
 
 - **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
   browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons
