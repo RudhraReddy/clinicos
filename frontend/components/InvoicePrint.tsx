@@ -185,15 +185,16 @@ export function InvoicePrint({
             {/* Items */}
             {billItems.map((item, idx) => {
                 const mfg = abbreviateManufacturer(item.manufacturer)
-                const mfgText = mfg ? `MFG: ${mfg}` : null
-                const packText = item.pack_size ? `PACK: ${item.pack_size}` : null
-                const batchText = item.batch_number ? `BATCH: ${item.batch_number}` : null
-                const hasLine1 = !!(mfgText || packText || batchText)
-
-                const hsnText = item.hsn_code ? `HSN: ${item.hsn_code}` : null
-                const gstText = item.gst_rate ? `GST: ${item.gst_rate}%` : null
-                const expText = item.expiry_date ? `EXP: ${formatExpiry(item.expiry_date)}` : null
-                const hasLine2 = !!(hsnText || gstText || expText)
+                const detailLine1 = [
+                    mfg && `MFG: ${mfg}`,
+                    item.pack_size && `PACK: ${item.pack_size}`,
+                    item.batch_number && `BATCH: ${item.batch_number}`,
+                ].filter(Boolean)
+                const detailLine2 = [
+                    item.hsn_code && `HSN: ${item.hsn_code}`,
+                    item.gst_rate ? `GST: ${item.gst_rate}%` : null,
+                    item.expiry_date && `EXP: ${formatExpiry(item.expiry_date)}`,
+                ].filter(Boolean)
 
                 const amount = item.qty * item.mrp
 
@@ -202,25 +203,20 @@ export function InvoicePrint({
                         <div style={{ fontWeight: 700, fontSize: "10.5pt", paddingLeft: "1.4em", textIndent: "-1.4em", wordBreak: "break-word" }}>
                             {idx + 1}. {item.item_name.toUpperCase()}
                         </div>
-                        {/* Fixed 3-column grid, not flex space-between — each field
-                            always lands in the same column (MFG/HSN in column 1,
-                            PACK/GST in column 2, BATCH/EXP in column 3) regardless of
-                            how long any single value is, so the two rows' labels line
-                            up with each other. space-between would instead anchor the
-                            *last* item to the row's end, which follows each row's own
-                            value lengths and misaligns the two rows against each other. */}
-                        {hasLine1 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "2px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
-                                <span>{mfgText}</span>
-                                <span>{packText}</span>
-                                <span>{batchText}</span>
+                        {/* Only present fields are rendered — a missing field (no
+                            manufacturer, no HSN, etc.) is simply absent from the row
+                            rather than leaving an empty reserved column of blank
+                            space. This means the two rows won't always column-align
+                            with each other when they have different fields present,
+                            but that's the trade-off for never showing dead space. */}
+                        {detailLine1.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
+                                {detailLine1.map((f, i) => <span key={i}>{f}</span>)}
                             </div>
                         )}
-                        {hasLine2 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: "2px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
-                                <span>{hsnText}</span>
-                                <span>{gstText}</span>
-                                <span>{expText}</span>
+                        {detailLine2.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", fontSize: "7.5pt", wordBreak: "keep-all", overflowWrap: "normal" }}>
+                                {detailLine2.map((f, i) => <span key={i}>{f}</span>)}
                             </div>
                         )}
                         <div style={{ ...row, fontSize: "9.5pt", fontWeight: 500 }}>
