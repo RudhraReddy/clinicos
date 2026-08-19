@@ -443,10 +443,18 @@ or hardcoded strings.
   block stays visible once staged (`canShowRefundBlock`, not gated on `!refundLine`) so the amount/
   pending/mode remain editable — the bill-items-table refund row dropped its `"+₹X paid out directly
   via {mode}"` explainer text since that detail now lives permanently in the still-visible block
-  instead. Note: `refund.amount` must still be a whole number of rupees server-side (pre-existing
-  `routes/billing.py` validation, unchanged) — a fractional `preRefundTotal` (e.g. from GST-inclusive
-  item pricing) plus a fractional pending amount can trip this; surfaced today as a toast error on
-  Create Bill, same as any other rejected payload.
+  instead. `refund.amount` must still be a whole number of rupees server-side (pre-existing
+  `routes/billing.py` validation, unchanged) — a fractional `preRefundTotal` (e.g. GST-inclusive item
+  pricing) routinely produces a fractional pending amount, so `handleCreateBill` rounds down *only*
+  the pending/payout portion at submission (`preRefundTotal + Math.floor(refundLine.amount -
+  preRefundTotal)`) — the applied portion (bill minus refund) is never touched — then runs the sum
+  through `Math.round(v*100)/100` to strip binary floating-point noise from the item-price arithmetic
+  (e.g. `19.213*15` landing a few `1e-13` off a value that's mathematically whole), which would
+  otherwise still fail the backend's exact-integer check. Known remaining gap: `refundLine.amount` (the
+  staged total) is only recomputed when Add to bill/Submit refund is clicked — if the bill changes
+  again afterward without re-clicking either, the *displayed* pending amount live-updates (per the
+  `useEffect` above) but the underlying staged total doesn't, so Create Bill can submit a stale figure;
+  not yet fixed.
 
 - **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
   browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons
