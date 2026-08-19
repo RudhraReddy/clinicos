@@ -420,43 +420,40 @@ or hardcoded strings.
   is within ±₹1 of the total). Design doc: `docs/superpowers/specs/2026-08-18-split-payment-design.md`.
 
 - **Refund Block Redesign (2026-08-19):** The Billing page's Refund block (bottom-left column of the
-  "New Bill" tab, shown when building a visit's first bill) no longer has an upfront settlement-type
-  dropdown. Row 1 is a plain reference line, `Refund : ₹{visit.amount_paid}` (the money actually
-  collected for the visit, not the billed `visiting_fee`). Row 2 starts as just `[amount input
-  (refundDraftAmount)] [Add to bill]` — no mode picker, and typing a large draft amount does **not**
-  reveal one live; the switch only happens once the refund has actually been staged
-  (`refundHasPendingPayout = !!refundLine && refundLine.amount > preRefundTotal`), so the layout can't
-  flicker mid-type. Clicking **Add to bill** always stages first (`addRefundToBill`, mode hardcoded to
-  `'cash'` — provably inert whenever the refund is fully absorbed, since Daily Summary's
-  `billing_refund` bucket keys off the *bill's* own payment mode in that case, not the refund's). If
-  that staged amount exceeds the bill, row 2 becomes `[pending amount input, bound to
-  refundPendingAmount] [Cash / Billing UPI select]` and a row 3 `[Submit refund]` button appears
-  (`submitOverflowRefund` re-stages `refundLine` as `preRefundTotal + parsedPending` with the chosen
-  mode). `refundPendingAmount` is kept as "`refundLine.amount` (the stable total once staged) minus
-  the live `preRefundTotal`" by a `useEffect` keyed on `[refundLine, preRefundTotal]` — so it
-  auto-updates if the bill itself keeps changing after the refund was added (items/discount edited),
-  always reflecting the current true remainder, without needing Add to bill clicked again — but the
-  effect isn't keyed on `refundPendingAmount` itself, so it never fights normal typing directly into
-  that box between such bill-total changes (the box is a plain, non-reformatted text field otherwise).
-  Staging stays client-side only (`refundLine` state) throughout — nothing hits the backend until
-  Create Bill is clicked. The
-  block stays visible once staged (`canShowRefundBlock`, not gated on `!refundLine`) so the amount/
-  pending/mode remain editable — the bill-items-table refund row dropped its `"+₹X paid out directly
-  via {mode}"` explainer text since that detail now lives permanently in the still-visible block
-  instead. `routes/billing.py`'s whole-rupee validation was originally on the raw `refund.amount`
-  (the total requested) — moved to apply to `payout` (`refund_requested - applied`) only: the applied
-  portion is folded into the bill as a pure discount, no money physically changes hands, so it can
-  carry paise same as any other bill total (e.g. GST-inclusive item pricing); only an actual cash/UPI
-  handover conventionally needs whole notes. A `1e-6` epsilon absorbs binary float noise in the
-  `payout` comparison. Frontend's `handleCreateBill` still separately rounds down *only* the
-  pending/payout portion at submission (`preRefundTotal + Math.floor(refundLine.amount -
-  preRefundTotal)`, applied portion untouched) and runs the sum through `Math.round(v*100)/100` to
-  strip its own float noise before sending — belt-and-suspenders with the backend's epsilon check, not
-  strictly required by it alone but keeps the number actually sent clean. Known remaining gap:
-  `refundLine.amount` (the staged total) is only recomputed when Add to bill/Submit refund is clicked
-  — if the bill changes again afterward without re-clicking either, the *displayed* pending amount
-  live-updates (per the `useEffect` above) but the underlying staged total doesn't, so Create Bill can
-  submit a stale figure; not yet fixed.
+  "New Bill" tab, shown when building a visit's first bill, `canShowRefundBlock` — not gated on
+  `!refundLine`, so it stays visible once staged rather than disappearing) no longer has an upfront
+  settlement-type dropdown. Current layout:
+  - **Row 1** — plain reference line, `Refund : ₹{visit.amount_paid}` (money actually collected, not
+    the billed `visiting_fee`).
+  - **Row 2 (before staging)** — `[amount input (refundDraftAmount)] [Add to bill]`, no mode picker.
+    Typing a large draft amount does **not** reveal a mode picker live — that only happens once the
+    refund is actually staged (`refundHasPendingPayout = !!refundLine && refundLine.amount >
+    preRefundTotal`), so the layout can't flicker mid-type. **Add to bill** always stages first
+    (`addRefundToBill`, mode hardcoded to `'cash'` — provably inert whenever the refund ends up fully
+    absorbed, since Daily Summary's `billing_refund` bucket keys off the *bill's* own payment mode in
+    that case, not the refund's) and resets `refundPayoutAmount` to blank.
+  - **Row 2 (staged, exceeds the bill)** — a plain-text, always-live formula line: `(₹{refundLine.amount}
+    − ₹{preRefundTotal}) = ₹{refundPendingDisplay} pending` (`refundPendingDisplay` is a plain derived
+    value, not stored state, so it can never go stale). **Row 3** — `[amount input (refundPayoutAmount)]
+    [Cash / Billing UPI select]`, then a **Submit refund** button. `refundPayoutAmount` is deliberately
+    **never auto-filled** from the formula — it always starts blank/zero, so the amount actually
+    submitted is something staff typed on purpose after seeing the math, not an accepted suggestion.
+    `submitOverflowRefund` re-stages `refundLine` as `preRefundTotal + parsedPayout` with the chosen
+    mode.
+  - Staging stays client-side only (`refundLine` state) throughout — nothing hits the backend until
+    Create Bill is clicked. The bill-items-table refund row shows just a bare `−₹amount` deduction, no
+    per-mode explainer text (that detail lives in the block itself).
+  - `routes/billing.py`'s whole-rupee validation applies to `payout` (`refund_requested - applied`)
+    only, not the raw total — the applied portion is folded into the bill as a pure discount, no money
+    physically changes hands, so it can carry paise same as any other bill total (e.g. GST-inclusive
+    item pricing); only an actual cash/UPI handover conventionally needs whole notes. A `1e-6` epsilon
+    absorbs binary float noise in that comparison. Since `refundPayoutAmount` is manually typed by
+    staff (not auto-computed), it's very unlikely to be fractional in practice, but `handleCreateBill`
+    still defensively rounds the submitted total through `Math.round(v*100)/100` before sending.
+  - Known remaining gap: `refundLine.amount` (the staged total) is only recomputed when Add to bill /
+    Submit refund is clicked — if the bill changes again afterward without re-clicking either, the
+    staged total goes stale (the row 2 formula display, being live-derived, would still reflect it
+    correctly at the time of staging, but not any further bill changes after that). Not yet fixed.
 
 - **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
   browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons
