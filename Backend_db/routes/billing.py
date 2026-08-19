@@ -245,15 +245,6 @@ def create_bill():
             applied = min(refund_requested, final_total)
             final_total -= applied
         payout = refund_requested - applied
-        # Only the payout portion needs to be a whole number of rupees -- it's
-        # an actual cash/UPI handover, conventionally whole notes. The applied
-        # portion is folded into the bill as a pure discount (no money
-        # physically changes hands), so it can carry paise same as any other
-        # bill total (e.g. GST-inclusive item pricing). A small epsilon
-        # absorbs binary float noise from the applied/subtotal arithmetic
-        # rather than rejecting a payout that's mathematically whole.
-        if abs(payout - round(payout)) > 1e-6:
-            return jsonify({'error': 'The payout portion of a refund must be a whole number of rupees'}), 400
 
         visit.refund_amount = new_refund_total
         visit.refund_mode = refund_mode

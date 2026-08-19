@@ -443,13 +443,14 @@ or hardcoded strings.
   - Staging stays client-side only (`refundLine` state) throughout — nothing hits the backend until
     Create Bill is clicked. The bill-items-table refund row shows just a bare `−₹amount` deduction, no
     per-mode explainer text (that detail lives in the block itself).
-  - `routes/billing.py`'s whole-rupee validation applies to `payout` (`refund_requested - applied`)
-    only, not the raw total — the applied portion is folded into the bill as a pure discount, no money
-    physically changes hands, so it can carry paise same as any other bill total (e.g. GST-inclusive
-    item pricing); only an actual cash/UPI handover conventionally needs whole notes. A `1e-6` epsilon
-    absorbs binary float noise in that comparison. Since `refundPayoutAmount` is manually typed by
-    staff (not auto-computed), it's very unlikely to be fractional in practice, but `handleCreateBill`
-    still defensively rounds the submitted total through `Math.round(v*100)/100` before sending.
+  - Refund amounts — applied or payout — do **not** need to be whole rupees; a paise/decimal
+    payout (e.g. `₹42.50` via Cash) is accepted end to end. An earlier whole-rupee requirement (both
+    here and on the standalone `/visits/<id>/refund` endpoint in `routes/visits.py`) was removed
+    2026-08-19 as an unwanted business-rule holdover, not a technical constraint — nothing else in the
+    app enforces whole-rupee amounts. `handleCreateBill` still runs the submitted refund amount through
+    `Math.round(v*100)/100` purely to strip binary floating-point noise from the item-price/discount
+    arithmetic (e.g. `19.213*15` landing a few `1e-13` off a clean value) before sending — not a
+    business rounding rule, just float cleanup.
   - Known remaining gap: `refundLine.amount` (the staged total) is only recomputed when Add to bill /
     Submit refund is clicked — if the bill changes again afterward without re-clicking either, the
     staged total goes stale (the row 2 formula display, being live-derived, would still reflect it

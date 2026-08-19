@@ -383,20 +383,14 @@ function BillingContent() {
 
         setSubmitting(true)
         try {
-            // The backend requires refund.amount to be a whole number of
-            // rupees. Round down only the pending/payout portion (the part
-            // beyond what the bill absorbs) — never the applied portion
-            // (bill minus refund), which is left exactly as computed. The
-            // extra Math.round(...*100)/100 cleans up binary floating-point
-            // noise from the item-price/discount arithmetic (e.g. 19.21*15
-            // - 0.19 lands a few 1e-13 off a clean value) — without it, a
-            // sum that's mathematically whole can still fail the backend's
-            // exact-integer check by a hair.
+            // Refund amounts (applied and payout alike) no longer need to be
+            // whole rupees server-side — this just cleans up binary
+            // floating-point noise from the item-price/discount arithmetic
+            // (e.g. 19.213*15 landing a few 1e-13 off a clean value) before
+            // sending.
             const roundMoney = (v: number) => Math.round(v * 100) / 100
             const submittedRefund = refundLine ? {
-                amount: refundLine.amount > preRefundTotal
-                    ? roundMoney(preRefundTotal + Math.floor(refundLine.amount - preRefundTotal))
-                    : roundMoney(refundLine.amount),
+                amount: roundMoney(refundLine.amount),
                 mode: refundLine.mode,
             } : null
             const payload = {
