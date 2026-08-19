@@ -413,11 +413,29 @@ or hardcoded strings.
   breakdown. The Billing page's "New Bill" tab was restructured to match: the top row's Payment
   Type (Cash/UPI) selector is gone and **Create Bill** moved out of the top row entirely — **Walk-in
   Bill** now sits top-right in its old spot. The bottom of the card is three columns: **Refund**
-  (left, relocated from the Items-header area, same "Add Refund" control as before) | **Payment**
-  (center, new — Cash ₹ / UPI ₹ rows, each with a "Full amount" quick-fill button covering the
-  single-mode case, plus a live "Remaining: ₹X" / "✓ Matches total" hint) | **Discount + Total +
-  Create Bill** (right, Create Bill moved here, disabled until Cash+UPI is within ±₹1 of the total).
-  Design doc: `docs/superpowers/specs/2026-08-18-split-payment-design.md`.
+  (left, relocated from the Items-header area — see the 2026-08-19 refund block redesign below for
+  its current form) | **Payment** (center, new — Cash ₹ / UPI ₹ rows, each with a "Full amount"
+  quick-fill button covering the single-mode case, plus a live "Remaining: ₹X" / "✓ Matches total"
+  hint) | **Discount + Total + Create Bill** (right, Create Bill moved here, disabled until Cash+UPI
+  is within ±₹1 of the total). Design doc: `docs/superpowers/specs/2026-08-18-split-payment-design.md`.
+
+- **Refund Block Redesign (2026-08-19):** The Billing page's Refund block (bottom-left column of the
+  "New Bill" tab, shown when building a visit's first bill) no longer has an upfront settlement-type
+  dropdown. Row 1 is now a plain reference line, `Refund : ₹{visit.amount_paid}` (the money actually
+  collected for the visit, not the billed `visiting_fee`). Row 2/3 are driven live by the typed
+  amount against the bill's current total (`preRefundTotal`): while the amount fits entirely within
+  the bill it's a pure discount — no money actually leaves a till — so row 2 is just `[amount input]
+  [Add to bill]`, no mode picker; the mode sent to the backend in this branch is hardcoded to
+  `'cash'`, which is provably inert here (Daily Summary's `billing_refund` bucket keys off the
+  *bill's* own payment mode, not the refund's, whenever it's fully absorbed). Once the typed amount
+  exceeds the bill, row 2 becomes `[pending amount input, defaults to the excess but independently
+  editable] [Cash / Billing UPI select]` and a row 3 `[Submit refund]` button appears — that excess
+  is a real payout and does need a mode. Either way, staging stays client-side only (`refundLine`
+  state) exactly as before — nothing hits the backend until Create Bill is clicked. The block used to
+  disappear once a refund was staged; it now stays visible (`canShowRefundBlock`, no longer gated on
+  `!refundLine`) so the amount/mode remain editable — the bill-items-table refund row dropped its
+  `"+₹X paid out directly via {mode}"` explainer text since that detail now lives permanently in the
+  still-visible block instead.
 
 - **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
   browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons

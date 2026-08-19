@@ -125,10 +125,19 @@ function BillingContent() {
     // patient search doesn't point at any one visit, so there's nothing to refund.
     const [linkedVisit, setLinkedVisit] = useState<Visit | null>(null)
     // A refund entered while building this bill. Only meaningful for a
-    // visit's first bill — see the "Add Refund" control, which is only
-    // rendered when linkedVisit.has_bill is false. Staged client-side only:
-    // nothing is sent to the backend until "Create Bill" is clicked, so
-    // deleting it before then discards it silently. At most one at a time.
+    // visit's first bill — see the refund block, which is only rendered
+    // when linkedVisit.has_bill is false. Staged client-side only: nothing
+    // is sent to the backend until "Create Bill" is clicked, so clearing it
+    // before then discards it silently. At most one at a time.
+    //
+    // refundDraftAmount is always the TOTAL amount being refunded. Whether
+    // it needs a payment mode depends on whether it exceeds what the bill
+    // can absorb (preRefundTotal) — see the refund block below: within the
+    // bill it's a pure discount (no real payout, so no mode needed); any
+    // excess is a real payout and does need one, entered via
+    // refundDraftMode. The block stays visible once staged so both remain
+    // editable — removeRefundLine (the trash icon on its bill-table row) is
+    // the only way to clear it.
     const [refundLine, setRefundLine] = useState<{ amount: number; mode: RefundMode } | null>(null)
     const [refundDraftAmount, setRefundDraftAmount] = useState("")
     const [refundDraftMode, setRefundDraftMode] = useState<"" | RefundMode>("")
@@ -194,11 +203,12 @@ function BillingContent() {
         setRefundDraftMode("")
     }, [linkedVisit])
 
-    // The "Add Refund" control only makes sense while building a visit's
-    // first bill — once a bill exists, folding a refund into it is no
-    // longer possible (see the backend's is_first_bill check), so offering
-    // the control at all would be misleading.
-    const canAddRefund = !walkInMode && !!linkedVisit && !linkedVisit.has_bill && !refundLine
+    // The refund block only makes sense while building a visit's first bill
+    // — once a bill exists, folding a refund into it is no longer possible
+    // (see the backend's is_first_bill check), so offering the control at
+    // all would be misleading. Stays visible once a refund is staged (not
+    // gated on refundLine being unset) so the amount/mode stay editable.
+    const canShowRefundBlock = !walkInMode && !!linkedVisit && !linkedVisit.has_bill
 
     const loadHistory = useCallback(async (page = 1) => {
         setLoadingHistory(true)
@@ -316,15 +326,30 @@ function BillingContent() {
         setBillItems(billItems.filter((_, i) => i !== index))
     }
 
-    const addRefundLine = () => {
+    // Stages a refund that fits entirely within the bill (no payout) — the
+    // mode is never shown to or chosen by staff here, since it's a pure
+    // discount and no money actually leaves a till, so it's fixed to 'cash'
+    // (proven inert server-side in this branch — Daily Summary's
+    // billing_refund bucket keys off the bill's own payment mode, not this).
+    const addRefundToBill = () => {
+        const amount = parseFloat(refundDraftAmount || '0')
+        if (!(amount > 0)) return
+        setRefundLine({ amount, mode: 'cash' })
+    }
+
+    // Stages a refund whose amount exceeds the bill — the excess is a real
+    // payout, so a settlement mode is required.
+    const submitOverflowRefund = () => {
         const amount = parseFloat(refundDraftAmount || '0')
         if (!(amount > 0) || !refundDraftMode) return
         setRefundLine({ amount, mode: refundDraftMode })
+    }
+
+    const removeRefundLine = () => {
+        setRefundLine(null)
         setRefundDraftAmount("")
         setRefundDraftMode("")
     }
-
-    const removeRefundLine = () => setRefundLine(null)
 
     const handleCreateBill = async () => {
         if (walkInMode ? !walkInName.trim() : !patientId) return
@@ -435,6 +460,14 @@ function BillingContent() {
     // deduction (see routes/billing.py create_bill).
     const refundToApply = refundLine ? Math.min(refundLine.amount, preRefundTotal) : 0
     const finalTotal = preRefundTotal - refundToApply
+
+    // Live draft state for the refund block — driven by whatever's
+    // currently in refundDraftAmount, staged or not, so the block always
+    // reflects what would happen if Add to bill / Submit refund were
+    // clicked right now. Any amount beyond what the bill can absorb is the
+    // "pending" payout portion shown in the overflow row.
+    const refundDraftAmountNum = parseFloat(refundDraftAmount || '0') || 0
+    const refundDraftOverflow = Math.max(0, refundDraftAmountNum - preRefundTotal)
 
     // Split payment — Cash + UPI must add up to finalTotal, within a small
     // rounding tolerance (mirrors the same ±₹1 check server-side).
@@ -747,10 +780,10 @@ function BillingContent() {
                                             <TableRow>
                                                 <TableCell>{billItems.length + 1}</TableCell>
                                                 <TableCell className="font-medium text-destructive">
-                                                    Refund ({refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'})
+                                                    Refund
                                                     {refundLine.amount > preRefundTotal && (
                                                         <div className="text-xs font-normal text-muted-foreground mt-0.5">
-                                                            +₹{(refundLine.amount - preRefundTotal).toFixed(2)} paid out directly via {refundLine.mode === 'billing_upi' ? 'Billing UPI' : 'Cash'}
+                                                            see refund block below for the pending payout
                                                         </div>
                                                     )}
                                                 </TableCell>
@@ -782,37 +815,74 @@ function BillingContent() {
                             <div className="flex flex-col md:flex-row items-stretch justify-between gap-6 mt-4 shrink-0">
                                 {/* Left: Refund (relocated from the Items header) */}
                                 <div className="flex-1 min-w-[220px]">
-                                    {canAddRefund && (
+                                    {canShowRefundBlock && (
                                         <div className="space-y-1.5">
-                                            <span className="text-sm text-muted-foreground">Refund</span>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Refund value"
-                                                    className="w-28 h-8"
-                                                    value={refundDraftAmount}
-                                                    onChange={(e) => setRefundDraftAmount(e.target.value)}
-                                                />
-                                                <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
-                                                    <SelectTrigger className="w-32 h-8">
-                                                        <SelectValue placeholder="Settle via..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="billing_upi">Billing UPI</SelectItem>
-                                                        <SelectItem value="cash">Cash</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8"
-                                                    disabled={!(parseFloat(refundDraftAmount || '0') > 0) || !refundDraftMode}
-                                                    onClick={addRefundLine}
-                                                >
-                                                    Add Refund
-                                                </Button>
+                                            <div className="flex items-center gap-1.5 text-sm">
+                                                <span className="text-muted-foreground">Refund :</span>
+                                                <span className="font-medium">₹{(linkedVisit?.amount_paid ?? 0).toFixed(2)}</span>
                                             </div>
+
+                                            {refundDraftOverflow <= 0 ? (
+                                                // Fits entirely within the bill — a pure discount, no
+                                                // real payout, so no settlement mode is needed.
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Refund value"
+                                                        className="w-28 h-8"
+                                                        value={refundDraftAmount}
+                                                        onChange={(e) => setRefundDraftAmount(e.target.value)}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8"
+                                                        disabled={!(refundDraftAmountNum > 0)}
+                                                        onClick={addRefundToBill}
+                                                    >
+                                                        Add to bill
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                // Exceeds the bill — the excess is a real payout and
+                                                // needs a settlement mode. The pending amount defaults
+                                                // to the excess but can be adjusted directly; editing it
+                                                // updates the overall refund total to match.
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="Pending amount"
+                                                            className="w-28 h-8"
+                                                            value={refundDraftOverflow.toFixed(2)}
+                                                            onChange={(e) => {
+                                                                const pending = parseFloat(e.target.value || '0') || 0
+                                                                setRefundDraftAmount((preRefundTotal + pending).toString())
+                                                            }}
+                                                        />
+                                                        <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
+                                                            <SelectTrigger className="w-32 h-8">
+                                                                <SelectValue placeholder="Settle via..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="billing_upi">Billing UPI</SelectItem>
+                                                                <SelectItem value="cash">Cash</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8"
+                                                        disabled={!(refundDraftOverflow > 0) || !refundDraftMode}
+                                                        onClick={submitOverflowRefund}
+                                                    >
+                                                        Submit refund
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
