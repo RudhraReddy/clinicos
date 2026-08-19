@@ -428,14 +428,18 @@ or hardcoded strings.
   (`refundHasPendingPayout = !!refundLine && refundLine.amount > preRefundTotal`), so the layout can't
   flicker mid-type. Clicking **Add to bill** always stages first (`addRefundToBill`, mode hardcoded to
   `'cash'` — provably inert whenever the refund is fully absorbed, since Daily Summary's
-  `billing_refund` bucket keys off the *bill's* own payment mode in that case, not the refund's) and
-  primes a separate `refundPendingAmount` string state with the excess (`(amount -
-  preRefundTotal).toFixed(2)`, rounded once at that moment, not on every keystroke). *Then*, if that
-  staged amount exceeds the bill, row 2 becomes `[pending amount input, bound directly to
-  refundPendingAmount — a plain free-typed text box, never reformatted on each keystroke] [Cash /
-  Billing UPI select]` and a row 3 `[Submit refund]` button appears (`submitOverflowRefund` re-stages
-  `refundLine` as `preRefundTotal + parsedPending` with the chosen mode). Staging stays client-side
-  only (`refundLine` state) throughout — nothing hits the backend until Create Bill is clicked. The
+  `billing_refund` bucket keys off the *bill's* own payment mode in that case, not the refund's). If
+  that staged amount exceeds the bill, row 2 becomes `[pending amount input, bound to
+  refundPendingAmount] [Cash / Billing UPI select]` and a row 3 `[Submit refund]` button appears
+  (`submitOverflowRefund` re-stages `refundLine` as `preRefundTotal + parsedPending` with the chosen
+  mode). `refundPendingAmount` is kept as "`refundLine.amount` (the stable total once staged) minus
+  the live `preRefundTotal`" by a `useEffect` keyed on `[refundLine, preRefundTotal]` — so it
+  auto-updates if the bill itself keeps changing after the refund was added (items/discount edited),
+  always reflecting the current true remainder, without needing Add to bill clicked again — but the
+  effect isn't keyed on `refundPendingAmount` itself, so it never fights normal typing directly into
+  that box between such bill-total changes (the box is a plain, non-reformatted text field otherwise).
+  Staging stays client-side only (`refundLine` state) throughout — nothing hits the backend until
+  Create Bill is clicked. The
   block stays visible once staged (`canShowRefundBlock`, not gated on `!refundLine`) so the amount/
   pending/mode remain editable — the bill-items-table refund row dropped its `"+₹X paid out directly
   via {mode}"` explainer text since that detail now lives permanently in the still-visible block

@@ -132,13 +132,16 @@ function BillingContent() {
     //
     // Whether a settlement mode is needed is only decided (and only then
     // shown) once a refund has actually been added — refundDraftAmount is
-    // the plain amount box shown before that. Once refundLine is staged and
-    // exceeds what the bill can absorb (preRefundTotal), the block reveals
-    // refundPendingAmount (the payout portion, defaulted from the excess
-    // but freely editable like a normal text box — not reformatted on every
-    // keystroke) and refundDraftMode. The block stays visible once staged
-    // so everything remains editable — removeRefundLine (the trash icon on
-    // its bill-table row) is the only way to clear it.
+    // the plain amount box shown before that. refundLine.amount is the
+    // stable "total requested" once staged; once it exceeds what the bill
+    // can absorb (preRefundTotal), the block reveals refundPendingAmount
+    // (the payout portion — kept in sync with refundLine.amount minus the
+    // live bill total by the effect below whenever either changes, e.g. the
+    // bill's items change after staging, but otherwise a normal freely
+    // editable text box, not reformatted on every keystroke) and
+    // refundDraftMode. The block stays visible once staged so everything
+    // remains editable — removeRefundLine (the trash icon on its bill-table
+    // row) is the only way to clear it.
     const [refundLine, setRefundLine] = useState<{ amount: number; mode: RefundMode } | null>(null)
     const [refundDraftAmount, setRefundDraftAmount] = useState("")
     const [refundPendingAmount, setRefundPendingAmount] = useState("")
@@ -340,11 +343,8 @@ function BillingContent() {
         const amount = parseFloat(refundDraftAmount || '0')
         if (!(amount > 0)) return
         setRefundLine({ amount, mode: 'cash' })
-        // If this exceeds the bill, prime the pending-amount box with the
-        // excess (rounded once here, not on every keystroke) so the payout
-        // portion the refund block reveals next has a sensible default.
-        const overflow = amount - preRefundTotal
-        setRefundPendingAmount(overflow > 0 ? overflow.toFixed(2) : "")
+        // Pending-amount priming (if this exceeds the bill) happens in the
+        // effect below, keyed off refundLine — see there.
     }
 
     // Re-stages an already-added refund whose amount exceeds the bill, now
@@ -478,6 +478,19 @@ function BillingContent() {
     // refund has actually been staged AND it exceeds what the bill absorbs
     // — not while just typing a draft amount, so it can't flicker mid-type.
     const refundHasPendingPayout = !!refundLine && refundLine.amount > preRefundTotal
+
+    // Keeps the pending-amount box showing "total refund requested − current
+    // bill total" as the bill keeps changing (items/discount edited after
+    // the refund was staged) or the refund is (re)staged — refundLine.amount
+    // itself is the stable, once-entered total; this just re-derives the
+    // remainder from it. Deliberately NOT keyed on refundPendingAmount
+    // itself, so it only reacts to those external changes and never fights
+    // normal typing in the box between them.
+    useEffect(() => {
+        if (!refundLine) return
+        const remaining = refundLine.amount - preRefundTotal
+        setRefundPendingAmount(remaining > 0 ? remaining.toFixed(2) : "")
+    }, [refundLine, preRefundTotal])
 
     // Split payment — Cash + UPI must add up to finalTotal, within a small
     // rounding tolerance (mirrors the same ±₹1 check server-side).
