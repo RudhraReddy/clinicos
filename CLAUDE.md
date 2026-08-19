@@ -421,21 +421,28 @@ or hardcoded strings.
 
 - **Refund Block Redesign (2026-08-19):** The Billing page's Refund block (bottom-left column of the
   "New Bill" tab, shown when building a visit's first bill) no longer has an upfront settlement-type
-  dropdown. Row 1 is now a plain reference line, `Refund : ₹{visit.amount_paid}` (the money actually
-  collected for the visit, not the billed `visiting_fee`). Row 2/3 are driven live by the typed
-  amount against the bill's current total (`preRefundTotal`): while the amount fits entirely within
-  the bill it's a pure discount — no money actually leaves a till — so row 2 is just `[amount input]
-  [Add to bill]`, no mode picker; the mode sent to the backend in this branch is hardcoded to
-  `'cash'`, which is provably inert here (Daily Summary's `billing_refund` bucket keys off the
-  *bill's* own payment mode, not the refund's, whenever it's fully absorbed). Once the typed amount
-  exceeds the bill, row 2 becomes `[pending amount input, defaults to the excess but independently
-  editable] [Cash / Billing UPI select]` and a row 3 `[Submit refund]` button appears — that excess
-  is a real payout and does need a mode. Either way, staging stays client-side only (`refundLine`
-  state) exactly as before — nothing hits the backend until Create Bill is clicked. The block used to
-  disappear once a refund was staged; it now stays visible (`canShowRefundBlock`, no longer gated on
-  `!refundLine`) so the amount/mode remain editable — the bill-items-table refund row dropped its
-  `"+₹X paid out directly via {mode}"` explainer text since that detail now lives permanently in the
-  still-visible block instead.
+  dropdown. Row 1 is a plain reference line, `Refund : ₹{visit.amount_paid}` (the money actually
+  collected for the visit, not the billed `visiting_fee`). Row 2 starts as just `[amount input
+  (refundDraftAmount)] [Add to bill]` — no mode picker, and typing a large draft amount does **not**
+  reveal one live; the switch only happens once the refund has actually been staged
+  (`refundHasPendingPayout = !!refundLine && refundLine.amount > preRefundTotal`), so the layout can't
+  flicker mid-type. Clicking **Add to bill** always stages first (`addRefundToBill`, mode hardcoded to
+  `'cash'` — provably inert whenever the refund is fully absorbed, since Daily Summary's
+  `billing_refund` bucket keys off the *bill's* own payment mode in that case, not the refund's) and
+  primes a separate `refundPendingAmount` string state with the excess (`(amount -
+  preRefundTotal).toFixed(2)`, rounded once at that moment, not on every keystroke). *Then*, if that
+  staged amount exceeds the bill, row 2 becomes `[pending amount input, bound directly to
+  refundPendingAmount — a plain free-typed text box, never reformatted on each keystroke] [Cash /
+  Billing UPI select]` and a row 3 `[Submit refund]` button appears (`submitOverflowRefund` re-stages
+  `refundLine` as `preRefundTotal + parsedPending` with the chosen mode). Staging stays client-side
+  only (`refundLine` state) throughout — nothing hits the backend until Create Bill is clicked. The
+  block stays visible once staged (`canShowRefundBlock`, not gated on `!refundLine`) so the amount/
+  pending/mode remain editable — the bill-items-table refund row dropped its `"+₹X paid out directly
+  via {mode}"` explainer text since that detail now lives permanently in the still-visible block
+  instead. Note: `refund.amount` must still be a whole number of rupees server-side (pre-existing
+  `routes/billing.py` validation, unchanged) — a fractional `preRefundTotal` (e.g. from GST-inclusive
+  item pricing) plus a fractional pending amount can trip this; surfaced today as a toast error on
+  Create Bill, same as any other rejected payload.
 
 - **Responsive / High-Zoom Overflow Fixes (2026-08-11):** Fixed a class of bugs where zooming the
   browser to ~150-200% (or opening the app on a narrow tablet/phone) pushed primary action buttons

@@ -130,16 +130,18 @@ function BillingContent() {
     // is sent to the backend until "Create Bill" is clicked, so clearing it
     // before then discards it silently. At most one at a time.
     //
-    // refundDraftAmount is always the TOTAL amount being refunded. Whether
-    // it needs a payment mode depends on whether it exceeds what the bill
-    // can absorb (preRefundTotal) — see the refund block below: within the
-    // bill it's a pure discount (no real payout, so no mode needed); any
-    // excess is a real payout and does need one, entered via
-    // refundDraftMode. The block stays visible once staged so both remain
-    // editable — removeRefundLine (the trash icon on its bill-table row) is
-    // the only way to clear it.
+    // Whether a settlement mode is needed is only decided (and only then
+    // shown) once a refund has actually been added — refundDraftAmount is
+    // the plain amount box shown before that. Once refundLine is staged and
+    // exceeds what the bill can absorb (preRefundTotal), the block reveals
+    // refundPendingAmount (the payout portion, defaulted from the excess
+    // but freely editable like a normal text box — not reformatted on every
+    // keystroke) and refundDraftMode. The block stays visible once staged
+    // so everything remains editable — removeRefundLine (the trash icon on
+    // its bill-table row) is the only way to clear it.
     const [refundLine, setRefundLine] = useState<{ amount: number; mode: RefundMode } | null>(null)
     const [refundDraftAmount, setRefundDraftAmount] = useState("")
+    const [refundPendingAmount, setRefundPendingAmount] = useState("")
     const [refundDraftMode, setRefundDraftMode] = useState<"" | RefundMode>("")
 
     // Clinic assignment — every bill is tagged to a clinic, same as the visit it may
@@ -200,6 +202,7 @@ function BillingContent() {
     useEffect(() => {
         setRefundLine(null)
         setRefundDraftAmount("")
+        setRefundPendingAmount("")
         setRefundDraftMode("")
     }, [linkedVisit])
 
@@ -326,28 +329,36 @@ function BillingContent() {
         setBillItems(billItems.filter((_, i) => i !== index))
     }
 
-    // Stages a refund that fits entirely within the bill (no payout) — the
-    // mode is never shown to or chosen by staff here, since it's a pure
-    // discount and no money actually leaves a till, so it's fixed to 'cash'
-    // (proven inert server-side in this branch — Daily Summary's
-    // billing_refund bucket keys off the bill's own payment mode, not this).
+    // Stages the refund from the plain amount box — this is always the
+    // first step, regardless of whether it'll turn out to fit in the bill.
+    // Mode is fixed to 'cash' here since whether a payout is even needed is
+    // only decided once staged (see the refund block's render logic below);
+    // if it fits entirely within the bill, 'cash' stays inert — proven so
+    // server-side, since Daily Summary's billing_refund bucket keys off the
+    // bill's own payment mode in that case, not the refund's.
     const addRefundToBill = () => {
         const amount = parseFloat(refundDraftAmount || '0')
         if (!(amount > 0)) return
         setRefundLine({ amount, mode: 'cash' })
+        // If this exceeds the bill, prime the pending-amount box with the
+        // excess (rounded once here, not on every keystroke) so the payout
+        // portion the refund block reveals next has a sensible default.
+        const overflow = amount - preRefundTotal
+        setRefundPendingAmount(overflow > 0 ? overflow.toFixed(2) : "")
     }
 
-    // Stages a refund whose amount exceeds the bill — the excess is a real
-    // payout, so a settlement mode is required.
+    // Re-stages an already-added refund whose amount exceeds the bill, now
+    // with the payout portion (possibly hand-edited) and its settlement mode.
     const submitOverflowRefund = () => {
-        const amount = parseFloat(refundDraftAmount || '0')
-        if (!(amount > 0) || !refundDraftMode) return
-        setRefundLine({ amount, mode: refundDraftMode })
+        const pending = parseFloat(refundPendingAmount || '0')
+        if (!(pending > 0) || !refundDraftMode) return
+        setRefundLine({ amount: preRefundTotal + pending, mode: refundDraftMode })
     }
 
     const removeRefundLine = () => {
         setRefundLine(null)
         setRefundDraftAmount("")
+        setRefundPendingAmount("")
         setRefundDraftMode("")
     }
 
@@ -401,6 +412,9 @@ function BillingContent() {
             setBillItems([])
             setDiscountValue("")
             setRefundLine(null)
+            setRefundDraftAmount("")
+            setRefundPendingAmount("")
+            setRefundDraftMode("")
             setCashAmount("")
             setUpiAmount("")
             if (walkInMode) {
@@ -460,14 +474,10 @@ function BillingContent() {
     // deduction (see routes/billing.py create_bill).
     const refundToApply = refundLine ? Math.min(refundLine.amount, preRefundTotal) : 0
     const finalTotal = preRefundTotal - refundToApply
-
-    // Live draft state for the refund block — driven by whatever's
-    // currently in refundDraftAmount, staged or not, so the block always
-    // reflects what would happen if Add to bill / Submit refund were
-    // clicked right now. Any amount beyond what the bill can absorb is the
-    // "pending" payout portion shown in the overflow row.
-    const refundDraftAmountNum = parseFloat(refundDraftAmount || '0') || 0
-    const refundDraftOverflow = Math.max(0, refundDraftAmountNum - preRefundTotal)
+    // The refund block only reveals the payout (mode + Submit) step once a
+    // refund has actually been staged AND it exceeds what the bill absorbs
+    // — not while just typing a draft amount, so it can't flicker mid-type.
+    const refundHasPendingPayout = !!refundLine && refundLine.amount > preRefundTotal
 
     // Split payment — Cash + UPI must add up to finalTotal, within a small
     // rounding tolerance (mirrors the same ±₹1 check server-side).
@@ -639,6 +649,9 @@ function BillingContent() {
                                             setWalkInAge("")
                                             setWalkInSex("")
                                             setRefundLine(null)
+                                            setRefundDraftAmount("")
+                                            setRefundPendingAmount("")
+                                            setRefundDraftMode("")
                                         }}
                                     >
                                         Walk-in Bill
@@ -822,9 +835,11 @@ function BillingContent() {
                                                 <span className="font-medium">₹{(linkedVisit?.amount_paid ?? 0).toFixed(2)}</span>
                                             </div>
 
-                                            {refundDraftOverflow <= 0 ? (
-                                                // Fits entirely within the bill — a pure discount, no
-                                                // real payout, so no settlement mode is needed.
+                                            {!refundHasPendingPayout ? (
+                                                // Not yet added, or added but fully absorbed by the
+                                                // bill — just the amount and Add to bill. Whether this
+                                                // ends up needing a payout is only decided (and only
+                                                // then shown, below) once it's actually added.
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <Input
                                                         type="number"
@@ -838,28 +853,26 @@ function BillingContent() {
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8"
-                                                        disabled={!(refundDraftAmountNum > 0)}
+                                                        disabled={!(parseFloat(refundDraftAmount || '0') > 0)}
                                                         onClick={addRefundToBill}
                                                     >
                                                         Add to bill
                                                     </Button>
                                                 </div>
                                             ) : (
-                                                // Exceeds the bill — the excess is a real payout and
-                                                // needs a settlement mode. The pending amount defaults
-                                                // to the excess but can be adjusted directly; editing it
-                                                // updates the overall refund total to match.
+                                                // Added, and it exceeds the bill — only now does the
+                                                // excess need a settlement mode. Pending amount defaults
+                                                // to the excess but is a plain editable text box from
+                                                // here on, same as any other amount field (not
+                                                // reformatted to 2 decimals on every keystroke).
                                                 <div className="space-y-1.5">
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <Input
                                                             type="number"
                                                             placeholder="Pending amount"
                                                             className="w-28 h-8"
-                                                            value={refundDraftOverflow.toFixed(2)}
-                                                            onChange={(e) => {
-                                                                const pending = parseFloat(e.target.value || '0') || 0
-                                                                setRefundDraftAmount((preRefundTotal + pending).toString())
-                                                            }}
+                                                            value={refundPendingAmount}
+                                                            onChange={(e) => setRefundPendingAmount(e.target.value)}
                                                         />
                                                         <Select value={refundDraftMode} onValueChange={(v) => setRefundDraftMode(v as RefundMode)}>
                                                             <SelectTrigger className="w-32 h-8">
@@ -876,7 +889,7 @@ function BillingContent() {
                                                         variant="outline"
                                                         size="sm"
                                                         className="h-8"
-                                                        disabled={!(refundDraftOverflow > 0) || !refundDraftMode}
+                                                        disabled={!(parseFloat(refundPendingAmount || '0') > 0) || !refundDraftMode}
                                                         onClick={submitOverflowRefund}
                                                     >
                                                         Submit refund
