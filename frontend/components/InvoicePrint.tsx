@@ -126,15 +126,33 @@ export function InvoicePrint({
     const hasAge = patient.age !== null && patient.age !== undefined
 
     const base: React.CSSProperties = {
-        fontFamily: '"Courier New", Courier, monospace',
+        // No fallback fonts on purpose -- loaded directly via the Google
+        // Fonts <link> below rather than relying on it being installed
+        // locally, so it renders as itself regardless of the printing
+        // machine. Must stay genuinely monospaced (Roboto Mono is), since
+        // Label's padEnd column alignment depends on fixed character width.
+        fontFamily: '"Roboto Mono"',
         fontSize: "9.5pt",
         lineHeight: 1.2,
         color: "#000",
     }
 
     return (
-        <div id="invoice-print-region" className={className} style={{ ...base, width: "74mm", maxWidth: "74mm" }}>
-            <style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>
+        <div id="invoice-print-region" className={className} style={{ ...base, width: "75mm", maxWidth: "75mm" }}>
+            {/* No fallback fonts are set (see `base` above), so Roboto Mono
+                must actually load for the receipt to render as monospace at
+                all -- loaded here, not via next/font, so this same markup
+                still pulls it in when copied via innerHTML into the print
+                popup (printElement in PrintInvoiceDialog.tsx), which has no
+                access to the app's own <head>. Same weights the typography
+                table uses: 400 body, 500 item price line, 600 Label, 700
+                headings/totals. next/font/google (the usual Next.js approach)
+                isn't an option here for the same reason -- it only wires up
+                the app's own <head>, not a raw document.write()'d popup with
+                no relation to it. */}
+            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap" />
+            <style>{'@page { size: 80mm auto; margin: 2.5mm }'}</style>
 
             {/* Pharmacy name */}
             <div style={{ textAlign: "center", fontWeight: 700, fontSize: "12.5pt", textTransform: "uppercase" }}>

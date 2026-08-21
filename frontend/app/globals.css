@@ -144,6 +144,6 @@ body {
   }
   @page {
     size: 80mm auto;
-    margin: 2.5mm 3mm;
+    margin: 2.5mm;
   }
 }

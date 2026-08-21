@@ -71,7 +71,7 @@ export function printElement(elementId: string) {
     const win = window.open('', '_blank', 'width=380,height=700')
     if (!win) return
     win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
-    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm 3mm}</style>
+    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
     win.document.close()
     win.focus()
@@ -176,7 +176,7 @@ export function PrintInvoiceDialog({
 
                 {!loading && invoiceData && (
                     // The padding/border live on this OUTER wrapper, not on InvoicePrint itself —
-                    // InvoicePrint's own element is width-constrained to 74mm to match the real
+                    // InvoicePrint's own element is width-constrained to 75mm to match the real
                     // print output exactly; adding padding directly to it (as className) would
                     // shrink its usable content width in this preview only, making the preview
                     // wrap text that the actual print (which copies just its innerHTML, without

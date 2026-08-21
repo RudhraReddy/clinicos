@@ -251,8 +251,18 @@ The invoice print flow uses a popup window (`window.open`) to render and print, 
 dot-matrix/thermal receipt printer** (not a full-page printer) — the sole invoice format, no A4/A5
 alternative. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses
 **100% inline CSS** — no Tailwind class names inside the invoice markup. Layout is monospace
-(`"Courier New", Courier, monospace`), single-column, pure black on white, with literal repeated-`-`/`=`
-characters as dividers (not CSS borders) for an authentic receipt look.
+(`fontFamily: '"Roboto Mono"'` — no fallback fonts; instead `InvoicePrint.tsx` embeds a Google Fonts
+`<link>` (weights 400/500/600/700, matching the typography table below) as the first child of its
+own markup, right next to its `<style>{'@page {...}'}</style>` tag, rather than via
+`next/font/google` — the usual Next.js approach only wires up the app's own `<head>`, which doesn't
+help the print popup (`printElement()` in `PrintInvoiceDialog.tsx`, a raw `document.write()`'d
+document unrelated to the app's `<head>`); embedding the `<link>` in the same markup that gets
+copied via `innerHTML` into that popup covers both the on-screen preview and the actual print output
+from one insertion point. Roboto Mono is genuinely monospaced, which `Label`'s `padEnd` column
+alignment depends on — known tradeoff: with no fallback, a print station with no internet access at
+print time (so the Google Fonts stylesheet fails to load) falls back to the browser's non-monospace
+default font instead), single-column, pure black on white, with literal repeated-`-`/`=` characters
+as dividers (not CSS borders) for an authentic receipt look.
 
 ### Files
 
@@ -264,11 +274,11 @@ characters as dividers (not CSS borders) for an authentic receipt look.
 
 ### Page size
 
-All three files are aligned to **80mm width, automatic (continuous) height, 2.5mm/3mm margin**:
-- `InvoicePrint.tsx` injects `<style>{'@page { size: 80mm auto; margin: 2.5mm 3mm }'}</style>` inside `#invoice-print-region`
-- `printElement()` in `PrintInvoiceDialog.tsx` writes `@page{size:80mm auto;margin:2.5mm 3mm}` into the popup's `<style>` block
-- `globals.css` `@page` rule: `size: 80mm auto; margin: 2.5mm 3mm`
-- Content itself is constrained to `width: 74mm` (usable width after margins)
+All three files are aligned to **80mm width, automatic (continuous) height, 2.5mm uniform margin**:
+- `InvoicePrint.tsx` injects `<style>{'@page { size: 80mm auto; margin: 2.5mm }'}</style>` inside `#invoice-print-region`
+- `printElement()` in `PrintInvoiceDialog.tsx` writes `@page{size:80mm auto;margin:2.5mm}` into the popup's `<style>` block
+- `globals.css` `@page` rule: `size: 80mm auto; margin: 2.5mm`
+- Content itself is constrained to `width: 75mm` (usable width after margins — 80mm − 2.5mm − 2.5mm)
 
 ### InvoicePrint props
 
@@ -319,7 +329,7 @@ column. Only pass `width` within a group of labels that are actually stacked ver
 column — `AGE`/`DATE`/`TIME` share a row with something else and don't need it. Full size/weight table.
 Two rows are deliberately smaller than the rest — not for visual hierarchy, but because the pharmacy
 name and the `PH`/`DL NO` line are the two lines most likely to overflow onto a second line at
-real (long) clinic data lengths on a 74mm line; keep them at these sizes (or smaller) even if the
+real (long) clinic data lengths on a 75mm line; keep them at these sizes (or smaller) even if the
 rest of the scale changes:
 
 | Element | Size | Weight |
@@ -386,7 +396,7 @@ function printElement(elementId: string) {
   const win = window.open('', '_blank', 'width=380,height=700')
   if (!win) return
   win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
-    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm 3mm}</style>
+    <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
   win.document.close()
   win.focus()
