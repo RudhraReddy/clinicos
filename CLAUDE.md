@@ -93,6 +93,20 @@ TOTP flow when poking the live local app or API during testing/verification.
   doesn't persist across environment resets, since `/tmp` is ephemeral here) — don't rely on HTTPS
   remotes or `gh` for auth in this environment; if `origin` is ever set to an `https://github.com/...`
   URL, switch it back to the `git@github.com:...` SSH form.
+- **Editing directly on `main`:** background-job sessions in this project are configured to work in
+  place on the actual checkout (`main`), not in an isolated git worktree — file writes there go
+  straight to this working tree, same as an interactive session. Other agent types (e.g. one spawned
+  in `isolation: "worktree"`, or a sandboxed subagent whose cwd is pinned elsewhere) do NOT have this
+  — they get their own worktree/branch and can't write back to this checkout directly, which shows up
+  as edits silently failing or the agent reporting it's "blocked" from writing to the main repo. That
+  failure is sandboxing working as intended for that agent type, not a bug to route around (e.g. by
+  loosening `.claude/settings.json` permissions) — if an isolated agent needs its work applied to
+  `main`, either paste/merge the diff in from its worktree/branch, or just redo the edit directly in a
+  session that's actually configured to work in place.
+- **Commit/push gating:** independent of the above — do not run `git commit` after making changes; leave
+  them in the working tree until the user explicitly says "commit" (and separately "push it" before
+  pushing to `origin`). See the memory file `feedback_commit_no_push` for the full rule if this ever
+  needs restating.
 
 ## Architecture
 
@@ -252,16 +266,29 @@ dot-matrix/thermal receipt printer** (not a full-page printer) — the sole invo
 alternative. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses
 **100% inline CSS** — no Tailwind class names inside the invoice markup. Layout is monospace
 (`fontFamily: '"Roboto Mono"'` — no fallback fonts, and no web-font loading; relies entirely on
-Roboto Mono being installed as a system font on whatever machine renders/prints the receipt. An
-earlier version loaded it via a Google Fonts `<link>`, but that's a network fetch that races against
-`printElement()`'s immediate `win.print()` call (`PrintInvoiceDialog.tsx` — no wait for anything to
-finish loading before printing) — the print almost always fired before the network font finished
-loading, and with no fallback set, silently printed in the browser's own default (Times New Roman)
-instead. Removed once diagnosed; resolving `"Roboto Mono"` directly against the local system font
-(same mechanism e.g. Microsoft Word uses, confirmed working there) has no network fetch to race
-against. Roboto Mono is genuinely monospaced, which `Label`'s `padEnd` column alignment depends on),
-single-column, pure black on white, with literal repeated-`-`/`=` characters as dividers (not CSS
-borders) for an authentic receipt look.
+Roboto Mono being installed as a system font on whatever machine renders/prints the receipt — same
+mechanism e.g. Microsoft Word uses, confirmed working there). Roboto Mono is genuinely monospaced,
+which `Label`'s `padEnd` column alignment depends on, single-column, pure black on white, with literal
+repeated-`-`/`=` characters as dividers (not CSS borders) for an authentic receipt look.
+
+This went through two rounds of misdiagnosis before the real bug was found, both around the receipt
+printing in the browser's bare default (Times New Roman) instead of Roboto Mono:
+1. An earlier version loaded Roboto Mono via a Google Fonts `<link>` — a network fetch with no
+   `local()` fallback, racing `printElement()`'s then-immediate `win.print()` call. Removed in favor
+   of resolving `"Roboto Mono"` directly against the local system font (no network fetch to race).
+   This alone did not fix it.
+2. `printElement()` then gained an `await` on `win.document.fonts.ready` (raced against a 1.5s
+   timeout) before printing, on the theory that even local font matching in a freshly-created popup
+   document isn't guaranteed to finish in the same tick. This *also* did not fix it, because —
+3. **Actual root cause:** `printElement()` builds the popup body from `el.innerHTML`, but `el` (via
+   `document.getElementById("invoice-print-region")`) IS the outer wrapper div itself — the one
+   `fontFamily: '"Roboto Mono"'` is actually set on (every descendant just inherits it; nothing else
+   in `InvoicePrint.tsx` sets `font-family` anywhere). `innerHTML` serializes only an element's
+   *children*, deliberately dropping the element's own tag and `style` attribute — so the popup
+   document never received a `font-family` declaration at all, no matter how long anything waited for
+   fonts to load. Fixed by using `el.outerHTML` instead, so the wrapper div (and its inline style)
+   makes it into the popup. The `fonts.ready` wait from step 2 is still correct to keep — a real,
+   separate race that only matters once the font-family is actually present in the document.
 
 ### Files
 
@@ -389,15 +416,25 @@ rest of the scale changes:
 ### printElement function
 
 ```ts
-function printElement(elementId: string) {
+async function printElement(elementId: string) {
   const el = document.getElementById(elementId)
   if (!el) return
   const win = window.open('', '_blank', 'width=380,height=700')
   if (!win) return
+  // outerHTML, not innerHTML -- el IS #invoice-print-region itself, and its
+  // own `style` attribute is where font-family: "Roboto Mono" lives.
   win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
     <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm}</style>
-    </head><body>${el.innerHTML}</body></html>`)
+    </head><body>${el.outerHTML}</body></html>`)
   win.document.close()
+  // Local font matching in a freshly-created popup document isn't
+  // guaranteed to finish in the same tick as document.close() -- wait for
+  // it, raced against a timeout so a font that never resolves doesn't hang
+  // the print indefinitely.
+  await Promise.race([
+    win.document.fonts.ready,
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ])
   win.focus()
   win.print()
   win.close()

@@ -70,9 +70,19 @@ export async function printElement(elementId: string) {
     if (!el) return
     const win = window.open('', '_blank', 'width=380,height=700')
     if (!win) return
+    // el.outerHTML, not el.innerHTML: el IS #invoice-print-region itself, and
+    // that div's own `style` attribute is where `font-family: "Roboto Mono"`
+    // actually lives (every descendant just inherits it -- nothing else in
+    // InvoicePrint sets font-family anywhere). innerHTML serializes only an
+    // element's CHILDREN, deliberately dropping the element's own tag and
+    // attributes -- so the popup document never received a font-family
+    // declaration at all, and printed in the browser's bare default (Times
+    // New Roman) regardless of how long anything waited for fonts to load.
+    // This was the actual root cause; the fonts.ready wait below is still
+    // correct to keep (a real, separate race once the font-family is present).
     win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title>
     <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm}</style>
-    </head><body>${el.innerHTML}</body></html>`)
+    </head><body>${el.outerHTML}</body></html>`)
     win.document.close()
     // Printing immediately after document.write()/close() (as this used to)
     // races the browser's own font matching for the freshly-created
@@ -87,8 +97,8 @@ export async function printElement(elementId: string) {
         new Promise((resolve) => setTimeout(resolve, 1500)),
     ])
     win.focus()
-    // win.print()
-    // win.close()
+    win.print()
+    win.close()
 }
 
 export function PrintInvoiceDialog({
