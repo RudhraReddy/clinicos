@@ -87,8 +87,8 @@ export async function printElement(elementId: string) {
         new Promise((resolve) => setTimeout(resolve, 1500)),
     ])
     win.focus()
-    win.print()
-    win.close()
+    // win.print()
+    // win.close()
 }
 
 export function PrintInvoiceDialog({
