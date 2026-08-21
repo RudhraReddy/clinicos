@@ -65,7 +65,7 @@ interface PrintInvoiceDialogProps {
     photos?: any[]
 }
 
-export function printElement(elementId: string) {
+export async function printElement(elementId: string) {
     const el = document.getElementById(elementId)
     if (!el) return
     const win = window.open('', '_blank', 'width=380,height=700')
@@ -74,6 +74,18 @@ export function printElement(elementId: string) {
     <style>body{margin:0;padding:0}@page{size:80mm auto;margin:2.5mm}</style>
     </head><body>${el.innerHTML}</body></html>`)
     win.document.close()
+    // Printing immediately after document.write()/close() (as this used to)
+    // races the browser's own font matching for the freshly-created
+    // document -- even for a locally installed font, that resolution isn't
+    // guaranteed to be done in the same tick, and print() can still capture
+    // whatever fallback is showing at that instant. document.fonts.ready
+    // resolves once the popup's own font matching has settled; raced
+    // against a short timeout so a font that genuinely never resolves
+    // doesn't hang the print indefinitely.
+    await Promise.race([
+        win.document.fonts.ready,
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+    ])
     win.focus()
     win.print()
     win.close()

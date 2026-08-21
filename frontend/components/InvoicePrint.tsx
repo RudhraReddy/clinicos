@@ -130,15 +130,17 @@ export function InvoicePrint({
         // expected to already be installed as a system font on whatever
         // machine renders/prints this (confirmed: printing from Word with
         // Roboto Mono selected there works correctly). An earlier version
-        // loaded it via a Google Fonts <link>, but that's a network fetch
-        // racing against printElement()'s immediate win.print() call in
-        // PrintInvoiceDialog.tsx -- the print almost always fired before the
-        // font finished loading, and with no fallback set, silently printed
-        // in the browser's own default (Times New Roman) instead. Resolving
-        // "Roboto Mono" directly against the local system font, with no
-        // network involved, removes that race entirely. Must stay genuinely
-        // monospaced (Roboto Mono is), since Label's padEnd column alignment
-        // depends on fixed character width.
+        // loaded it via a Google Fonts <link>, a network fetch that raced
+        // against printElement()'s print() call in PrintInvoiceDialog.tsx and
+        // usually lost, silently printing in the browser's own default
+        // (Times New Roman) since no fallback is set. Resolving "Roboto
+        // Mono" directly against the local system font removes the network
+        // side of that race; printElement() also now explicitly awaits
+        // document.fonts.ready before printing, since even local font
+        // matching in a freshly-created popup document isn't guaranteed to
+        // finish in the same tick otherwise. Must stay genuinely monospaced
+        // (Roboto Mono is), since Label's padEnd column alignment depends on
+        // fixed character width.
         fontFamily: '"Roboto Mono"',
         fontSize: "9.5pt",
         lineHeight: 1.2,
