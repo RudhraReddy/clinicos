@@ -126,11 +126,19 @@ export function InvoicePrint({
     const hasAge = patient.age !== null && patient.age !== undefined
 
     const base: React.CSSProperties = {
-        // No fallback fonts on purpose -- loaded directly via the Google
-        // Fonts <link> below rather than relying on it being installed
-        // locally, so it renders as itself regardless of the printing
-        // machine. Must stay genuinely monospaced (Roboto Mono is), since
-        // Label's padEnd column alignment depends on fixed character width.
+        // No fallback fonts, and no web-font loading -- Roboto Mono is
+        // expected to already be installed as a system font on whatever
+        // machine renders/prints this (confirmed: printing from Word with
+        // Roboto Mono selected there works correctly). An earlier version
+        // loaded it via a Google Fonts <link>, but that's a network fetch
+        // racing against printElement()'s immediate win.print() call in
+        // PrintInvoiceDialog.tsx -- the print almost always fired before the
+        // font finished loading, and with no fallback set, silently printed
+        // in the browser's own default (Times New Roman) instead. Resolving
+        // "Roboto Mono" directly against the local system font, with no
+        // network involved, removes that race entirely. Must stay genuinely
+        // monospaced (Roboto Mono is), since Label's padEnd column alignment
+        // depends on fixed character width.
         fontFamily: '"Roboto Mono"',
         fontSize: "9.5pt",
         lineHeight: 1.2,
@@ -139,19 +147,6 @@ export function InvoicePrint({
 
     return (
         <div id="invoice-print-region" className={className} style={{ ...base, width: "75mm", maxWidth: "75mm" }}>
-            {/* No fallback fonts are set (see `base` above), so Roboto Mono
-                must actually load for the receipt to render as monospace at
-                all -- loaded here, not via next/font, so this same markup
-                still pulls it in when copied via innerHTML into the print
-                popup (printElement in PrintInvoiceDialog.tsx), which has no
-                access to the app's own <head>. Same weights the typography
-                table uses: 400 body, 500 item price line, 600 Label, 700
-                headings/totals. next/font/google (the usual Next.js approach)
-                isn't an option here for the same reason -- it only wires up
-                the app's own <head>, not a raw document.write()'d popup with
-                no relation to it. */}
-            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap" />
             <style>{'@page { size: 80mm auto; margin: 2.5mm }'}</style>
 
             {/* Pharmacy name */}

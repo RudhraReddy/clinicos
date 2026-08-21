@@ -251,18 +251,17 @@ The invoice print flow uses a popup window (`window.open`) to render and print, 
 dot-matrix/thermal receipt printer** (not a full-page printer) — the sole invoice format, no A4/A5
 alternative. Because the popup has no access to the app's Tailwind stylesheet, `InvoicePrint.tsx` uses
 **100% inline CSS** — no Tailwind class names inside the invoice markup. Layout is monospace
-(`fontFamily: '"Roboto Mono"'` — no fallback fonts; instead `InvoicePrint.tsx` embeds a Google Fonts
-`<link>` (weights 400/500/600/700, matching the typography table below) as the first child of its
-own markup, right next to its `<style>{'@page {...}'}</style>` tag, rather than via
-`next/font/google` — the usual Next.js approach only wires up the app's own `<head>`, which doesn't
-help the print popup (`printElement()` in `PrintInvoiceDialog.tsx`, a raw `document.write()`'d
-document unrelated to the app's `<head>`); embedding the `<link>` in the same markup that gets
-copied via `innerHTML` into that popup covers both the on-screen preview and the actual print output
-from one insertion point. Roboto Mono is genuinely monospaced, which `Label`'s `padEnd` column
-alignment depends on — known tradeoff: with no fallback, a print station with no internet access at
-print time (so the Google Fonts stylesheet fails to load) falls back to the browser's non-monospace
-default font instead), single-column, pure black on white, with literal repeated-`-`/`=` characters
-as dividers (not CSS borders) for an authentic receipt look.
+(`fontFamily: '"Roboto Mono"'` — no fallback fonts, and no web-font loading; relies entirely on
+Roboto Mono being installed as a system font on whatever machine renders/prints the receipt. An
+earlier version loaded it via a Google Fonts `<link>`, but that's a network fetch that races against
+`printElement()`'s immediate `win.print()` call (`PrintInvoiceDialog.tsx` — no wait for anything to
+finish loading before printing) — the print almost always fired before the network font finished
+loading, and with no fallback set, silently printed in the browser's own default (Times New Roman)
+instead. Removed once diagnosed; resolving `"Roboto Mono"` directly against the local system font
+(same mechanism e.g. Microsoft Word uses, confirmed working there) has no network fetch to race
+against. Roboto Mono is genuinely monospaced, which `Label`'s `padEnd` column alignment depends on),
+single-column, pure black on white, with literal repeated-`-`/`=` characters as dividers (not CSS
+borders) for an authentic receipt look.
 
 ### Files
 
