@@ -115,6 +115,9 @@ def _apply_migrations(db):
         "WHERE cash_amount IS NULL AND upi_amount IS NULL AND payment_type = 'UPI'",
         "UPDATE bills SET cash_amount = total_amount, upi_amount = 0 "
         "WHERE cash_amount IS NULL AND upi_amount IS NULL AND COALESCE(payment_type, 'CASH') != 'UPI'",
+        # 2026-08-23: next follow-up/review date, entered from the "Mark
+        # Visit as Done" popup, shown on the patient card header.
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS next_review_date DATE",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

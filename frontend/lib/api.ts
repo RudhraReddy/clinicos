@@ -14,6 +14,27 @@ export interface Patient {
     reference_patient_id?: string | null;
     reference_patient_name?: string | null;
     created_at?: string;
+    // Next follow-up/review date, set from the "Mark Visit as Done" popup.
+    // Always just the most recently entered value.
+    next_review_date?: string | null;
+}
+
+// Backs the Dashboard's Review tab — patients grouped by next_review_date.
+export interface PatientReviewEntry {
+    patient_id: string;
+    name: string;
+    phone_number: string;
+    age?: number;
+    sex?: string;
+}
+
+export interface PatientReviewDay {
+    date: string; // "YYYY-MM-DD"
+    patients: PatientReviewEntry[];
+}
+
+export interface PatientReviewsResponse {
+    days: PatientReviewDay[];
 }
 
 // Visit UPI is always a direct payout; Billing UPI and Cash apply to a
@@ -247,6 +268,14 @@ export const api = {
     // Patient APIs
     async getPatients(page = 1, limit = 50): Promise<Patient[]> {
         return fetchApi(`/api/patients?page=${page}&limit=${limit}`);
+    },
+
+    async getPatientReviews(dateFrom?: string, dateTo?: string): Promise<PatientReviewsResponse> {
+        const params = new URLSearchParams()
+        if (dateFrom) params.set('date_from', dateFrom)
+        if (dateTo) params.set('date_to', dateTo)
+        const qs = params.toString()
+        return fetchApi(`/api/patients/reviews${qs ? `?${qs}` : ''}`)
     },
 
     async getPatientsByPhone(phone: string): Promise<Patient[]> {

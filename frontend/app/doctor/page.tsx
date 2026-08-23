@@ -7,9 +7,10 @@ import { QRCodeUpload } from "@/components/QRCodeUpload"
 import { StaffAssignmentDialog } from "@/components/StaffAssignmentDialog"
 import { PrintInvoiceDialog } from "@/components/PrintInvoiceDialog"
 import { DeleteVisitDialog } from "@/components/DeleteVisitDialog"
+import { MarkVisitDoneDialog } from "@/components/MarkVisitDoneDialog"
 import { getTodayIST, orderTodayVisits, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { useState, useEffect, useMemo, useRef } from "react"
-import { api, type Visit, API_BASE_URL } from "@/lib/api"
+import { api, type Visit, type Patient, API_BASE_URL } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useMenu } from "@/components/layout/AppShell"
@@ -25,6 +26,7 @@ export default function DoctorDashboard() {
     const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null)
     const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
     const [visitToDelete, setVisitToDelete] = useState<Visit | null>(null)
+    const [visitToMarkDone, setVisitToMarkDone] = useState<Visit | null>(null)
 
     // Active Console State
     // const [rxHistory, setRxHistory] = useState<any[]>([]) // Removed
@@ -93,6 +95,7 @@ export default function DoctorDashboard() {
     const [patientBills, setPatientBills] = useState<any[]>([])
     const [showTrash, setShowTrash] = useState(false)
     const [trashImages, setTrashImages] = useState<any[]>([])
+    const [selectedPatientDetails, setSelectedPatientDetails] = useState<Patient | null>(null)
 
     // Invoice preview, opened from a bill card in the Visit Timeline
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
@@ -121,11 +124,17 @@ export default function DoctorDashboard() {
                 .then(setPatientBills)
                 .catch(err => console.error("Failed to load billing history", err))
 
+            // Fetch Patient details — for the Age/Sex shown in the pictures card header
+            api.getPatient(selectedVisit.patient_id)
+                .then(setSelectedPatientDetails)
+                .catch(err => console.error("Failed to load patient details", err))
+
         } else {
 
             setPatientHistory([])
             setPatientImages([])
             setPatientBills([])
+            setSelectedPatientDetails(null)
         }
     }, [selectedVisitId, selectedVisit?.visit_id, selectedVisit?.patient_id, refreshTrigger])
 
@@ -196,6 +205,16 @@ export default function DoctorDashboard() {
         setVisits(prev => prev.filter(v => v.visit_id !== visitId))
     }
 
+    const handleVisitMarkedDone = (visitId: string, nextReviewDate?: string) => {
+        setVisits(prev => prev.map(v => v.visit_id === visitId ? { ...v, status: 'done' } : v))
+        if (nextReviewDate) {
+            const patientId = visits.find(v => v.visit_id === visitId)?.patient_id
+            if (patientId && patientId === selectedVisit?.patient_id) {
+                setSelectedPatientDetails(prev => prev ? { ...prev, next_review_date: nextReviewDate } : prev)
+            }
+        }
+    }
+
     const getDaysAgo = (isoString: string): string => {
         const deleted = new Date(isoString)
         const now = new Date()
@@ -205,6 +224,20 @@ export default function DoctorDashboard() {
         if (days === 1) return "1 day ago"
         return `${days} days ago`
     }
+
+    // Age / Sex / Review Date summary for the pictures card header (replaces
+    // the "Patient Pictures" label). Review Date is whatever was last
+    // entered in the "Mark Visit as Done" popup for this patient — omitted
+    // entirely if none has ever been set. Kept as an array (rendered with a
+    // flex gap, not a joined string) so the parts get real spacing instead
+    // of a single collapsible space around the separator.
+    const patientHeaderParts = [
+        selectedPatientDetails?.age != null ? `${selectedPatientDetails.age} yrs` : null,
+        selectedPatientDetails?.sex || null,
+        selectedPatientDetails?.next_review_date
+            ? `Follow-up : ${new Date(selectedPatientDetails.next_review_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}`
+            : null,
+    ].filter((p): p is string => !!p)
 
     // Filter images logic hoisted for navigation context
     const filteredImages = useMemo(() => {
@@ -359,7 +392,12 @@ export default function DoctorDashboard() {
                         {/* Patient Pictures card header */}
                         <div className="flex items-center justify-between px-4 py-2 bg-card border-b">
                             <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                                <ImageIcon className="h-3.5 w-3.5" /> Patient Pictures
+                                <User className="h-3.5 w-3.5" />
+                                {patientHeaderParts.length > 0 ? (
+                                    <span className="flex items-center gap-3">
+                                        {patientHeaderParts.map((part, i) => <span key={i}>{part}</span>)}
+                                    </span>
+                                ) : '—'}
                             </span>
                             <div className="flex items-center gap-1">
                                 {!showTrash && (
@@ -477,6 +515,16 @@ export default function DoctorDashboard() {
                                             ₹{visit.billed_amount}
                                         </span>
                                     )}
+                                    {visit.status !== 'done' && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2 flex-shrink-0 text-green-700 dark:text-green-400 hover:text-green-700 dark:hover:text-green-400 hover:bg-green-500/10"
+                                            onClick={(e) => { e.stopPropagation(); setVisitToMarkDone(visit) }}
+                                        >
+                                            Done
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -550,7 +598,12 @@ export default function DoctorDashboard() {
                                 <Card className="flex-1 flex flex-col min-h-0">
                                     <CardHeader className="pb-2 py-3 px-4 border-b bg-muted/10 flex flex-row items-center justify-between">
                                         <CardTitle className="text-sm font-medium opacity-80 flex items-center gap-2">
-                                            <ImageIcon className="h-4 w-4" /> Patient Pictures
+                                            <User className="h-4 w-4" />
+                                            {patientHeaderParts.length > 0 ? (
+                                                <span className="flex items-center gap-12">
+                                                    {patientHeaderParts.map((part, i) => <span key={i}>{part}</span>)}
+                                                </span>
+                                            ) : '—'}
                                         </CardTitle>
                                         <div className="flex gap-2">
                                             {!showTrash && (
@@ -1075,6 +1128,16 @@ export default function DoctorDashboard() {
                                             ))}
                                         </div>
                                     )}
+                                    {visit.status !== 'done' && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setVisitToMarkDone(visit) }}
+                                            className="px-2 py-1 rounded text-xs font-medium text-green-700 dark:text-green-400 hover:bg-green-500/10 transition-colors flex-shrink-0"
+                                            title={`Mark visit ${visit.visit_id} done`}
+                                        >
+                                            Done
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); setVisitToDelete(visit) }}
@@ -1099,6 +1162,12 @@ export default function DoctorDashboard() {
                 onOpenChange={(open) => { if (!open) setVisitToDelete(null) }}
                 visit={visitToDelete}
                 onDeleted={handleVisitDeleted}
+            />
+            <MarkVisitDoneDialog
+                open={!!visitToMarkDone}
+                onOpenChange={(open) => { if (!open) setVisitToMarkDone(null) }}
+                visit={visitToMarkDone}
+                onDone={handleVisitMarkedDone}
             />
         </div>
     )

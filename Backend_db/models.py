@@ -15,6 +15,10 @@ class Patient(db.Model):
     reference_patient_id = db.Column(db.String(8), db.ForeignKey('patients.patient_id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     created_by_user_id = db.Column(db.String(36), nullable=True)
+    # Next follow-up/review date, set from the "Mark Visit as Done" popup.
+    # Always just the most recently entered value — overwritten each time,
+    # no history of past review dates is kept.
+    next_review_date = db.Column(db.Date, nullable=True)
 
     # Def to generate unique patient_id
     @staticmethod

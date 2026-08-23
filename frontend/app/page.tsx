@@ -13,6 +13,7 @@ import { EditVisitDialog } from "@/components/EditVisitDialog"
 import { WalkInForm } from "@/components/WalkInForm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
+import { ReviewTab } from "@/components/ReviewTab"
 import { api, type Visit } from "@/lib/api"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
@@ -299,6 +300,7 @@ function DashboardContent() {
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="visits">All Visits</TabsTrigger>
+                        <TabsTrigger value="review">Review</TabsTrigger>
                     </TabsList>
                     <div className="ml-auto">
                         {activeTab === "visits" && (
@@ -327,6 +329,10 @@ function DashboardContent() {
 
                 <TabsContent value="visits" className="flex-1 overflow-hidden m-0">
                     <VisitsTab visits={filteredVisits} loading={filteredLoading} />
+                </TabsContent>
+
+                <TabsContent value="review" className="flex-1 overflow-hidden m-0">
+                    <ReviewTab />
                 </TabsContent>
             </Tabs>
 

@@ -1,6 +1,7 @@
 
 import io
 import csv
+from datetime import datetime
 from flask import Blueprint, request, jsonify, g, send_file
 from models import Patient
 from extensions import db, get_ist_now
@@ -97,6 +98,53 @@ def get_patients():
         })
     return jsonify(results), 200
 
+@patients.route('/patients/reviews', methods=['GET'])
+@require_auth
+def get_patient_reviews():
+    """Patients grouped by next_review_date — backs the Dashboard's Review tab.
+    Unfiltered = every patient with any next_review_date set (past or future),
+    sorted ascending (soonest first), since these are forward-looking
+    follow-ups — the opposite of a most-recent-first activity log."""
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+
+    query = Patient.query.filter(Patient.next_review_date.isnot(None))
+
+    if date_from:
+        try:
+            datetime.strptime(date_from, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date_from format, expected YYYY-MM-DD'}), 400
+        query = query.filter(Patient.next_review_date >= date_from)
+
+    if date_to:
+        try:
+            datetime.strptime(date_to, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid date_to format, expected YYYY-MM-DD'}), 400
+        query = query.filter(Patient.next_review_date <= date_to)
+
+    patients_list = query.order_by(Patient.next_review_date.asc(), Patient.name.asc()).all()
+
+    from collections import defaultdict
+    grouped: dict = defaultdict(list)
+    for p in patients_list:
+        date_key = p.next_review_date.isoformat()
+        grouped[date_key].append({
+            'patient_id': p.patient_id,
+            'name': p.name,
+            'phone_number': p.phone_number,
+            'age': p.age,
+            'sex': p.sex,
+        })
+
+    result = [
+        {'date': date_key, 'patients': grouped[date_key]}
+        for date_key in sorted(grouped.keys())
+    ]
+
+    return jsonify({'days': result}), 200
+
 @patients.route('/patients/<patient_id>', methods=['GET'])
 @require_auth
 def get_patient_detail(patient_id):
@@ -115,6 +163,7 @@ def get_patient_detail(patient_id):
         'reference_patient_id': patient.reference_patient_id,
         'reference_patient_name': ref_name,
         'created_at': patient.created_at.isoformat() if patient.created_at else None,
+        'next_review_date': patient.next_review_date.isoformat() if patient.next_review_date else None,
     }), 200
 
 @patients.route('/patients/<patient_id>', methods=['PUT'])
@@ -141,6 +190,18 @@ def update_patient(patient_id):
             if not Patient.query.filter_by(patient_id=ref_id).first():
                 return jsonify({'error': 'Referenced patient not found'}), 400
         patient.reference_patient_id = ref_id
+    if 'next_review_date' in data:
+        raw = data['next_review_date']
+        if raw is None or raw == '':
+            patient.next_review_date = None
+        else:
+            try:
+                parsed = datetime.strptime(raw, '%Y-%m-%d').date()
+            except (TypeError, ValueError):
+                return jsonify({'error': 'next_review_date must be YYYY-MM-DD'}), 400
+            if parsed < get_ist_now().date():
+                return jsonify({'error': 'Review date cannot be in the past'}), 400
+            patient.next_review_date = parsed
 
     db.session.commit()
 
