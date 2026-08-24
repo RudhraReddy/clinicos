@@ -36,9 +36,9 @@ interface InvoicePrintProps {
     paymentType?: string | null
     cashAmount?: number | null
     upiAmount?: number | null
-    // Stamped between the pharmacy header and patient details when true — a
-    // saved, actually-paid bill. Never true on a draft/preview print (nothing
-    // has actually been paid or recorded yet).
+    // No longer rendered (the "PAID IN FULL" stamp was removed) — kept in the
+    // interface so existing callers (PrintInvoiceDialog, DraftInvoicePreviewDialog)
+    // don't need to change what they pass.
     paid?: boolean
     date?: Date
     referenceDoctor?: string
@@ -108,7 +108,6 @@ export function InvoicePrint({
     paymentType = null,
     cashAmount = null,
     upiAmount = null,
-    paid = false,
     date = new Date(),
     referenceDoctor,
     className,
@@ -168,18 +167,6 @@ export function InvoicePrint({
             )}
 
             <Divider />
-
-            {/* PAID IN FULL stamp — only for a saved, actually-paid bill. Never
-                shown on a draft/preview print. Matches the divider style used
-                everywhere else on the receipt (plain dashes, no box). */}
-            {paid && (
-                <>
-                    <div style={{ textAlign: "center", fontWeight: 700, fontSize: "11pt" }}>
-                        PAID IN FULL
-                    </div>
-                    <Divider />
-                </>
-            )}
 
             {/* Patient details — NAME alone, then PH + AGE sharing a row, then REF alone.
                 NAME/PH/REF share a padded label width (4 — "NAME" is the longest) so
