@@ -34,7 +34,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
     const [invoicePhotos, setInvoicePhotos] = useState<any[]>([]) // eslint-disable-line @typescript-eslint/no-explicit-any
-    const { clinicName, clinicAddress, clinicPhone, referenceDoctor, appFontSize } = useSettings()
+    const { clinicName, clinicAddress, clinicPhone, clinicLicense, referenceDoctor, appFontSize } = useSettings()
 
     useEffect(() => {
         if (open && patient) {
@@ -306,7 +306,7 @@ export function PatientDetailsView({ patient, open, onOpenChange, trigger, viewM
                     clinicName={clinicName}
                     clinicAddress={clinicAddress}
                     clinicPhone={clinicPhone}
-                    clinicLicense="TG/WLU/2025-140763"
+                    clinicLicense={clinicLicense}
                     referenceDoctor={referenceDoctor}
                     photos={invoicePhotos}
                 />

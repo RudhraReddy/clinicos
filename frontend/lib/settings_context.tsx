@@ -42,6 +42,7 @@ interface SettingsContextType {
     clinicName: string
     clinicAddress: string
     clinicPhone: string
+    clinicLicense: string
     referenceDoctor: string
     appFontSize: number
     expiryReminderMonths: number
@@ -58,6 +59,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [clinicName, setClinicName] = useState("Teja Reddy Clinic")
     const [clinicAddress, setClinicAddress] = useState("#3145 Here and there, TS 500081")
     const [clinicPhone, setClinicPhone] = useState("+91 98765 43210")
+    const [clinicLicense, setClinicLicense] = useState("TG/WLU/2025-140763")
     const [referenceDoctor, setReferenceDoctor] = useState("")
     const [appFontSize, setAppFontSize] = useState(16)
     const [expiryReminderMonths, setExpiryReminderMonths] = useState(6)
@@ -72,6 +74,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const storedName       = localStorage.getItem("clinic_name")
         const storedAddress    = localStorage.getItem("clinic_address")
         const storedPhone      = localStorage.getItem("clinic_phone")
+        const storedLicense    = localStorage.getItem("clinic_license")
         const storedRefDoc     = localStorage.getItem("clinic_ref_doc")
         const storedFontSize   = localStorage.getItem("clinic_font_size")
         const storedExpiry     = localStorage.getItem("expiry_reminder_months")
@@ -81,6 +84,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (storedName)    setClinicName(storedName)
         if (storedAddress !== null) setClinicAddress(storedAddress)
         if (storedPhone !== null)   setClinicPhone(storedPhone)
+        if (storedLicense !== null) setClinicLicense(storedLicense)
         if (storedRefDoc !== null)  setReferenceDoctor(storedRefDoc)
         if (storedFontSize) {
             const parsed = parseInt(storedFontSize, 10)
@@ -126,6 +130,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             setClinicPhone(settings.clinicPhone)
             localStorage.setItem("clinic_phone", settings.clinicPhone)
         }
+        if (settings.clinicLicense !== undefined) {
+            setClinicLicense(settings.clinicLicense)
+            localStorage.setItem("clinic_license", settings.clinicLicense)
+        }
         if (settings.referenceDoctor !== undefined) {
             setReferenceDoctor(settings.referenceDoctor)
             localStorage.setItem("clinic_ref_doc", settings.referenceDoctor)
@@ -159,6 +167,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             clinicName,
             clinicAddress,
             clinicPhone,
+            clinicLicense,
             referenceDoctor,
             appFontSize: currentFontSize,
             expiryReminderMonths,

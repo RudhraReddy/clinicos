@@ -49,7 +49,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange }: VisitDetailsDi
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
     const [invoicePhotos, setInvoicePhotos] = useState<any[]>([]) // eslint-disable-line @typescript-eslint/no-explicit-any
-    const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
+    const { clinicName, clinicAddress, clinicPhone, clinicLicense, referenceDoctor } = useSettings()
     const { role } = useAuth()
 
     useEffect(() => {
@@ -226,7 +226,7 @@ export function VisitDetailsDialog({ visit, open, onOpenChange }: VisitDetailsDi
                     clinicName={clinicName}
                     clinicAddress={clinicAddress}
                     clinicPhone={clinicPhone}
-                    clinicLicense="TG/WLU/2025-140763"
+                    clinicLicense={clinicLicense}
                     referenceDoctor={referenceDoctor}
                     photos={invoicePhotos}
                 />

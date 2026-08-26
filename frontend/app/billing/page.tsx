@@ -180,7 +180,7 @@ function BillingContent() {
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
     const [draftPreviewOpen, setDraftPreviewOpen] = useState(false)
 
-    const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
+    const { clinicName, clinicAddress, clinicPhone, clinicLicense, referenceDoctor } = useSettings()
 
     // Load patient if ID present in URL
     useEffect(() => {
@@ -1262,7 +1262,7 @@ function BillingContent() {
                 clinicName={clinicName}
                 clinicAddress={clinicAddress}
                 clinicPhone={clinicPhone}
-                clinicLicense="TG/WLU/2025-140763"
+                clinicLicense={clinicLicense}
                 referenceDoctor={referenceDoctor}
             />
 
@@ -1274,7 +1274,7 @@ function BillingContent() {
                 clinicName={clinicName}
                 clinicAddress={clinicAddress}
                 clinicPhone={clinicPhone}
-                clinicLicense="TG/WLU/2025-140763"
+                clinicLicense={clinicLicense}
                 referenceDoctor={referenceDoctor}
                 patient={walkInMode
                     ? { name: walkInName || "Walk-in", phone_number: "", age: walkInAge ? parseInt(walkInAge) : null, sex: walkInSex || null }

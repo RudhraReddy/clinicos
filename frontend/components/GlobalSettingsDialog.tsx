@@ -21,8 +21,9 @@ export function GlobalSettingsDialog() {
     const { 
         clinicName, 
         clinicAddress, 
-        clinicPhone, 
-        referenceDoctor, 
+        clinicPhone,
+        clinicLicense,
+        referenceDoctor,
         appFontSize,
         setSettings,
         setPreviewFontSize
@@ -32,6 +33,7 @@ export function GlobalSettingsDialog() {
     const [settingsNameDraft, setSettingsNameDraft] = useState("")
     const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
     const [settingsPhoneDraft, setSettingsPhoneDraft] = useState("")
+    const [settingsLicenseDraft, setSettingsLicenseDraft] = useState("")
     const [settingsReferenceDoctorDraft, setSettingsReferenceDoctorDraft] = useState("")
     const [fontSizeDraft, setFontSizeDraft] = useState<number[]>([16])
 
@@ -41,6 +43,7 @@ export function GlobalSettingsDialog() {
             setSettingsNameDraft(clinicName)
             setSettingsAddressDraft(clinicAddress)
             setSettingsPhoneDraft(clinicPhone)
+            setSettingsLicenseDraft(clinicLicense)
             setSettingsReferenceDoctorDraft(referenceDoctor)
             setFontSizeDraft([appFontSize])
         } else {
@@ -62,6 +65,7 @@ export function GlobalSettingsDialog() {
             clinicName: settingsNameDraft,
             clinicAddress: settingsAddressDraft,
             clinicPhone: settingsPhoneDraft,
+            clinicLicense: settingsLicenseDraft,
             referenceDoctor: settingsReferenceDoctorDraft,
             appFontSize: fontSizeDraft[0]
         })
@@ -116,6 +120,15 @@ export function GlobalSettingsDialog() {
                                 value={settingsPhoneDraft}
                                 onChange={(e) => setSettingsPhoneDraft(e.target.value)}
                                 placeholder="+91 98765 43210"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="global-clinic-license">DL No</Label>
+                            <Input
+                                id="global-clinic-license"
+                                value={settingsLicenseDraft}
+                                onChange={(e) => setSettingsLicenseDraft(e.target.value)}
+                                placeholder="TG/WLU/2025-140763"
                             />
                         </div>
                         <div className="space-y-2">
