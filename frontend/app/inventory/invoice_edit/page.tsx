@@ -350,7 +350,10 @@ export default function InvoiceEditPage() {
                         onOpenChange={setShowQR}
                         contextType="inventory"
                         contextId={invoiceNo || qrContextId}
-                        onSuccess={() => toast.success("Image uploaded via QR — will be linked on save")}
+                        onSuccess={(res) => {
+                            if (res?.path) setImagePath(res.path)
+                            toast.success("Image uploaded via QR")
+                        }}
                     />
                     {imagePath && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive ml-2" onClick={() => setImagePath("")} title="Remove Image">

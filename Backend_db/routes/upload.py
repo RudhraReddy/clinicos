@@ -134,12 +134,22 @@ def finalize_session(session_id):
         if not filepath or not os.path.exists(filepath):
             return jsonify({'error': 'Uploaded file not found on disk'}), 500
 
+        # Move out of the temp session folder into permanent invoice image
+        # storage — same destination as the direct-upload path in
+        # routes/inventory.py's upload_inventory_report(). Leaving it under
+        # temp/<session_id>/ would tie the invoice's saved image_path to a
+        # scratch location instead of permanent storage.
+        invoices_folder = os.path.join(os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads'), 'invoices')
+        os.makedirs(invoices_folder, exist_ok=True)
+        dst = os.path.join(invoices_folder, first_file.get('filename', os.path.basename(filepath)))
+        os.rename(filepath, dst)
+
         session.status = 'COMPLETED'
         db.session.commit()
 
         return jsonify({
             'message': 'File processed successfully',
-            'path': filepath,
+            'path': dst,
         }), 200
 
     # ── Patient path ─────────────────────────────────────────────────────────
