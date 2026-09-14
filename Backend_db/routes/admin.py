@@ -379,6 +379,15 @@ def _preview_counts(scope, image_scope=None):
             'expense_ledger': ExpenseLedger.query.count(),
             'upload_sessions': UploadSession.query.count(),
         })
+        # Walk-in bills (patient_id IS NULL) are outside _patient_cascade_counts()'s
+        # scope -- add them on top so the preview matches what _wipe_all() actually
+        # deletes (see _wipe_all()'s matching walk-in bill block).
+        walkin_bill_ids = [b.invoice_id for b in
+                           Bill.query.with_entities(Bill.invoice_id)
+                           .filter(Bill.patient_id.is_(None)).all()]
+        counts['bills'] += len(walkin_bill_ids)
+        counts['bill_items'] += BillItem.query.filter(
+            BillItem.bill_id.in_(walkin_bill_ids)).count() if walkin_bill_ids else 0
         return counts
 
     raise ValueError(f'Unknown scope: {scope}')
@@ -528,11 +537,12 @@ def _wipe_patients():
 
 def _wipe_all():
     """Composition of _wipe_patients() + _wipe_inventory_all(), plus
-    ExpenseLedger + any remaining UploadSession rows. Deliberately does NOT
-    also call _wipe_images('all') -- see the comment in the spec doc's
-    Backend API section for why that would double-count/double-delete
-    PatientImage rows. Keeps: User, DoctorStaffAssignment, Location,
-    AuditLog."""
+    walk-in bills (Bill.patient_id IS NULL, missed by both of those --
+    see the walk-in bill block below), ExpenseLedger, and any remaining
+    UploadSession rows. Deliberately does NOT also call _wipe_images('all')
+    -- see the comment in the spec doc's Backend API section for why that
+    would double-count/double-delete PatientImage rows. Keeps: User,
+    DoctorStaffAssignment, Location, AuditLog."""
     counts = {}
     files = []
 
@@ -543,6 +553,24 @@ def _wipe_all():
     inv_counts, inv_files = _wipe_inventory_all()
     counts.update(inv_counts)
     files.extend(inv_files)
+
+    # Walk-in bills (patient_id IS NULL) are outside _wipe_patients()'s scope
+    # (correctly, for the standalone patients scope) and _wipe_inventory_all()
+    # never touches Bill at all -- 'all' must finish the job here to match its
+    # own "wipes everything except accounts" promise. Added to the EXISTING
+    # counts['bills']/counts['bill_items'] (already holding the patient-linked
+    # totals from _wipe_patients()) so the final numbers are the true total.
+    walkin_bill_ids = [b.invoice_id for b in
+                       Bill.query.with_entities(Bill.invoice_id)
+                       .filter(Bill.patient_id.is_(None)).all()]
+    if walkin_bill_ids:
+        counts['bills'] = counts.get('bills', 0) + len(walkin_bill_ids)
+        counts['bill_items'] = counts.get('bill_items', 0) + BillItem.query.filter(
+            BillItem.bill_id.in_(walkin_bill_ids)).count()
+        BillItem.query.filter(BillItem.bill_id.in_(walkin_bill_ids)).delete(synchronize_session=False)
+        InventoryHistory.query.filter(InventoryHistory.bill_id.in_(walkin_bill_ids)).update(
+            {'bill_id': None}, synchronize_session=False)
+        Bill.query.filter(Bill.invoice_id.in_(walkin_bill_ids)).delete(synchronize_session=False)
 
     expenses = ExpenseLedger.query.all()
     expense_files = [e.receipt_path for e in expenses if e.receipt_path]
