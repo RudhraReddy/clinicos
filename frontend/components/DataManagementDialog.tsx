@@ -88,11 +88,15 @@ export function DataManagementDialog({ open, onOpenChange }: DataManagementDialo
             // attachment response, so these trigger a save without actually
             // navigating away. Images are deliberately not included; neither
             // endpoint has ever contained anything but tabular CSV data.
-            // Note: setTimeout delay is needed between these calls — when two
+            // Note: 300ms delay is needed between these calls — when two
             // location.href assignments fire back-to-back, the second aborts
-            // the first's in-flight request before download completes.
+            // the first's in-flight request before download completes. We
+            // await this delay to guarantee both export requests are
+            // dispatched before the destructive execute call fires, so the
+            // pre-wipe backup captures real data, not already-wiped state.
             api.exportInventory()
-            setTimeout(() => api.exportPatients(), 300)
+            await new Promise(resolve => setTimeout(resolve, 300))
+            api.exportPatients()
             const res = await api.executeDataManagement(scope, totpCode, effectiveImageScope)
             toast.success(res.message)
             onOpenChange(false)
