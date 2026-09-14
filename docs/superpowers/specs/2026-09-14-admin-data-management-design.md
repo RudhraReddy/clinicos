@@ -98,9 +98,19 @@ Each scope maps to one private helper (`_wipe_stock_counts()`,
   `AuditLog` — a table every one of these five scopes explicitly excludes
   from deletion (`all` included), so the trail always survives.
 
-`_wipe_all()` is a straight composition of the other four helpers, called in
-dependency order (`images(all)` → `patients` → `inventory_all` →
-`ExpenseLedger` + remaining `UploadSession` rows), not duplicated logic.
+`_wipe_all()` is a straight composition of `_wipe_patients()` and
+`_wipe_inventory_all()`, plus its own final step for `ExpenseLedger` +
+remaining `UploadSession` rows — **not** a separate call to `_wipe_images()`
+on top of those two. `_wipe_patients()` already deletes every `PatientImage`
+row as part of its own cascade (since `PatientImage.patient_id` is
+non-nullable, no image can outlive its patient), and `_wipe_inventory_all()`
+already collects and deletes every `PurchaseInvoice` row — image and all —
+as part of wiping the catalog. Composing in `images(all)` first, then
+`patients`, as originally drafted, would run `PatientImage` deletion twice
+and — worse — overwrite the correct `patient_images` count from the first
+call with `0` from the second when merging the two helpers' count dicts.
+Call order: `_wipe_patients()` → `_wipe_inventory_all()` → inline
+`ExpenseLedger`/`UploadSession` cleanup.
 
 ## Frontend
 
