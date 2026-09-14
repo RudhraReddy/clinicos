@@ -6,7 +6,11 @@ from flask import Blueprint, g, jsonify, request
 from sqlalchemy import func, text
 
 from extensions import db, get_ist_now
-from models import AuditLog, User, DoctorStaffAssignment, Visit, Bill, Patient, Location, InventoryBatch, InventoryHistory
+from models import (
+    AuditLog, User, DoctorStaffAssignment, Visit, Bill, BillItem, VisitRefund,
+    Patient, Location, InventoryBatch, InventoryHistory, PatientImage,
+    UploadSession, ExpenseLedger, ProductMaster, PurchaseInvoice,
+)
 from routes.auth import require_admin, require_auth, _verify_totp
 
 admin_bp = Blueprint('admin', __name__)
@@ -328,3 +332,164 @@ def wipe_inventory():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ─── Data Management (Danger Zone) ─────────────────────────────────────────
+
+_VALID_SCOPES = ('stock_counts', 'inventory_all', 'images', 'patients', 'all')
+_VALID_IMAGE_SCOPES = ('all', 'prescriptions', 'invoices')
+
+
+def _unlink_files(paths):
+    """Best-effort delete of files on disk. Never raises -- a missing or
+    unremovable file is logged and skipped, not a reason to fail the
+    (already-committed) DB wipe."""
+    for p in paths:
+        if not p:
+            continue
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except Exception as e:
+            print(f"Warning: could not delete file {p}: {e}")
+
+
+def _patient_cascade_counts(patient_ids):
+    """Row counts for everything Clear Patients / Clear All would cascade-
+    delete for the given patient ids. Read-only -- used by preview."""
+    if not patient_ids:
+        return {'patients': 0, 'visits': 0, 'bills': 0, 'bill_items': 0,
+                'visit_refunds': 0, 'patient_images': 0}
+
+    visit_ids = [v.visit_id for v in
+                 Visit.query.with_entities(Visit.visit_id)
+                 .filter(Visit.patient_id.in_(patient_ids)).all()]
+    bill_ids = [b.invoice_id for b in
+                Bill.query.with_entities(Bill.invoice_id)
+                .filter(Bill.patient_id.in_(patient_ids)).all()]
+
+    return {
+        'patients': len(patient_ids),
+        'visits': len(visit_ids),
+        'bills': len(bill_ids),
+        'bill_items': BillItem.query.filter(BillItem.bill_id.in_(bill_ids)).count() if bill_ids else 0,
+        'visit_refunds': VisitRefund.query.filter(VisitRefund.visit_id.in_(visit_ids)).count() if visit_ids else 0,
+        'patient_images': PatientImage.query.filter(PatientImage.patient_id.in_(patient_ids)).count(),
+    }
+
+
+def _preview_counts(scope, image_scope=None):
+    """Read-only row counts for the given scope. Raises ValueError on an
+    unknown scope/image_scope -- callers must validate against
+    _VALID_SCOPES/_VALID_IMAGE_SCOPES first and turn that into a 400."""
+    if scope == 'stock_counts':
+        return {
+            'inventory_batches': InventoryBatch.query.count(),
+            'inventory_history': InventoryHistory.query.count(),
+        }
+
+    if scope == 'inventory_all':
+        return {
+            'inventory_batches': InventoryBatch.query.count(),
+            'inventory_history': InventoryHistory.query.count(),
+            'purchase_invoices': PurchaseInvoice.query.count(),
+            'product_master': ProductMaster.query.count(),
+        }
+
+    if scope == 'images':
+        if image_scope == 'prescriptions':
+            return {'patient_images': PatientImage.query.filter_by(tag='Prescription').count()}
+        if image_scope == 'invoices':
+            return {'purchase_invoice_images': PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).count()}
+        return {
+            'patient_images': PatientImage.query.count(),
+            'purchase_invoice_images': PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).count(),
+        }
+
+    if scope == 'patients':
+        patient_ids = [p.patient_id for p in Patient.query.with_entities(Patient.patient_id).all()]
+        return _patient_cascade_counts(patient_ids)
+
+    if scope == 'all':
+        patient_ids = [p.patient_id for p in Patient.query.with_entities(Patient.patient_id).all()]
+        counts = _patient_cascade_counts(patient_ids)
+        counts.update({
+            'inventory_batches': InventoryBatch.query.count(),
+            'inventory_history': InventoryHistory.query.count(),
+            'purchase_invoices': PurchaseInvoice.query.count(),
+            'product_master': ProductMaster.query.count(),
+            'expense_ledger': ExpenseLedger.query.count(),
+            'upload_sessions': UploadSession.query.count(),
+        })
+        return counts
+
+    raise ValueError(f'Unknown scope: {scope}')
+
+
+def _wipe_stock_counts():
+    """= today's existing Wipe Inventory behavior: batches + history only."""
+    history_count = InventoryHistory.query.count()
+    batch_count = InventoryBatch.query.count()
+    InventoryHistory.query.delete(synchronize_session=False)
+    InventoryBatch.query.delete(synchronize_session=False)
+    db.session.commit()
+    return {'inventory_batches': batch_count, 'inventory_history': history_count}, []
+
+
+@admin_bp.route('/admin/data_management/preview', methods=['GET'])
+@require_auth
+@require_admin
+def data_management_preview():
+    scope = request.args.get('scope')
+    image_scope = request.args.get('image_scope')
+
+    if scope not in _VALID_SCOPES:
+        return jsonify({'error': 'Invalid scope'}), 400
+    if scope == 'images' and image_scope not in _VALID_IMAGE_SCOPES:
+        return jsonify({'error': 'Invalid image_scope'}), 400
+
+    return jsonify({'counts': _preview_counts(scope, image_scope)}), 200
+
+
+@admin_bp.route('/admin/data_management/execute', methods=['DELETE'])
+@require_auth
+@require_admin
+def data_management_execute():
+    data = request.get_json(silent=True) or {}
+    scope = data.get('scope')
+    image_scope = data.get('image_scope')
+    totp_code = (data.get('totp_code') or '').strip()
+
+    if scope not in _VALID_SCOPES:
+        return jsonify({'error': 'Invalid scope'}), 400
+    if scope == 'images' and image_scope not in _VALID_IMAGE_SCOPES:
+        return jsonify({'error': 'Invalid image_scope'}), 400
+    if not totp_code:
+        return jsonify({'error': 'Auth code is required'}), 400
+    if not _verify_totp(totp_code):
+        return jsonify({'error': 'Invalid or expired auth code'}), 401
+
+    try:
+        if scope == 'stock_counts':
+            counts, files = _wipe_stock_counts()
+        else:
+            return jsonify({'error': f'Scope not yet implemented: {scope}'}), 501
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+    _unlink_files(files)
+
+    from routes.auth import log_activity
+    log_activity(
+        action='DELETE',
+        resource_type='data_management',
+        resource_id=scope if scope != 'images' else f'images:{image_scope}',
+        resource_label=f'Data management wipe: {scope}',
+        details=', '.join(f'{k}={v}' for k, v in counts.items()),
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
+    return jsonify({'message': 'Wipe completed successfully.', 'counts': counts}), 200
