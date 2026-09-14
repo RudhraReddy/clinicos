@@ -88,8 +88,11 @@ export function DataManagementDialog({ open, onOpenChange }: DataManagementDialo
             // attachment response, so these trigger a save without actually
             // navigating away. Images are deliberately not included; neither
             // endpoint has ever contained anything but tabular CSV data.
+            // Note: setTimeout delay is needed between these calls — when two
+            // location.href assignments fire back-to-back, the second aborts
+            // the first's in-flight request before download completes.
             api.exportInventory()
-            api.exportPatients()
+            setTimeout(() => api.exportPatients(), 300)
             const res = await api.executeDataManagement(scope, totpCode, effectiveImageScope)
             toast.success(res.message)
             onOpenChange(false)
