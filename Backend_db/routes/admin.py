@@ -469,6 +469,46 @@ def _wipe_inventory_all():
     }, files
 
 
+def _wipe_images(image_scope):
+    if image_scope == 'prescriptions':
+        imgs = PatientImage.query.filter_by(tag='Prescription').all()
+        files = [i.image_path for i in imgs if i.image_path]
+        count = len(imgs)
+        PatientImage.query.filter_by(tag='Prescription').delete(synchronize_session=False)
+        db.session.commit()
+        return {'patient_images': count}, files
+
+    if image_scope == 'invoices':
+        invs = PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).all()
+        files = [i.image_path for i in invs]
+        count = len(invs)
+        PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).update(
+            {'image_path': None}, synchronize_session=False)
+        db.session.commit()
+        return {'purchase_invoice_images': count}, files
+
+    # 'all' -- every PatientImage row (any tag, including trashed) + every
+    # PurchaseInvoice image file. PurchaseInvoice rows themselves are kept
+    # (deleting the row is inventory_all's job, not this one).
+    imgs = PatientImage.query.all()
+    patient_image_files = [i.image_path for i in imgs if i.image_path]
+    patient_image_count = len(imgs)
+
+    invs = PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).all()
+    invoice_image_files = [i.image_path for i in invs]
+    invoice_image_count = len(invs)
+
+    PatientImage.query.delete(synchronize_session=False)
+    PurchaseInvoice.query.filter(PurchaseInvoice.image_path.isnot(None)).update(
+        {'image_path': None}, synchronize_session=False)
+    db.session.commit()
+
+    return {
+        'patient_images': patient_image_count,
+        'purchase_invoice_images': invoice_image_count,
+    }, patient_image_files + invoice_image_files
+
+
 @admin_bp.route('/admin/data_management/preview', methods=['GET'])
 @require_auth
 @require_admin
@@ -507,6 +547,8 @@ def data_management_execute():
             counts, files = _wipe_stock_counts()
         elif scope == 'inventory_all':
             counts, files = _wipe_inventory_all()
+        elif scope == 'images':
+            counts, files = _wipe_images(image_scope)
         else:
             return jsonify({'error': f'Scope not yet implemented: {scope}'}), 501
     except Exception as e:
