@@ -509,6 +509,65 @@ def _wipe_images(image_scope):
     }, patient_image_files + invoice_image_files
 
 
+def _wipe_patients():
+    """Deletes every Patient and cascades PatientImage (+ files),
+    VisitRefund, BillItem, Bill (only bills with patient_id set -- walk-in
+    bills stay), Visit, and any 'patient'-context UploadSession rows for
+    the deleted ids. InventoryHistory.bill_id is nulled (not cascaded) on
+    the bills about to be deleted -- same FK-null-not-cascade reasoning as
+    _wipe_inventory_all()'s BillItem.product_id handling: the stock-
+    movement audit trail should survive even though the bill it once
+    pointed at is gone."""
+    patient_ids = [p.patient_id for p in Patient.query.with_entities(Patient.patient_id).all()]
+    if not patient_ids:
+        return {'patients': 0, 'visits': 0, 'bills': 0, 'bill_items': 0,
+                'visit_refunds': 0, 'patient_images': 0}, []
+
+    visit_ids = [v.visit_id for v in
+                 Visit.query.with_entities(Visit.visit_id)
+                 .filter(Visit.patient_id.in_(patient_ids)).all()]
+    bill_ids = [b.invoice_id for b in
+                Bill.query.with_entities(Bill.invoice_id)
+                .filter(Bill.patient_id.in_(patient_ids)).all()]
+
+    images = PatientImage.query.filter(PatientImage.patient_id.in_(patient_ids)).all()
+    files = [i.image_path for i in images if i.image_path]
+    image_count = len(images)
+
+    bill_item_count = BillItem.query.filter(BillItem.bill_id.in_(bill_ids)).count() if bill_ids else 0
+    refund_count = VisitRefund.query.filter(VisitRefund.visit_id.in_(visit_ids)).count() if visit_ids else 0
+
+    PatientImage.query.filter(PatientImage.patient_id.in_(patient_ids)).delete(synchronize_session=False)
+    if visit_ids:
+        VisitRefund.query.filter(VisitRefund.visit_id.in_(visit_ids)).delete(synchronize_session=False)
+    if bill_ids:
+        BillItem.query.filter(BillItem.bill_id.in_(bill_ids)).delete(synchronize_session=False)
+        InventoryHistory.query.filter(InventoryHistory.bill_id.in_(bill_ids)).update(
+            {'bill_id': None}, synchronize_session=False)
+        Bill.query.filter(Bill.invoice_id.in_(bill_ids)).delete(synchronize_session=False)
+    Visit.query.filter(Visit.patient_id.in_(patient_ids)).delete(synchronize_session=False)
+    UploadSession.query.filter(
+        UploadSession.context_type == 'patient',
+        UploadSession.context_id.in_(patient_ids),
+    ).delete(synchronize_session=False)
+    Patient.query.filter(Patient.patient_id.in_(patient_ids)).delete(synchronize_session=False)
+    db.session.commit()
+
+    # Best-effort: remove each patient's now-empty upload folder.
+    base_folder = os.path.join(os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads'), 'patients')
+    for pid in patient_ids:
+        shutil.rmtree(os.path.join(base_folder, pid), ignore_errors=True)
+
+    return {
+        'patients': len(patient_ids),
+        'visits': len(visit_ids),
+        'bills': len(bill_ids),
+        'bill_items': bill_item_count,
+        'visit_refunds': refund_count,
+        'patient_images': image_count,
+    }, files
+
+
 @admin_bp.route('/admin/data_management/preview', methods=['GET'])
 @require_auth
 @require_admin
@@ -549,6 +608,8 @@ def data_management_execute():
             counts, files = _wipe_inventory_all()
         elif scope == 'images':
             counts, files = _wipe_images(image_scope)
+        elif scope == 'patients':
+            counts, files = _wipe_patients()
         else:
             return jsonify({'error': f'Scope not yet implemented: {scope}'}), 501
     except Exception as e:
