@@ -292,48 +292,6 @@ def admin_diagnostics():
     }), 200
 
 
-@admin_bp.route('/admin/inventory/wipe', methods=['DELETE'])
-@require_auth
-@require_admin
-def wipe_inventory():
-    data = request.get_json(silent=True) or {}
-    totp_code = (data.get('totp_code') or '').strip()
-
-    if not totp_code:
-        return jsonify({'error': 'Auth code is required'}), 400
-
-    if not _verify_totp(totp_code):
-        return jsonify({'error': 'Invalid or expired auth code'}), 401
-
-    try:
-        history_count = InventoryHistory.query.count()
-        batch_count = InventoryBatch.query.count()
-
-        InventoryHistory.query.delete(synchronize_session=False)
-        InventoryBatch.query.delete(synchronize_session=False)
-        db.session.commit()
-
-        from routes.auth import log_activity
-        log_activity(
-            action='DELETE',
-            resource_type='inventory',
-            resource_id='ALL',
-            resource_label='FULL INVENTORY WIPE',
-            details=f'Wiped {batch_count} batches and {history_count} history entries',
-            user_id=g.current_user.get('user_id'),
-            username=g.current_user.get('username'),
-            ip_address=request.remote_addr,
-        )
-
-        return jsonify({
-            'message': f'Inventory wiped — {batch_count} batches and {history_count} history records deleted.',
-        }), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
 # ─── Data Management (Danger Zone) ─────────────────────────────────────────
 
 _VALID_SCOPES = ('stock_counts', 'inventory_all', 'images', 'patients', 'all')
@@ -568,6 +526,45 @@ def _wipe_patients():
     }, files
 
 
+def _wipe_all():
+    """Composition of _wipe_patients() + _wipe_inventory_all(), plus
+    ExpenseLedger + any remaining UploadSession rows. Deliberately does NOT
+    also call _wipe_images('all') -- see the comment in the spec doc's
+    Backend API section for why that would double-count/double-delete
+    PatientImage rows. Keeps: User, DoctorStaffAssignment, Location,
+    AuditLog."""
+    counts = {}
+    files = []
+
+    patient_counts, patient_files = _wipe_patients()
+    counts.update(patient_counts)
+    files.extend(patient_files)
+
+    inv_counts, inv_files = _wipe_inventory_all()
+    counts.update(inv_counts)
+    files.extend(inv_files)
+
+    expenses = ExpenseLedger.query.all()
+    expense_files = [e.receipt_path for e in expenses if e.receipt_path]
+    counts['expense_ledger'] = len(expenses)
+    files.extend(expense_files)
+    ExpenseLedger.query.delete(synchronize_session=False)
+
+    counts['upload_sessions'] = UploadSession.query.count()
+    UploadSession.query.delete(synchronize_session=False)
+
+    db.session.commit()
+
+    # Best-effort: sweep any leftover scratch files under temp/ (e.g. from
+    # an abandoned/never-finalized QR session) not tracked by any DB row.
+    temp_dir = os.path.join(os.environ.get('UPLOAD_BASE_DIR', '/tmp/clinic_uploads'), 'temp')
+    if os.path.isdir(temp_dir):
+        for entry in os.listdir(temp_dir):
+            shutil.rmtree(os.path.join(temp_dir, entry), ignore_errors=True)
+
+    return counts, files
+
+
 @admin_bp.route('/admin/data_management/preview', methods=['GET'])
 @require_auth
 @require_admin
@@ -610,8 +607,8 @@ def data_management_execute():
             counts, files = _wipe_images(image_scope)
         elif scope == 'patients':
             counts, files = _wipe_patients()
-        else:
-            return jsonify({'error': f'Scope not yet implemented: {scope}'}), 501
+        else:  # 'all'
+            counts, files = _wipe_all()
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
