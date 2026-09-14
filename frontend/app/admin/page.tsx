@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Plus, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle, Menu } from "lucide-react"
+import { Loader2, Users, Activity, ShieldCheck, LogIn, LogOut, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, Edit, PlusCircle, Plus, Pencil, Trash2, CreditCard, Calendar, Database, HardDrive, ScanEye, CheckCircle2, XCircle, Menu, ShieldAlert } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { format } from "date-fns"
+import { DataManagementDialog } from "@/components/DataManagementDialog"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -746,6 +747,7 @@ function ActivityLogTab({ allUsers }: { allUsers: AdminUser[] }) {
 function SettingsTab() {
     const { expiryReminderMonths, defaultInventoryColumns, defaultMinStock, defaultPatientColumns, setSettings } = useSettings()
     const [localMonths, setLocalMonths] = useState(expiryReminderMonths)
+    const [dataMgmtOpen, setDataMgmtOpen] = useState(false)
 
     useEffect(() => {
         setLocalMonths(expiryReminderMonths)
@@ -1115,6 +1117,25 @@ function SettingsTab() {
                     </Button>
                 </div>
             </div>
+
+            {/* ── Danger Zone ── */}
+            <div>
+                <h2 className="text-lg font-semibold mb-1 text-rose-600">Danger Zone</h2>
+                <p className="text-sm text-muted-foreground">
+                    Permanently delete data. These actions cannot be undone.
+                </p>
+            </div>
+            <div className="rounded-lg border border-rose-200 dark:border-rose-800 p-4">
+                <Button
+                    variant="outline"
+                    className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                    onClick={() => setDataMgmtOpen(true)}
+                >
+                    <ShieldAlert className="h-4 w-4 mr-2" />
+                    Data Management
+                </Button>
+            </div>
+            <DataManagementDialog open={dataMgmtOpen} onOpenChange={setDataMgmtOpen} />
         </div>
     )
 }
