@@ -897,245 +897,253 @@ function SettingsTab() {
     }
 
     return (
-        <div className="space-y-6 max-w-lg">
-            {/* ── Inventory Settings ── */}
-            <div>
-                <h2 className="text-lg font-semibold mb-1">Inventory Settings</h2>
-                <p className="text-sm text-muted-foreground">
-                    These settings apply across all inventory tables and dashboards.
-                </p>
-            </div>
-            <div className="rounded-lg border p-4 space-y-4">
-                <div className="space-y-1">
-                    <label className="text-sm font-medium">Expiry Reminder (months)</label>
-                    <p className="text-xs text-muted-foreground">
-                        Items expiring within this many months will be flagged as &quot;Expires Soon&quot;.
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* ══ Column 1: Inventory ══ */}
+            <div className="space-y-6">
+                {/* ── Inventory Settings ── */}
+                <div>
+                    <h2 className="text-lg font-semibold mb-1">Inventory Settings</h2>
+                    <p className="text-sm text-muted-foreground">
+                        These settings apply across all inventory tables and dashboards.
                     </p>
-                    <div className="flex items-center gap-3 mt-2">
-                        <input
-                            type="number"
-                            min={1}
-                            max={24}
-                            value={localMonths}
-                            onChange={e => {
-                                const n = parseInt(e.target.value, 10)
-                                if (!isNaN(n)) setLocalMonths(n)
-                            }}
-                            className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        />
-                        <span className="text-sm text-muted-foreground">months (1–24)</span>
-                    </div>
                 </div>
-                <Button size="sm" onClick={handleSave}>Save Settings</Button>
-            </div>
-
-            {/* ── Default Min Stock ── */}
-            <div className="rounded-lg border p-4 space-y-4">
-                <div className="space-y-1">
-                    <label className="text-sm font-medium">Default Min Stock Level</label>
-                    <p className="text-xs text-muted-foreground">
-                        Products without a custom min stock will use this value. Saving updates all such products automatically.
-                    </p>
-                    <div className="flex items-center gap-3 mt-2">
-                        <input
-                            type="number"
-                            min={1}
-                            max={9999}
-                            value={localDefaultMinStock}
-                            onChange={e => {
-                                const n = parseInt(e.target.value, 10)
-                                if (!isNaN(n)) setLocalDefaultMinStock(n)
-                            }}
-                            className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        />
-                        <span className="text-sm text-muted-foreground">units (1–9999)</span>
-                    </div>
-                </div>
-                <Button size="sm" onClick={handleSaveDefaultMinStock}>Save</Button>
-            </div>
-
-            {/* ── Inventory Default Columns ── */}
-            <div>
-                <h2 className="text-lg font-semibold mb-1">Inventory Default Columns</h2>
-                <p className="text-sm text-muted-foreground">
-                    Choose which columns are shown by default in the inventory table. Users can still toggle columns per-session.
-                </p>
-            </div>
-            <div className="rounded-lg border p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                    {ALL_INVENTORY_COLUMNS.map(col => (
-                        <label
-                            key={col.id}
-                            className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                        >
+                <div className="rounded-lg border p-4 space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium">Expiry Reminder (months)</label>
+                        <p className="text-xs text-muted-foreground">
+                            Items expiring within this many months will be flagged as &quot;Expires Soon&quot;.
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
                             <input
-                                type="checkbox"
-                                checked={localCols.has(col.id)}
-                                onChange={() => toggleCol(col.id)}
-                                disabled={col.required}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                type="number"
+                                min={1}
+                                max={24}
+                                value={localMonths}
+                                onChange={e => {
+                                    const n = parseInt(e.target.value, 10)
+                                    if (!isNaN(n)) setLocalMonths(n)
+                                }}
+                                className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                             />
-                            <span className="font-medium leading-none">{col.label}</span>
-                            {col.required && <span className="text-xs text-muted-foreground">(always on)</span>}
-                        </label>
-                    ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                    <Button size="sm" onClick={handleSaveCols}>Save Defaults</Button>
-                    <Button size="sm" variant="ghost" onClick={handleResetCols}>Reset</Button>
-                </div>
-            </div>
-
-            {/* ── Patient Page Default Columns ── */}
-            <div>
-                <h2 className="text-lg font-semibold mb-1">Patient Page Default Columns</h2>
-                <p className="text-sm text-muted-foreground">
-                    Choose which columns are shown by default in the Patients table. Users can still toggle per-session.
-                </p>
-            </div>
-            <div className="rounded-lg border p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                    {ALL_PATIENT_COLUMNS.map(col => (
-                        <label
-                            key={col.id}
-                            className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={localPatientCols.has(col.id)}
-                                onChange={() => togglePatientCol(col.id)}
-                                disabled={col.required}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                            <span className="font-medium leading-none">{col.label}</span>
-                            {col.required && <span className="text-xs text-muted-foreground">(always on)</span>}
-                        </label>
-                    ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                    <Button size="sm" onClick={handleSavePatientCols}>Save Defaults</Button>
-                    <Button size="sm" variant="ghost" onClick={handleResetPatientCols}>Reset</Button>
-                </div>
-            </div>
-
-            {/* ── Locations ── */}
-            <div>
-                <h2 className="text-lg font-semibold mb-1">Locations</h2>
-                <p className="text-sm text-muted-foreground">
-                    Clinic branches or chambers. Used to track inventory and billing per location.
-                </p>
-            </div>
-            <div className="rounded-lg border divide-y">
-                {locLoading ? (
-                    <div className="p-4 text-sm text-muted-foreground">Loading…</div>
-                ) : locations.length === 0 && !addingLoc ? (
-                    <div className="p-4 text-sm text-muted-foreground">No locations yet.</div>
-                ) : (
-                    locations.map(loc => (
-                        <div key={loc.id} className="flex items-center gap-2 px-4 py-3">
-                            {editingLocId === loc.id ? (
-                                <>
-                                    <Input
-                                        autoFocus
-                                        value={editingLocName}
-                                        onChange={e => setEditingLocName(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') handleRenameLocation(loc.id)
-                                            if (e.key === 'Escape') setEditingLocId(null)
-                                        }}
-                                        className="h-8 flex-1"
-                                    />
-                                    <Button size="sm" onClick={() => handleRenameLocation(loc.id)}>Save</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingLocId(null)}>Cancel</Button>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="flex-1 text-sm font-medium">{loc.name}</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${loc.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
-                                        {loc.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-8 w-8"
-                                        title="Rename"
-                                        onClick={() => { setEditingLocId(loc.id); setEditingLocName(loc.name) }}
-                                    >
-                                        <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-8 w-8"
-                                        title={loc.is_active ? 'Deactivate' : 'Reactivate'}
-                                        onClick={() => handleToggleActive(loc)}
-                                    >
-                                        {loc.is_active ? <XCircle className="h-3.5 w-3.5 text-muted-foreground" /> : <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
-                                    </Button>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-8 w-8 text-rose-600 hover:text-rose-700"
-                                        title="Delete"
-                                        onClick={() => handleDeleteLocation(loc)}
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                </>
-                            )}
+                            <span className="text-sm text-muted-foreground">months (1–24)</span>
                         </div>
-                    ))
-                )}
-
-                {addingLoc && (
-                    <div className="flex items-center gap-2 px-4 py-3">
-                        <Input
-                            autoFocus
-                            placeholder="Location name…"
-                            value={newLocName}
-                            onChange={e => setNewLocName(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter') handleAddLocation()
-                                if (e.key === 'Escape') { setAddingLoc(false); setNewLocName('') }
-                            }}
-                            className="h-8 flex-1"
-                        />
-                        <Button size="sm" onClick={handleAddLocation}>Add</Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setAddingLoc(false); setNewLocName('') }}>Cancel</Button>
                     </div>
-                )}
+                    <Button size="sm" onClick={handleSave}>Save Settings</Button>
+                </div>
 
-                <div className="px-4 py-3">
+                {/* ── Default Min Stock ── */}
+                <div className="rounded-lg border p-4 space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium">Default Min Stock Level</label>
+                        <p className="text-xs text-muted-foreground">
+                            Products without a custom min stock will use this value. Saving updates all such products automatically.
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                            <input
+                                type="number"
+                                min={1}
+                                max={9999}
+                                value={localDefaultMinStock}
+                                onChange={e => {
+                                    const n = parseInt(e.target.value, 10)
+                                    if (!isNaN(n)) setLocalDefaultMinStock(n)
+                                }}
+                                className="w-24 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                            <span className="text-sm text-muted-foreground">units (1–9999)</span>
+                        </div>
+                    </div>
+                    <Button size="sm" onClick={handleSaveDefaultMinStock}>Save</Button>
+                </div>
+
+                {/* ── Inventory Default Columns ── */}
+                <div>
+                    <h2 className="text-lg font-semibold mb-1">Inventory Default Columns</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Choose which columns are shown by default in the inventory table. Users can still toggle columns per-session.
+                    </p>
+                </div>
+                <div className="rounded-lg border p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {ALL_INVENTORY_COLUMNS.map(col => (
+                            <label
+                                key={col.id}
+                                className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={localCols.has(col.id)}
+                                    onChange={() => toggleCol(col.id)}
+                                    disabled={col.required}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span className="font-medium leading-none">{col.label}</span>
+                                {col.required && <span className="text-xs text-muted-foreground">(always on)</span>}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                        <Button size="sm" onClick={handleSaveCols}>Save Defaults</Button>
+                        <Button size="sm" variant="ghost" onClick={handleResetCols}>Reset</Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ══ Column 2: General ══ */}
+            <div className="space-y-6">
+                {/* ── Patient Page Default Columns ── */}
+                <div>
+                    <h2 className="text-lg font-semibold mb-1">Patient Page Default Columns</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Choose which columns are shown by default in the Patients table. Users can still toggle per-session.
+                    </p>
+                </div>
+                <div className="rounded-lg border p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {ALL_PATIENT_COLUMNS.map(col => (
+                            <label
+                                key={col.id}
+                                className={`flex items-center gap-2 text-sm rounded px-2 py-1 hover:bg-accent transition-colors ${col.required ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={localPatientCols.has(col.id)}
+                                    onChange={() => togglePatientCol(col.id)}
+                                    disabled={col.required}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span className="font-medium leading-none">{col.label}</span>
+                                {col.required && <span className="text-xs text-muted-foreground">(always on)</span>}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                        <Button size="sm" onClick={handleSavePatientCols}>Save Defaults</Button>
+                        <Button size="sm" variant="ghost" onClick={handleResetPatientCols}>Reset</Button>
+                    </div>
+                </div>
+
+                {/* ── Locations ── */}
+                <div>
+                    <h2 className="text-lg font-semibold mb-1">Locations</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Clinic branches or chambers. Used to track inventory and billing per location.
+                    </p>
+                </div>
+                <div className="rounded-lg border divide-y">
+                    {locLoading ? (
+                        <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+                    ) : locations.length === 0 && !addingLoc ? (
+                        <div className="p-4 text-sm text-muted-foreground">No locations yet.</div>
+                    ) : (
+                        locations.map(loc => (
+                            <div key={loc.id} className="flex items-center gap-2 px-4 py-3">
+                                {editingLocId === loc.id ? (
+                                    <>
+                                        <Input
+                                            autoFocus
+                                            value={editingLocName}
+                                            onChange={e => setEditingLocName(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') handleRenameLocation(loc.id)
+                                                if (e.key === 'Escape') setEditingLocId(null)
+                                            }}
+                                            className="h-8 flex-1"
+                                        />
+                                        <Button size="sm" onClick={() => handleRenameLocation(loc.id)}>Save</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => setEditingLocId(null)}>Cancel</Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="flex-1 text-sm font-medium">{loc.name}</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${loc.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                                            {loc.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8"
+                                            title="Rename"
+                                            onClick={() => { setEditingLocId(loc.id); setEditingLocName(loc.name) }}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8"
+                                            title={loc.is_active ? 'Deactivate' : 'Reactivate'}
+                                            onClick={() => handleToggleActive(loc)}
+                                        >
+                                            {loc.is_active ? <XCircle className="h-3.5 w-3.5 text-muted-foreground" /> : <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 text-rose-600 hover:text-rose-700"
+                                            title="Delete"
+                                            onClick={() => handleDeleteLocation(loc)}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        ))
+                    )}
+
+                    {addingLoc && (
+                        <div className="flex items-center gap-2 px-4 py-3">
+                            <Input
+                                autoFocus
+                                placeholder="Location name…"
+                                value={newLocName}
+                                onChange={e => setNewLocName(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleAddLocation()
+                                    if (e.key === 'Escape') { setAddingLoc(false); setNewLocName('') }
+                                }}
+                                className="h-8 flex-1"
+                            />
+                            <Button size="sm" onClick={handleAddLocation}>Add</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setAddingLoc(false); setNewLocName('') }}>Cancel</Button>
+                        </div>
+                    )}
+
+                    <div className="px-4 py-3">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAddingLoc(true)}
+                            disabled={addingLoc}
+                        >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Add Location
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ══ Column 3: Danger Zone ══ */}
+            <div className="space-y-6">
+                <div>
+                    <h2 className="text-lg font-semibold mb-1 text-rose-600">Danger Zone</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Permanently delete data. These actions cannot be undone.
+                    </p>
+                </div>
+                <div className="rounded-lg border border-rose-200 dark:border-rose-800 p-4">
                     <Button
-                        size="sm"
                         variant="outline"
-                        onClick={() => setAddingLoc(true)}
-                        disabled={addingLoc}
+                        className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                        onClick={() => setDataMgmtOpen(true)}
                     >
-                        <Plus className="h-3.5 w-3.5 mr-1.5" />
-                        Add Location
+                        <ShieldAlert className="h-4 w-4 mr-2" />
+                        Data Management
                     </Button>
                 </div>
+                <DataManagementDialog open={dataMgmtOpen} onOpenChange={setDataMgmtOpen} />
             </div>
-
-            {/* ── Danger Zone ── */}
-            <div>
-                <h2 className="text-lg font-semibold mb-1 text-rose-600">Danger Zone</h2>
-                <p className="text-sm text-muted-foreground">
-                    Permanently delete data. These actions cannot be undone.
-                </p>
-            </div>
-            <div className="rounded-lg border border-rose-200 dark:border-rose-800 p-4">
-                <Button
-                    variant="outline"
-                    className="text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                    onClick={() => setDataMgmtOpen(true)}
-                >
-                    <ShieldAlert className="h-4 w-4 mr-2" />
-                    Data Management
-                </Button>
-            </div>
-            <DataManagementDialog open={dataMgmtOpen} onOpenChange={setDataMgmtOpen} />
         </div>
     )
 }
