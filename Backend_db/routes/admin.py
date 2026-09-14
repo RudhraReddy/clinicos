@@ -436,6 +436,39 @@ def _wipe_stock_counts():
     return {'inventory_batches': batch_count, 'inventory_history': history_count}, []
 
 
+def _wipe_inventory_all():
+    """Everything _wipe_stock_counts() does, plus the ProductMaster catalog
+    and PurchaseInvoice rows (+ their image files). BillItem.product_id is
+    nulled (not cascaded) first -- same reasoning as delete_inventory_item
+    in routes/inventory.py: BillItem stores a sale-time snapshot, so losing
+    the live FK link on a bulk catalog wipe must not touch historical
+    billing rows."""
+    history_count = InventoryHistory.query.count()
+    batch_count = InventoryBatch.query.count()
+    product_ids = [p.id for p in ProductMaster.query.with_entities(ProductMaster.id).all()]
+    invoice_rows = PurchaseInvoice.query.with_entities(
+        PurchaseInvoice.invoice_number, PurchaseInvoice.image_path
+    ).all()
+
+    files = [r.image_path for r in invoice_rows if r.image_path]
+
+    if product_ids:
+        BillItem.query.filter(BillItem.product_id.in_(product_ids)).update(
+            {'product_id': None}, synchronize_session=False)
+    InventoryHistory.query.delete(synchronize_session=False)
+    InventoryBatch.query.delete(synchronize_session=False)
+    PurchaseInvoice.query.delete(synchronize_session=False)
+    ProductMaster.query.delete(synchronize_session=False)
+    db.session.commit()
+
+    return {
+        'inventory_batches': batch_count,
+        'inventory_history': history_count,
+        'purchase_invoices': len(invoice_rows),
+        'product_master': len(product_ids),
+    }, files
+
+
 @admin_bp.route('/admin/data_management/preview', methods=['GET'])
 @require_auth
 @require_admin
@@ -472,6 +505,8 @@ def data_management_execute():
     try:
         if scope == 'stock_counts':
             counts, files = _wipe_stock_counts()
+        elif scope == 'inventory_all':
+            counts, files = _wipe_inventory_all()
         else:
             return jsonify({'error': f'Scope not yet implemented: {scope}'}), 501
     except Exception as e:
