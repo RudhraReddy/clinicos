@@ -5,7 +5,7 @@ from extensions import db, get_ist_now
 from models import Visit, Patient, ProductMaster, User, Bill, VisitRefund, PatientImage
 from sqlalchemy import func
 from datetime import datetime
-from utils import generate_visit_id
+from utils import generate_visit_id, generate_invoice_id
 from .auth import require_auth, log_activity
 
 visits = Blueprint('visits', __name__)
@@ -216,6 +216,37 @@ def get_visit(visit_id):
         'created_at': visit.created_at.isoformat() if visit.created_at else None,
         'updated_at': visit.updated_at.isoformat() if hasattr(visit, 'updated_at') and visit.updated_at else None
     }), 200
+
+@visits.route('/visits/<visit_id>/fee_receipt', methods=['POST'])
+@require_auth
+def get_visit_fee_receipt(visit_id):
+    """
+    Idempotently generates (on first call) or reuses (on every call after
+    that) an invoice number for this visit's standalone fee receipt, and
+    returns everything the receipt print needs. The amount printed is
+    amount_paid (money actually collected), matching the same convention
+    Daily Summary already uses for a visit's fee -- not visiting_fee (the
+    billed amount, which can differ from what was actually paid).
+    """
+    visit = Visit.query.get_or_404(visit_id)
+    patient = Patient.query.get(visit.patient_id)
+
+    if not visit.visit_fee_invoice_id:
+        visit.visit_fee_invoice_id = generate_invoice_id()
+        db.session.commit()
+
+    return jsonify({
+        'invoice_id': visit.visit_fee_invoice_id,
+        'patient_name': patient.name if patient else 'Unknown',
+        'phone_number': patient.phone_number if patient else None,
+        'age': patient.age if patient else None,
+        'sex': patient.sex if patient else None,
+        'amount': visit.amount_paid or 0,
+        'payment_mode': visit.payment_mode,
+        'visit_date': visit.visit_date.strftime('%Y-%m-%d') if visit.visit_date else None,
+        'visit_time': visit.visit_time.strftime('%H:%M') if visit.visit_time else None,
+    }), 200
+
 
 @visits.route('/visits/<visit_id>', methods=['PUT'])
 @require_auth

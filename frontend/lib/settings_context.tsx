@@ -44,6 +44,7 @@ interface SettingsContextType {
     clinicPhone: string
     clinicLicense: string
     referenceDoctor: string
+    consultantName: string
     appFontSize: number
     expiryReminderMonths: number
     defaultMinStock: number
@@ -61,6 +62,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [clinicPhone, setClinicPhone] = useState("+91 98765 43210")
     const [clinicLicense, setClinicLicense] = useState("TG/WLU/2025-140763")
     const [referenceDoctor, setReferenceDoctor] = useState("")
+    const [consultantName, setConsultantName] = useState("")
     const [appFontSize, setAppFontSize] = useState(16)
     const [expiryReminderMonths, setExpiryReminderMonths] = useState(6)
     const [defaultMinStock, setDefaultMinStock] = useState(10)
@@ -76,6 +78,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const storedPhone      = localStorage.getItem("clinic_phone")
         const storedLicense    = localStorage.getItem("clinic_license")
         const storedRefDoc     = localStorage.getItem("clinic_ref_doc")
+        const storedConsultant = localStorage.getItem("clinic_consultant_name")
         const storedFontSize   = localStorage.getItem("clinic_font_size")
         const storedExpiry     = localStorage.getItem("expiry_reminder_months")
         const storedDefaultMinStock = localStorage.getItem("inventory_default_min_stock")
@@ -86,6 +89,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (storedPhone !== null)   setClinicPhone(storedPhone)
         if (storedLicense !== null) setClinicLicense(storedLicense)
         if (storedRefDoc !== null)  setReferenceDoctor(storedRefDoc)
+        if (storedConsultant !== null) setConsultantName(storedConsultant)
         if (storedFontSize) {
             const parsed = parseInt(storedFontSize, 10)
             if (!isNaN(parsed) && parsed >= 12 && parsed <= 24) setAppFontSize(parsed)
@@ -138,6 +142,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             setReferenceDoctor(settings.referenceDoctor)
             localStorage.setItem("clinic_ref_doc", settings.referenceDoctor)
         }
+        if (settings.consultantName !== undefined) {
+            setConsultantName(settings.consultantName)
+            localStorage.setItem("clinic_consultant_name", settings.consultantName)
+        }
         if (settings.appFontSize !== undefined) {
             setAppFontSize(settings.appFontSize)
             localStorage.setItem("clinic_font_size", settings.appFontSize.toString())
@@ -169,6 +177,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             clinicPhone,
             clinicLicense,
             referenceDoctor,
+            consultantName,
             appFontSize: currentFontSize,
             expiryReminderMonths,
             defaultMinStock,

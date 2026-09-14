@@ -515,6 +515,22 @@ export const api = {
         });
     },
 
+    async getVisitFeeReceipt(visitId: string): Promise<{
+        invoice_id: string
+        patient_name: string
+        phone_number: string | null
+        age: number | null
+        sex: string | null
+        amount: number
+        payment_mode: string | null
+        visit_date: string | null
+        visit_time: string | null
+    }> {
+        return fetchApi(`/api/visits/${visitId}/fee_receipt`, {
+            method: 'POST',
+        });
+    },
+
     // `refund` requests a payout of whatever's still unrefunded on the visit
     // fee — mode is picked server-side from the visit's own payment_mode
     // (upi -> Visit UPI, anything else -> Billing Cash), not passed in.

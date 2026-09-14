@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu } from "lucide-react"
+import { Check, Loader2, Pencil, Trash2, Package, CreditCard, Users, Menu, Printer } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getTodayIST, orderTodayVisits, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { useState, useEffect, Suspense } from "react"
@@ -10,6 +10,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
 import { EditVisitDialog } from "@/components/EditVisitDialog"
+import { VisitReceiptPrintDialog } from "@/components/VisitReceiptPrintDialog"
+import { useSettings } from "@/lib/settings_context"
 import { WalkInForm } from "@/components/WalkInForm"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisitsTab } from "@/components/VisitsTab"
@@ -73,6 +75,10 @@ function DashboardContent() {
 
     const [editVisitOpen, setEditVisitOpen] = useState(false)
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null)
+    const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
+    const [receiptVisitId, setReceiptVisitId] = useState<string | null>(null)
+
+    const { clinicName, clinicAddress, clinicPhone, clinicLicense, consultantName } = useSettings()
 
     // Controlled so the date-filter control (kept in the same header slot) can be
     // hidden on the Overview tab and shown only on All Visits, where it's meaningful.
@@ -165,6 +171,11 @@ function DashboardContent() {
         router.push(`/billing?patient_id=${visit.patient_id}&visit_id=${visit.visit_id}`)
     }
 
+    const handlePrintVisitReceipt = (visit: Visit) => {
+        setReceiptVisitId(visit.visit_id)
+        setReceiptDialogOpen(true)
+    }
+
     const renderVisitCard = (visit: Visit) => (
         <div
             key={visit.visit_id}
@@ -212,6 +223,14 @@ function DashboardContent() {
                         title="Go to Billing"
                     >
                         <CreditCard className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 rounded-md hover:bg-sky-100 hover:text-sky-600 dark:hover:bg-sky-500/20"
+                        onClick={() => handlePrintVisitReceipt(visit)}
+                        title="Print Visit Receipt"
+                    >
+                        <Printer className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                         variant="ghost" size="icon"
@@ -341,6 +360,17 @@ function DashboardContent() {
                 onOpenChange={setEditVisitOpen}
                 visit={selectedVisit}
                 onSuccess={refreshAll}
+            />
+
+            <VisitReceiptPrintDialog
+                open={receiptDialogOpen}
+                onOpenChange={setReceiptDialogOpen}
+                visitId={receiptVisitId}
+                clinicName={clinicName}
+                clinicAddress={clinicAddress}
+                clinicPhone={clinicPhone}
+                clinicLicense={clinicLicense}
+                consultantName={consultantName}
             />
         </div>
     )

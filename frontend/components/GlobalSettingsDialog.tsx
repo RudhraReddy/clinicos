@@ -24,6 +24,7 @@ export function GlobalSettingsDialog() {
         clinicPhone,
         clinicLicense,
         referenceDoctor,
+        consultantName,
         appFontSize,
         setSettings,
         setPreviewFontSize
@@ -35,6 +36,7 @@ export function GlobalSettingsDialog() {
     const [settingsPhoneDraft, setSettingsPhoneDraft] = useState("")
     const [settingsLicenseDraft, setSettingsLicenseDraft] = useState("")
     const [settingsReferenceDoctorDraft, setSettingsReferenceDoctorDraft] = useState("")
+    const [settingsConsultantNameDraft, setSettingsConsultantNameDraft] = useState("")
     const [fontSizeDraft, setFontSizeDraft] = useState<number[]>([16])
 
     // Update drafts when dialog opens
@@ -45,6 +47,7 @@ export function GlobalSettingsDialog() {
             setSettingsPhoneDraft(clinicPhone)
             setSettingsLicenseDraft(clinicLicense)
             setSettingsReferenceDoctorDraft(referenceDoctor)
+            setSettingsConsultantNameDraft(consultantName)
             setFontSizeDraft([appFontSize])
         } else {
             // Revert preview if dialog is closed without saving
@@ -67,6 +70,7 @@ export function GlobalSettingsDialog() {
             clinicPhone: settingsPhoneDraft,
             clinicLicense: settingsLicenseDraft,
             referenceDoctor: settingsReferenceDoctorDraft,
+            consultantName: settingsConsultantNameDraft,
             appFontSize: fontSizeDraft[0]
         })
         setOpen(false)
@@ -138,6 +142,15 @@ export function GlobalSettingsDialog() {
                                 value={settingsReferenceDoctorDraft}
                                 onChange={(e) => setSettingsReferenceDoctorDraft(e.target.value)}
                                 placeholder="Dr. John Doe"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="global-consultant-name">Consultant Name</Label>
+                            <Input
+                                id="global-consultant-name"
+                                value={settingsConsultantNameDraft}
+                                onChange={(e) => setSettingsConsultantNameDraft(e.target.value)}
+                                placeholder="Dr. Sai Teja Reddy"
                             />
                         </div>
                     </div>

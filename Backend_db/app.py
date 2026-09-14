@@ -118,6 +118,8 @@ def _apply_migrations(db):
         # 2026-08-23: next follow-up/review date, entered from the "Mark
         # Visit as Done" popup, shown on the patient card header.
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS next_review_date DATE",
+        # 2026-09-14: invoice number for the standalone Visit Fee Receipt.
+        "ALTER TABLE visits ADD COLUMN IF NOT EXISTS visit_fee_invoice_id VARCHAR(50)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

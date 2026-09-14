@@ -179,6 +179,13 @@ class Visit(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=get_ist_now)
     updated_at = db.Column(db.DateTime, default=get_ist_now, onupdate=get_ist_now)
+    # Invoice number for the standalone Visit Fee Receipt (Dashboard's "Print
+    # Visit Receipt" action) -- generated once on first print and reused on
+    # every re-print after that. Deliberately separate from Visit.invoice_id
+    # above, which already means something else (the most-recently-created
+    # PHARMACY bill's invoice_id) and can't be repurposed without breaking
+    # that field's existing meaning.
+    visit_fee_invoice_id = db.Column(db.String(50), nullable=True)
 
 class Bill(db.Model):
     __tablename__ = 'bills'
