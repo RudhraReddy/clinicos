@@ -662,7 +662,7 @@ export default function InventoryPage() {
         setWipeLoading(true)
         setWipeError(null)
         try {
-            const res = await api.wipeInventory(wipeCode.trim())
+            const res = await api.executeDataManagement('inventory_all', wipeCode.trim())
             setWipeDialogOpen(false)
             setWipeCode('')
             toast.success(res.message)

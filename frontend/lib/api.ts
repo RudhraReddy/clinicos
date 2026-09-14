@@ -358,11 +358,17 @@ export const api = {
         });
     },
 
-    async wipeInventory(totpCode: string): Promise<{ message: string }> {
-        return fetchApi('/api/admin/inventory/wipe', {
+    async getDataManagementPreview(scope: string, imageScope?: string): Promise<{ counts: DataManagementCounts }> {
+        const params = new URLSearchParams({ scope })
+        if (imageScope) params.set('image_scope', imageScope)
+        return fetchApi(`/api/admin/data_management/preview?${params.toString()}`);
+    },
+
+    async executeDataManagement(scope: string, totpCode: string, imageScope?: string): Promise<{ message: string; counts: DataManagementCounts }> {
+        return fetchApi('/api/admin/data_management/execute', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ totp_code: totpCode }),
+            body: JSON.stringify({ scope, image_scope: imageScope, totp_code: totpCode }),
         });
     },
 
@@ -842,6 +848,22 @@ export interface ActivityLogFilters {
   date_to?: string
   page?: number
   limit?: number
+}
+
+export interface DataManagementCounts {
+    inventory_batches?: number
+    inventory_history?: number
+    purchase_invoices?: number
+    product_master?: number
+    patient_images?: number
+    purchase_invoice_images?: number
+    patients?: number
+    visits?: number
+    bills?: number
+    bill_items?: number
+    visit_refunds?: number
+    expense_ledger?: number
+    upload_sessions?: number
 }
 
 export async function getAdminStats() {
