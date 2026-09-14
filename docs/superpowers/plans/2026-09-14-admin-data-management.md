@@ -57,6 +57,11 @@ Inventory-page wipe UI.
   renders `counts` generically (`Object.entries(counts)`) — never hardcode
   a fixed key list per scope, since the key set legitimately differs by
   scope (see spec's per-scope tables).
+- Every Execute click, on every scope (Task 7's `handleExecute`), triggers a
+  backup CSV download via the pre-existing `api.exportInventory()` and
+  `api.exportPatients()` before calling `api.executeDataManagement(...)` —
+  unconditional, not scope-gated, images deliberately excluded. See the
+  spec's "Pre-Wipe Backup Export" section.
 
 ---
 
@@ -819,7 +824,7 @@ git commit -m "feat(admin): api.ts data_management client + remove wipeInventory
 - Create: `frontend/components/DataManagementDialog.tsx`
 
 **Interfaces:**
-- Consumes: `api.getDataManagementPreview`, `api.executeDataManagement`, `DataManagementCounts` (Task 6).
+- Consumes: `api.getDataManagementPreview`, `api.executeDataManagement`, `DataManagementCounts` (Task 6); `api.exportInventory()` and `api.exportPatients()` — pre-existing functions already in `frontend/lib/api.ts` (not part of this plan, nothing to add), used unmodified by `handleExecute`.
 - Produces: `<DataManagementDialog open, onOpenChange>` — a self-contained dialog; the only prop surface it needs from its mount site (Task 8) is open/close state, matching the existing `QRCodeUpload`/wipe-dialog convention already used elsewhere in this codebase.
 
 - [ ] **Step 1: Write the component**
@@ -907,6 +912,16 @@ export function DataManagementDialog({ open, onOpenChange }: DataManagementDialo
         setExecuting(true)
         setExecuteError(null)
         try {
+            // Pre-wipe backup export -- unconditional on every scope (even
+            // Clear Images / Clear Stock Counts), not scope-conditional.
+            // Both are pre-existing endpoints/client functions (already used
+            // by the Inventory/Patients pages' own Download buttons) --
+            // window.location.href navigations to a Content-Disposition:
+            // attachment response, so these trigger a save without actually
+            // navigating away. Images are deliberately not included; neither
+            // endpoint has ever contained anything but tabular CSV data.
+            api.exportInventory()
+            api.exportPatients()
             const res = await api.executeDataManagement(scope, totpCode, effectiveImageScope)
             toast.success(res.message)
             onOpenChange(false)
@@ -1220,10 +1235,14 @@ expected: no matches anywhere in the codebase.
 
 Using the dev-JWT-cookie method, log in as admin, open Admin → Settings →
 Data Management, select "Clear Patients", confirm the live count preview
-renders, enter a live TOTP code, click Execute, and confirm the success
-toast + dialog closes. Re-open the dialog on "Clear Patients" again and
-confirm the preview now shows all zeros and Execute is disabled ("Nothing
-to delete").
+renders, enter a live TOTP code, click Execute, and confirm: the two
+backup CSV downloads fire (check via
+`mcp__plugin_playwright_playwright__browser_network_requests` or the
+downloads list for requests to `/api/inventory/export` and
+`/api/patients/export` immediately before the `execute` call), then the
+success toast + dialog closes. Re-open the dialog on "Clear Patients"
+again and confirm the preview now shows all zeros and Execute is disabled
+("Nothing to delete").
 
 - [ ] **Step 3: Spot-check the `images` sub-option UI interaction**
 
