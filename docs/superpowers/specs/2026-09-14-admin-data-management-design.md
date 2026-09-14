@@ -67,6 +67,37 @@ On a failed execute (bad/expired code, or a server error), the dialog stays
 open, the TOTP field is cleared, and the error is toasted — matching the
 current `wipeError` behavior on the Inventory page today.
 
+## Pre-Wipe Backup Export
+
+Every Execute click — all five scopes, unconditionally, regardless of
+which tables that scope actually touches — first triggers a download of
+the current data as CSV, before the destructive call fires. This is a
+safety net, not a scope-conditional feature: Clear Images and Clear Stock
+Counts trigger it exactly the same as Clear All.
+
+- Downloads **inventory** (`api.exportInventory()` → `GET
+  /api/inventory/export`) and **patients** (`api.exportPatients()` → `GET
+  /api/patients/export`) — both pre-existing endpoints/client functions,
+  reused as-is, no backend changes. Images are deliberately **not**
+  included (per the request that prompted this: "only the inventory and
+  patient details, ignore the images") — these two CSV endpoints already
+  only ever contained tabular data, never images, so nothing extra needs
+  excluding.
+- **Order:** `handleExecute` calls `api.exportInventory()` then
+  `api.exportPatients()` — each a `window.location.href` navigation to a
+  `Content-Disposition: attachment` response (same established pattern the
+  Inventory/Patients pages' own Download buttons already use — doesn't
+  actually navigate away, just triggers a save) — and only *then* calls
+  `api.executeDataManagement(...)`. Sequential, not blocked on the
+  browser's download UI actually finishing (there's no reliable way to
+  detect that from a `window.location.href` trigger) — "blocking" here
+  means the wipe request isn't fired until after both download requests
+  have been dispatched, not that Execute waits on user action in a
+  download dialog.
+- No new backend endpoint, no new export logic — this section exists
+  purely to document the two extra lines in `DataManagementDialog.tsx`'s
+  `handleExecute` (see Frontend section).
+
 ## Backend API
 
 New section in `Backend_db/routes/admin.py` (reuses `_verify_totp`,
@@ -118,7 +149,9 @@ Call order: `_wipe_patients()` → `_wipe_inventory_all()` → inline
   `getDataManagementPreview(scope, imageScope?)` and
   `executeDataManagement(scope, totpCode, imageScope?)`.
 - New `components/DataManagementDialog.tsx` mounted from the new Danger Zone
-  card in `SettingsTab`.
+  card in `SettingsTab`. Its `handleExecute` calls `api.exportInventory()`
+  and `api.exportPatients()` (both pre-existing) before
+  `api.executeDataManagement(...)` — see Pre-Wipe Backup Export above.
 - `app/inventory/page.tsx`: remove `wipeDialogOpen`/`wipeCode`/`wipeLoading`/
   `wipeError` state, `handleWipeInventory`, the Wipe Inventory button, and
   its dialog JSX.
