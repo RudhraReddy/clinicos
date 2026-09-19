@@ -582,6 +582,12 @@ export default function DoctorDashboard() {
                             All Visits
                         </Link>
                     </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/?tab=review">
+                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                            Review
+                        </Link>
+                    </Button>
                 </div>
             </div>
 

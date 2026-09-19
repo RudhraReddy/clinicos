@@ -82,22 +82,25 @@ function DashboardContent() {
 
     // Controlled so the date-filter control (kept in the same header slot) can be
     // hidden on the Overview tab and shown only on All Visits, where it's meaningful.
-    // Also lets external links (e.g. the doctor dashboard's "All Visits" button) land
-    // directly on the All Visits tab via ?tab=visits.
-    const [activeTab, setActiveTab] = useState(searchParams.get("tab") === "visits" ? "visits" : "overview")
+    // Also lets external links (e.g. the doctor dashboard's "All Visits" / "Review"
+    // buttons) land directly on that tab via ?tab=visits / ?tab=review.
+    const requestedTab = searchParams.get("tab")
+    const [activeTab, setActiveTab] = useState(
+        requestedTab === "visits" || requestedTab === "review" ? requestedTab : "overview"
+    )
 
     const { role, isLoading } = useAuth()
     const router = useRouter()
     const { openMenu } = useMenu()
 
     // Doctors are normally bounced to /doctor — except when they've explicitly
-    // followed a link straight to All Visits (e.g. the doctor dashboard's own
-    // "All Visits" button), which they're allowed to view directly.
-    const cameForAllVisits = searchParams.get("tab") === "visits"
+    // followed a link straight to All Visits or Review (the doctor dashboard's own
+    // "All Visits" / "Review" buttons), which they're allowed to view directly.
+    const cameForDirectTab = requestedTab === "visits" || requestedTab === "review"
 
     useEffect(() => {
-        if (!isLoading && role === 'doctor' && !cameForAllVisits) router.push('/doctor')
-    }, [role, isLoading, router, cameForAllVisits])
+        if (!isLoading && role === 'doctor' && !cameForDirectTab) router.push('/doctor')
+    }, [role, isLoading, router, cameForDirectTab])
 
     const filterDateFrom = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
     const filterDateTo = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''
@@ -137,7 +140,7 @@ function DashboardContent() {
         fetchFilteredVisits()
     }
 
-    if (isLoading || (role === 'doctor' && !cameForAllVisits)) {
+    if (isLoading || (role === 'doctor' && !cameForDirectTab)) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
