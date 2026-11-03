@@ -207,6 +207,10 @@ Other models: `InventoryHistory` (audit log), `PatientImage` (with tags), `Presc
 
 ## Deployment
 
+> **OFFLINE since 2026-11-02.** All Render resources were deleted at the owner's request; the DB was backed up first (verified) to `~/clinicos-backup-2026-11-02/` (not in git); uploaded invoice images were not kept. The URLs/plans below describe the setup as it was. To bring it back: [`docs/hosting-shutdown-and-restore.md`](docs/hosting-shutdown-and-restore.md).
+
+Full hosting write-up (how services connect, schema-change rules, data-safety pitfalls, common tasks): [`docs/hosting.md`](docs/hosting.md).
+
 ### Architecture
 
 Production stack, projected ~$15/month (Render Hobby workspace):

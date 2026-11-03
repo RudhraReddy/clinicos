@@ -2,6 +2,7 @@ databases:
   - name: clinicos-db
     databaseName: clinic_db
     user: clinicos
+    plan: basic-256mb
 
 services:
   - type: web
