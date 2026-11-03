@@ -48,6 +48,6 @@ services:
     startCommand: npm start
     envVars:
       - key: BACKEND_URL
-        value: https://clinicos-api-69mw.onrender.com
+        value: https://clinicos-api-95or.onrender.com
       - key: NODE_VERSION
         value: 20
