@@ -20,6 +20,7 @@ import { toast } from "sonner"
 export function GlobalSettingsDialog() {
     const { 
         clinicName, 
+        pharmacyName,
         clinicAddress, 
         clinicPhone,
         clinicLicense,
@@ -32,6 +33,7 @@ export function GlobalSettingsDialog() {
 
     const [open, setOpen] = useState(false)
     const [settingsNameDraft, setSettingsNameDraft] = useState("")
+    const [settingsPharmacyNameDraft, setSettingsPharmacyNameDraft] = useState("")
     const [settingsAddressDraft, setSettingsAddressDraft] = useState("")
     const [settingsPhoneDraft, setSettingsPhoneDraft] = useState("")
     const [settingsLicenseDraft, setSettingsLicenseDraft] = useState("")
@@ -43,6 +45,7 @@ export function GlobalSettingsDialog() {
     useEffect(() => {
         if (open) {
             setSettingsNameDraft(clinicName)
+            setSettingsPharmacyNameDraft(pharmacyName)
             setSettingsAddressDraft(clinicAddress)
             setSettingsPhoneDraft(clinicPhone)
             setSettingsLicenseDraft(clinicLicense)
@@ -66,6 +69,7 @@ export function GlobalSettingsDialog() {
     const handleSave = () => {
         setSettings({
             clinicName: settingsNameDraft,
+            pharmacyName: settingsPharmacyNameDraft,
             clinicAddress: settingsAddressDraft,
             clinicPhone: settingsPhoneDraft,
             clinicLicense: settingsLicenseDraft,
@@ -106,6 +110,18 @@ export function GlobalSettingsDialog() {
                                 onChange={(e) => setSettingsNameDraft(e.target.value)}
                                 placeholder="MediCare Clinic"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="global-pharmacy-name">Pharmacy Name</Label>
+                            <Input
+                                id="global-pharmacy-name"
+                                value={settingsPharmacyNameDraft}
+                                onChange={(e) => setSettingsPharmacyNameDraft(e.target.value)}
+                                placeholder="MediCare Pharmacy"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Printed on medicine bills. Clinic Name is printed on OP / visit fee receipts.
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="global-clinic-address">Clinic Address</Label>

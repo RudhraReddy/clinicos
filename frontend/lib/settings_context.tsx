@@ -40,6 +40,8 @@ export const DEFAULT_PATIENT_COLUMNS = ['name', 'phone_number', 'age', 'sex']
 
 interface SettingsContextType {
     clinicName: string
+    // Printed on medicine bills (InvoicePrint). Falls back to clinicName until set.
+    pharmacyName: string
     clinicAddress: string
     clinicPhone: string
     clinicLicense: string
@@ -58,6 +60,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [clinicName, setClinicName] = useState("Teja Reddy Clinic")
+    const [pharmacyName, setPharmacyName] = useState("")
     const [clinicAddress, setClinicAddress] = useState("#3145 Here and there, TS 500081")
     const [clinicPhone, setClinicPhone] = useState("+91 98765 43210")
     const [clinicLicense, setClinicLicense] = useState("TG/WLU/2025-140763")
@@ -74,6 +77,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const storedName       = localStorage.getItem("clinic_name")
+        const storedPharmacy   = localStorage.getItem("pharmacy_name")
         const storedAddress    = localStorage.getItem("clinic_address")
         const storedPhone      = localStorage.getItem("clinic_phone")
         const storedLicense    = localStorage.getItem("clinic_license")
@@ -85,6 +89,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const storedCols       = localStorage.getItem("inventory_default_columns")
 
         if (storedName)    setClinicName(storedName)
+        if (storedPharmacy) setPharmacyName(storedPharmacy)
         if (storedAddress !== null) setClinicAddress(storedAddress)
         if (storedPhone !== null)   setClinicPhone(storedPhone)
         if (storedLicense !== null) setClinicLicense(storedLicense)
@@ -125,6 +130,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (settings.clinicName !== undefined) {
             setClinicName(settings.clinicName)
             localStorage.setItem("clinic_name", settings.clinicName)
+        }
+        if (settings.pharmacyName !== undefined) {
+            setPharmacyName(settings.pharmacyName)
+            localStorage.setItem("pharmacy_name", settings.pharmacyName)
         }
         if (settings.clinicAddress !== undefined) {
             setClinicAddress(settings.clinicAddress)
@@ -173,6 +182,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return (
         <SettingsContext.Provider value={{
             clinicName,
+            pharmacyName: pharmacyName || clinicName,
             clinicAddress,
             clinicPhone,
             clinicLicense,

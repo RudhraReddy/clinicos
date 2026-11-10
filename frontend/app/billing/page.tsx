@@ -180,7 +180,7 @@ function BillingContent() {
     const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
     const [draftPreviewOpen, setDraftPreviewOpen] = useState(false)
 
-    const { clinicName, clinicAddress, clinicPhone, clinicLicense, referenceDoctor } = useSettings()
+    const { pharmacyName, clinicAddress, clinicPhone, clinicLicense, referenceDoctor } = useSettings()
 
     // Load patient if ID present in URL
     useEffect(() => {
@@ -1259,7 +1259,7 @@ function BillingContent() {
                 open={printDialogOpen}
                 onOpenChange={setPrintDialogOpen}
                 invoiceId={printInvoiceId}
-                clinicName={clinicName}
+                clinicName={pharmacyName}
                 clinicAddress={clinicAddress}
                 clinicPhone={clinicPhone}
                 clinicLicense={clinicLicense}
@@ -1271,7 +1271,7 @@ function BillingContent() {
             <DraftInvoicePreviewDialog
                 open={draftPreviewOpen}
                 onOpenChange={setDraftPreviewOpen}
-                clinicName={clinicName}
+                clinicName={pharmacyName}
                 clinicAddress={clinicAddress}
                 clinicPhone={clinicPhone}
                 clinicLicense={clinicLicense}

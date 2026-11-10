@@ -100,7 +100,7 @@ export default function DoctorDashboard() {
     // Invoice preview, opened from a bill card in the Visit Timeline
     const [invoiceId, setInvoiceId] = useState<string | null>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
-    const { clinicName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
+    const { pharmacyName, clinicAddress, clinicPhone, referenceDoctor } = useSettings()
 
     // Load Notes and History when selection changes
     useEffect(() => {
@@ -1027,7 +1027,7 @@ export default function DoctorDashboard() {
                                     open={invoiceOpen}
                                     onOpenChange={setInvoiceOpen}
                                     invoiceId={invoiceId}
-                                    clinicName={clinicName}
+                                    clinicName={pharmacyName}
                                     clinicAddress={clinicAddress}
                                     clinicPhone={clinicPhone}
                                     referenceDoctor={referenceDoctor}
