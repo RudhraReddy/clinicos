@@ -11,7 +11,9 @@ import { getTodayIST, cn, getVisitAge, formatVisitFee } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth_context"
 
-type FormState = 'idle' | 'searching' | 'found' | 'not_found' | 'new_patient'
+// 'matches' = search returned suggestions but none has been picked yet; the
+// form behaves as new-patient entry until a suggestion is selected ('found').
+type FormState = 'idle' | 'searching' | 'matches' | 'found' | 'not_found' | 'new_patient'
 
 interface WalkInFormProps {
     onSuccess: () => void
@@ -109,6 +111,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         const patient = matches.find(m => m.patient_id === patientId)
         if (patient) {
             selectPatient(patient)
+            setFormState('found')
             completeSearchBox(patient, phone)
         }
         setPickerOpen(false)
@@ -164,40 +167,25 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
         const timer = setTimeout(async () => {
             try {
                 const data = await api.searchPatients(phone)
-                if (data.length > 0) {
-                    setMatches(data)
-                    setFormState('found')
-                    if (data.length > 1) {
-                        setPickerOpen(true)
-                        setMatchedPatient(null)
-                        setName('')
-                        setAge('')
-                        setSex('')
-                        setAddress('')
-                        setPhoneNumber('')
-                        setPatientVisits([])
-                    } else {
-                        setPickerOpen(false)
-                        selectPatient(data[0])
-                        completeSearchBox(data[0], phone)
-                    }
+                // Never auto-select a hit: show suggestions in the dropdown only,
+                // and keep the fields open for a new patient (the typed number may
+                // be a new one that merely resembles an existing patient's).
+                setMatchedPatient(null)
+                setMatches(data)
+                setPickerOpen(data.length > 0)
+                setFormState(data.length > 0 ? 'matches' : 'not_found')
+                if (looksLikePhone(phone)) {
+                    setName('')
+                    setPhoneNumber(phone)
                 } else {
-                    setMatchedPatient(null)
-                    setMatches([])
-                    setPickerOpen(false)
-                    setFormState('not_found')
-                    if (looksLikePhone(phone)) {
-                        setName('')
-                        setPhoneNumber(phone)
-                    } else {
-                        setName(phone)
-                        setPhoneNumber('')
-                    }
-                    setAge('')
-                    setSex('')
-                    setAddress('')
-                    setPatientVisits([])
+                    setName(phone)
+                    setPhoneNumber('')
                 }
+                setAge('')
+                setSex('')
+                setAddress('')
+                setEditMode(false)
+                setPatientVisits([])
             } catch {
                 setMatchedPatient(null)
                 setMatches([])
@@ -328,7 +316,7 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
     }
 
     const patientBlank = formState === 'idle' || formState === 'searching'
-    const isNewPatientMode = formState === 'not_found' || formState === 'new_patient'
+    const isNewPatientMode = formState === 'not_found' || formState === 'matches' || formState === 'new_patient'
     const fieldsLocked = formState === 'found' && !editMode
     const feeTrimmed = visit.visiting_fee.trim()
     const feeParsed = parseFloat(feeTrimmed)
@@ -361,7 +349,9 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                         <div className="flex-1 overflow-y-auto min-h-0">
                             {formState !== 'found' ? (
                                 <p className="text-xs text-muted-foreground text-center py-6 px-3">
-                                    Search a name or phone number to view past visits
+                                    {formState === 'matches'
+                                        ? 'Select a patient from the suggestions to view past visits'
+                                        : 'Search a name or phone number to view past visits'}
                                 </p>
                             ) : patientVisits.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-6">No past visits</p>
@@ -412,7 +402,8 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                     const raw = e.target.value
                                     setPhone(/^\d+$/.test(raw) ? raw.slice(0, 10) : raw)
                                 }}
-                                onFocus={() => { if (matches.length > 1) setPickerOpen(true) }}
+                                onFocus={() => { if (matches.length > 0) setPickerOpen(true) }}
+                                onKeyDown={e => { if (e.key === 'Escape') setPickerOpen(false) }}
                                 placeholder="Search by name or phone number..."
                                 className="pr-8"
                                 autoComplete="off"
@@ -425,11 +416,11 @@ export function WalkInForm({ onSuccess }: WalkInFormProps) {
                                 <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-background" />
                             )}
 
-                            {pickerOpen && matches.length > 1 && formState === 'found' && (
+                            {pickerOpen && matches.length > 0 && (formState === 'matches' || formState === 'found') && (
                                 <div className="absolute z-20 top-full left-0 mt-1 w-full bg-popover border rounded-md shadow-md max-h-56 overflow-y-auto">
                                     <div className="px-3 py-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 border-b flex items-center gap-1.5">
                                         <Users className="h-3 w-3 shrink-0" />
-                                        {matches.length} patients share this number
+                                        {matches.length} matching patient{matches.length === 1 ? '' : 's'} — select to autofill
                                     </div>
                                     {matches.map(m => (
                                         <button
