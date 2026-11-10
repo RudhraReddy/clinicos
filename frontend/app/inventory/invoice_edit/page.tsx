@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth_context"
 // import { ImagePreviewDialog } from "@/components/ImagePreviewDialog" // Actually I'll let the user add it or I add it separately to be safe with line numbers
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { QRCodeUpload } from "@/components/QRCodeUpload"
+import { VendorNameInput } from "@/components/VendorNameInput"
 import { toast } from "sonner"
 
 interface ProductRow {
@@ -379,7 +380,11 @@ export default function InvoiceEditPage() {
             <div className="grid grid-cols-1 md:grid-cols-6 gap-6 p-6 border rounded-lg bg-card">
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Vendor Name</label>
-                    <Input value={vendorName} onChange={e => setVendorName(e.target.value)} />
+                    <VendorNameInput
+                        value={vendorName}
+                        onChange={setVendorName}
+                        onSelectVendor={v => { if (!gstNo.trim() && v.gst_number) setGstNo(v.gst_number) }}
+                    />
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Invoice Number</label>

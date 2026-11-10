@@ -1536,6 +1536,29 @@ def import_inventory():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@inventory.route('/inventory/vendors', methods=['GET'])
+@require_auth
+def get_vendors():
+    """Distinct vendor names from past purchase invoices, for the invoice
+    entry form's type-ahead. Deduped case/whitespace-insensitively, keeping
+    the most recently used spelling and that invoice's GST number."""
+    rows = (
+        db.session.query(PurchaseInvoice.vendor_name, PurchaseInvoice.gst_number)
+        .filter(PurchaseInvoice.vendor_name.isnot(None))
+        .filter(func.trim(PurchaseInvoice.vendor_name) != '')
+        .order_by(PurchaseInvoice.upload_date.desc())
+        .all()
+    )
+    seen = {}
+    for name, gst in rows:
+        key = ' '.join(name.split()).lower()
+        if key not in seen:
+            seen[key] = {'vendor_name': ' '.join(name.split()), 'gst_number': gst or ''}
+        elif not seen[key]['gst_number'] and gst:
+            seen[key]['gst_number'] = gst
+    vendors = sorted(seen.values(), key=lambda v: v['vendor_name'].lower())
+    return jsonify(vendors), 200
+
 @inventory.route('/inventory/invoices', methods=['GET'])
 @require_auth
 def get_invoices():

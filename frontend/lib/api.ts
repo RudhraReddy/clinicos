@@ -471,6 +471,10 @@ export const api = {
         });
     },
 
+    async getVendors(): Promise<{ vendor_name: string; gst_number: string }[]> {
+        return fetchApi(`/api/inventory/vendors`);
+    },
+
     async getInvoices(locationId?: number): Promise<any[]> {
         const qs = locationId ? `?location_id=${locationId}` : ''
         return fetchApi(`/api/inventory/invoices${qs}`);
