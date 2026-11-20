@@ -106,7 +106,8 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
                 <div className="border-t border-muted/30">
                     <p className="text-[10px] text-muted-foreground/60 tracking-wider">
-                        SYSTEM VERSION: v2.2.2
+                        SYSTEM VERSION: v{process.env.NEXT_PUBLIC_APP_VERSION}
+                        {process.env.NEXT_PUBLIC_APP_COMMIT ? ` (${process.env.NEXT_PUBLIC_APP_COMMIT})` : ""}
                     </p>
                 </div>
             </div>
