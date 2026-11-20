@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
-from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem, User
+from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem, User, StockTransferItem
 from sqlalchemy import func, case
 import io
 import csv
@@ -676,6 +676,8 @@ def delete_inventory_item(id):
         
         # Step 2: Hard purge active operational records tying storage to the product ID
         InventoryHistory.query.filter_by(product_id=id).delete(synchronize_session=False)
+        # Transfer lines reference this product's batches (the slip header stays).
+        StockTransferItem.query.filter_by(product_id=id).delete(synchronize_session=False)
         InventoryBatch.query.filter_by(product_id=id).delete(synchronize_session=False)
         
         # Step 3: Finalize master table deletion
@@ -773,6 +775,12 @@ def search_inventory():
     query = request.args.get('q', '').lower().strip()
     if not query: return jsonify([])
 
+    # Billing passes the bill's clinic: in-stock counts then cover only that
+    # clinic's batches plus legacy batches with no clinic -- exactly what
+    # create_bill is allowed to consume. Without it: all clinics (old behavior).
+    loc_param = request.args.get('location_id')
+    stock_location_id = int(loc_param) if loc_param and loc_param.isdigit() else None
+
     base_q = ProductMaster.query
     
     found_items = base_q.filter(
@@ -806,10 +814,15 @@ def search_inventory():
 
     results = []
     for item in found_items:
-        total_qty = db.session.query(func.sum(InventoryBatch.quantity)).filter(
+        qty_q = db.session.query(func.sum(InventoryBatch.quantity)).filter(
             InventoryBatch.product_id == item.id,
             InventoryBatch.quantity > 0
-        ).scalar() or 0
+        )
+        if stock_location_id is not None:
+            qty_q = qty_q.filter(
+                (InventoryBatch.location_id == stock_location_id) | InventoryBatch.location_id.is_(None)
+            )
+        total_qty = qty_q.scalar() or 0
 
         max_mrp = db.session.query(func.max(InventoryBatch.mrp)).filter(
             InventoryBatch.product_id == item.id
@@ -1594,14 +1607,31 @@ def get_invoices():
         })
     return jsonify(results), 200
 
+def _transfer_copy_ids(batches):
+    """IDs among `batches` that were created at a receiving clinic by a stock
+    transfer (initial_quantity 0, recorded as a transfer destination) rather
+    than bought on their purchase invoice."""
+    ids = [b.id for b in batches if not b.initial_quantity]
+    if not ids:
+        return set()
+    return {bid for (bid,) in db.session.query(StockTransferItem.to_batch_id)
+            .filter(StockTransferItem.to_batch_id.in_(ids)).distinct()}
+
+
 @inventory.route('/inventory/invoices/<invoice_number>', methods=['GET'])
 @require_auth
 def get_invoice_detail(invoice_number):
     inv = PurchaseInvoice.query.get_or_404(invoice_number)
     batches = InventoryBatch.query.filter_by(purchase_invoice_number=invoice_number).all()
-    
+    copies = _transfer_copy_ids(batches)
+
     items = []
     for b in batches:
+        # A stock transfer copies a batch to the receiving clinic, keeping its
+        # invoice number for traceability. That copy was not bought on this
+        # invoice, so it must not show up as an extra invoice line.
+        if b.id in copies:
+            continue
         product = ProductMaster.query.get(b.product_id)
         items.append({
             'product_name': product.item_name if product else 'Unknown',
@@ -1839,11 +1869,15 @@ def save_invoice():
                     if p_batch is not None
                     else InventoryBatch.batch_number.is_(None)
                 )
-                existing_batch = InventoryBatch.query.filter(
+                # Match the batch actually bought on this invoice, never a
+                # stock-transfer copy of it at another clinic.
+                candidates = InventoryBatch.query.filter(
                     InventoryBatch.purchase_invoice_number == invoice_no,
                     InventoryBatch.product_id == item.id,
                     _batch_filter,
-                ).first()
+                ).order_by(InventoryBatch.id).all()
+                _copies = _transfer_copy_ids(candidates)
+                existing_batch = next((b for b in candidates if b.id not in _copies), None)
 
                 if existing_batch:
                     existing_qty = float(existing_batch.initial_quantity or existing_batch.quantity)

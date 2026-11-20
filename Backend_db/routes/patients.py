@@ -145,6 +145,39 @@ def get_patient_reviews():
 
     return jsonify({'days': result}), 200
 
+@patients.route('/patients/<patient_id>/review/close', methods=['POST'])
+@require_auth
+def close_patient_review(patient_id):
+    """Close out a patient's pending review from the Review tab — outcome is
+    'reviewed' (patient came back) or 'no_show'. Clears next_review_date so
+    the patient drops off the Review tab; the outcome is recorded in the
+    audit log (Admin → Logs) rather than a dedicated column."""
+    data = request.get_json() or {}
+    outcome = data.get('outcome')
+    if outcome not in ('reviewed', 'no_show'):
+        return jsonify({'error': "outcome must be 'reviewed' or 'no_show'"}), 400
+
+    patient = Patient.query.filter_by(patient_id=patient_id).first_or_404()
+    if patient.next_review_date is None:
+        return jsonify({'error': 'Patient has no pending review'}), 400
+
+    review_date = patient.next_review_date.isoformat()
+    patient.next_review_date = None
+    db.session.commit()
+
+    log_activity(
+        action='REVIEW_CLOSED',
+        resource_type='patient',
+        resource_id=patient_id,
+        resource_label=patient.name,
+        details=f"Review on {review_date} marked {'Reviewed' if outcome == 'reviewed' else 'No show'}",
+        user_id=g.current_user.get('user_id'),
+        username=g.current_user.get('username'),
+        ip_address=request.remote_addr,
+    )
+
+    return jsonify({'message': 'Review closed', 'outcome': outcome, 'review_date': review_date}), 200
+
 @patients.route('/patients/<patient_id>', methods=['GET'])
 @require_auth
 def get_patient_detail(patient_id):

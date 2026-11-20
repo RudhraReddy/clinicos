@@ -10,6 +10,46 @@ export function getTodayIST(): string {
     return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
+// Units per stored inventory quantity: stock is stored in packs and shown as
+// a count ("10s" / "1x15" -> 10; anything else -> 1). Same rule as the
+// billing page's getPackMultiplier / inventory page's getDisplayQuantity.
+export function packMultiplier(packSize?: string | null): number {
+    const pack = packSize?.toLowerCase() || ""
+    if (pack.includes("s") || pack.includes("x")) {
+        const match = pack.match(/(\d+)/)
+        if (match) {
+            const num = parseInt(match[0])
+            if (!isNaN(num) && num > 1) return num
+        }
+    }
+    return 1
+}
+
+// "30 (3 packs × ₹30)" for a batch portion -- MRP is per stored unit (pack),
+// so for multi-unit packs show the pack maths rather than "30 × ₹30".
+export function batchQtyLabel(qty: number, mrp: number, mult: number): string {
+    const count = Math.round(qty * mult)
+    if (mult <= 1) return `${count} × ₹${mrp}`
+    const packs = Math.round(qty * 100) / 100
+    return `${count} (${packs} pack${packs === 1 ? "" : "s"} × ₹${mrp})`
+}
+
+// Review-date offsets: a day is +1, a week is +7, a month is a flat +30 days
+// (clinic convention, not calendar months).
+export type ReviewOffsetUnit = "days" | "weeks" | "months"
+export const REVIEW_OFFSET_DAYS: Record<ReviewOffsetUnit, number> = { days: 1, weeks: 7, months: 30 }
+
+// today-in-IST + amount × unit, as YYYY-MM-DD. null unless amount is a
+// positive whole number.
+export function reviewDateFromOffset(amount: string | number, unit: ReviewOffsetUnit): string | null {
+    const n = Number(amount)
+    if (String(amount).trim() === "" || !Number.isInteger(n) || n < 1) return null
+    const d = new Date(`${getTodayIST()}T00:00:00`)
+    d.setDate(d.getDate() + n * REVIEW_OFFSET_DAYS[unit])
+    const pad = (x: number) => String(x).padStart(2, "0")
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 // How long ago a visit happened, relative to today (IST). Counts in days up
 // to 90 days old, then switches to whole months (e.g. "8d", "90d", "3mo").
 export function getVisitAge(visitDate: string | null | undefined): string | null {

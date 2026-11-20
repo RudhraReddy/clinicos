@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func
 from extensions import db
-from models import Location, User, Visit, Bill, PurchaseInvoice, ExpenseLedger, InventoryBatch
+from models import Location, User, Visit, Bill, PurchaseInvoice, ExpenseLedger, InventoryBatch, StockTransfer
 from routes.auth import require_auth, require_admin
 
 locations_bp = Blueprint('locations', __name__)
@@ -72,7 +72,10 @@ def delete_location(loc_id):
         Bill.query.filter_by(location_id=loc_id).count() +
         PurchaseInvoice.query.filter_by(location_id=loc_id).count() +
         ExpenseLedger.query.filter_by(location_id=loc_id).count() +
-        InventoryBatch.query.filter_by(location_id=loc_id).count()
+        InventoryBatch.query.filter_by(location_id=loc_id).count() +
+        StockTransfer.query.filter(
+            (StockTransfer.from_location_id == loc_id) | (StockTransfer.to_location_id == loc_id)
+        ).count()
     )
     if refs > 0:
         return jsonify({

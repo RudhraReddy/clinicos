@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { format } from "date-fns"
+import { ReviewOffsetInput } from "@/components/ReviewOffsetInput"
 import {
     Dialog,
     DialogContent,
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
 import { api, type Visit } from "@/lib/api"
-import { getTodayIST } from "@/lib/utils"
+import { getTodayIST, reviewDateFromOffset, type ReviewOffsetUnit } from "@/lib/utils"
 import { toast } from "sonner"
 
 interface MarkVisitDoneDialogProps {
@@ -27,9 +29,14 @@ interface MarkVisitDoneDialogProps {
 }
 
 export function MarkVisitDoneDialog({ open, onOpenChange, visit, onDone }: MarkVisitDoneDialogProps) {
+    // Notes is disabled for now (not saved anywhere yet) — to be built later.
     const [notes, setNotes] = useState("")
-    // Not saved yet — UI placeholder only, storage/use TBD.
+    // Saved to the patient's next_review_date on confirm (shows in the
+    // Dashboard's Review tab); blank leaves the existing value untouched.
     const [reviewDate, setReviewDate] = useState("")
+    // Alternative to picking a date: "in N days/weeks/months" from today.
+    const [offsetAmount, setOffsetAmount] = useState("")
+    const [offsetUnit, setOffsetUnit] = useState<ReviewOffsetUnit>("days")
     const [submitting, setSubmitting] = useState(false)
 
     const today = getTodayIST()
@@ -39,10 +46,18 @@ export function MarkVisitDoneDialog({ open, onOpenChange, visit, onDone }: MarkV
         if (open) {
             setNotes("")
             setReviewDate("")
+            setOffsetAmount("")
+            setOffsetUnit("days")
         }
     }, [open, visit?.visit_id])
 
     if (!visit) return null
+
+    const applyOffset = (amount: string, unit: ReviewOffsetUnit) => {
+        setOffsetAmount(amount)
+        setOffsetUnit(unit)
+        setReviewDate(reviewDateFromOffset(amount, unit) ?? "")
+    }
 
     const handleConfirm = async () => {
         // Review date is optional, but if set it can't be in the past.
@@ -86,15 +101,16 @@ export function MarkVisitDoneDialog({ open, onOpenChange, visit, onDone }: MarkV
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="done-notes" className="text-sm font-medium">
-                            Notes
+                        <label htmlFor="done-notes" className="text-sm font-medium text-muted-foreground">
+                            Notes <span className="text-xs font-normal">(coming soon)</span>
                         </label>
                         <Textarea
                             id="done-notes"
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Add any notes..."
+                            placeholder="Notes will be available in a future update"
                             rows={3}
+                            disabled
                         />
                     </div>
 
@@ -102,15 +118,26 @@ export function MarkVisitDoneDialog({ open, onOpenChange, visit, onDone }: MarkV
                         <label htmlFor="done-review-date" className="text-sm font-medium">
                             Review Date
                         </label>
-                        <Input
-                            id="done-review-date"
-                            type="date"
-                            min={today}
-                            value={reviewDate}
-                            onChange={(e) => setReviewDate(e.target.value)}
-                        />
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Input
+                                id="done-review-date"
+                                type="date"
+                                min={today}
+                                value={reviewDate}
+                                onChange={(e) => {
+                                    // Picking a date directly overrides the "in N …" entry.
+                                    setReviewDate(e.target.value)
+                                    setOffsetAmount("")
+                                }}
+                                className="w-auto flex-1 min-w-[150px]"
+                            />
+                            <span className="text-sm text-muted-foreground">or in</span>
+                            <ReviewOffsetInput amount={offsetAmount} unit={offsetUnit} onChange={applyOffset} />
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                            When the patient should come back for a follow-up. Leave blank if none.
+                            {reviewDate
+                                ? <>Review on <span className="font-medium text-foreground">{format(new Date(reviewDate + "T00:00:00"), "EEE, dd MMM yyyy")}</span>{offsetAmount && ` (${offsetAmount} ${offsetAmount === "1" ? offsetUnit.slice(0, -1) : offsetUnit} from today)`}</>
+                                : "When the patient should come back for a follow-up. Pick a date or enter a number of days/weeks/months. Leave blank if none."}
                         </p>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ from models import (
     AuditLog, User, DoctorStaffAssignment, Visit, Bill, BillItem, VisitRefund,
     Patient, Location, InventoryBatch, InventoryHistory, PatientImage,
     UploadSession, ExpenseLedger, ProductMaster, PurchaseInvoice,
+    StockTransfer, StockTransferItem,
 )
 from routes.auth import require_admin, require_auth, _verify_totp
 
@@ -397,6 +398,9 @@ def _wipe_stock_counts():
     """= today's existing Wipe Inventory behavior: batches + history only."""
     history_count = InventoryHistory.query.count()
     batch_count = InventoryBatch.query.count()
+    # Transfer slips point at batches, so they go first.
+    StockTransferItem.query.delete(synchronize_session=False)
+    StockTransfer.query.delete(synchronize_session=False)
     InventoryHistory.query.delete(synchronize_session=False)
     InventoryBatch.query.delete(synchronize_session=False)
     db.session.commit()
@@ -422,6 +426,9 @@ def _wipe_inventory_all():
     if product_ids:
         BillItem.query.filter(BillItem.product_id.in_(product_ids)).update(
             {'product_id': None}, synchronize_session=False)
+    # Transfer slips point at batches, so they go first.
+    StockTransferItem.query.delete(synchronize_session=False)
+    StockTransfer.query.delete(synchronize_session=False)
     InventoryHistory.query.delete(synchronize_session=False)
     InventoryBatch.query.delete(synchronize_session=False)
     PurchaseInvoice.query.delete(synchronize_session=False)

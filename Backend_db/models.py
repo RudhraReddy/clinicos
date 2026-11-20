@@ -147,6 +147,46 @@ class InventoryHistory(db.Model):
     user_id = db.Column(db.String(36), nullable=True)
     username = db.Column(db.String(100), nullable=True)
 
+class StockTransfer(db.Model):
+    """A stock transfer slip: one or more items moved from one clinic to
+    another. The actual stock movement is batch-level (see
+    StockTransferItem / InventoryHistory TRANSFER_OUT + TRANSFER_IN rows);
+    this header just groups them for display. from_location_id is NULL when
+    moving legacy stock that was never assigned to a clinic."""
+    __tablename__ = 'stock_transfers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_number = db.Column(db.String(30), unique=True, nullable=False)  # TR-DDMMYY-XXXX
+    from_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
+    to_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    total_value = db.Column(db.Numeric(12, 2), default=0)  # sum of qty × MRP moved
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+    user_id = db.Column(db.String(36), nullable=True)
+    username = db.Column(db.String(100), nullable=True)
+
+    items = db.relationship('StockTransferItem', backref='transfer', lazy=True,
+                            cascade='all, delete-orphan')
+
+
+class StockTransferItem(db.Model):
+    """One batch-portion moved by a transfer: `quantity` taken from
+    from_batch_id and added to to_batch_id (an existing matching batch at the
+    destination, or a new copy of the source batch)."""
+    __tablename__ = 'stock_transfer_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'), nullable=False)
+    product_id = db.Column(db.String(10), db.ForeignKey('product_master.id'), nullable=False)
+    item_name = db.Column(db.String(100))
+    from_batch_id = db.Column(db.Integer, db.ForeignKey('inventory_batches.id'), nullable=True)
+    to_batch_id = db.Column(db.Integer, db.ForeignKey('inventory_batches.id'), nullable=True)
+    batch_number = db.Column(db.String(50))
+    expiry_date = db.Column(db.Date)
+    mrp = db.Column(db.Numeric(10, 2))
+    quantity = db.Column(db.Numeric(10, 2), nullable=False)  # stored (pack) units, same as InventoryBatch.quantity
+    value = db.Column(db.Numeric(12, 2))  # quantity × mrp
+
 # --- Visits & Billing ---
 
 class Visit(db.Model):

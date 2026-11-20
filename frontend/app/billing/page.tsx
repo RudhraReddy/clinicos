@@ -105,6 +105,8 @@ function BillingContent() {
 
     // Item search
     const [itemQuery, setItemQuery] = useState("")
+    // Bill's clinic for the item search's stock counts (synced from resolvedLocationId below)
+    const searchLocationRef = useRef<number | null>(null)
     const [searchResults, setSearchResults] = useState<InventorySearchResult[]>([])
     const [highlightedIndex, setHighlightedIndex] = useState(0)
     const itemSearchInputRef = useRef<HTMLInputElement>(null)
@@ -248,11 +250,13 @@ function BillingContent() {
         }
     }, [activeTab, loadHistory])
 
-    // Search inventory
+    // Search inventory -- stock counts scoped to the bill's clinic (see
+    // resolvedLocationId below; mirrored into a ref because it's computed
+    // after this effect is declared).
     useEffect(() => {
         const timer = setTimeout(() => {
             if (itemQuery.length > 2) {
-                api.searchInventory(itemQuery)
+                api.searchInventory(itemQuery, searchLocationRef.current)
                     .then(data => {
                         setSearchResults(data)
                         setHighlightedIndex(0)
@@ -518,6 +522,9 @@ function BillingContent() {
             : frontdeskLocationId
     const locationName = (id: number | null) => locations.find(l => l.id === id)?.name
     const noClinicAssigned = !isLockedToVisit && !isAdminOrDoctor && !frontdeskLocationId
+    useEffect(() => {
+        searchLocationRef.current = resolvedLocationId
+    }, [resolvedLocationId])
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">

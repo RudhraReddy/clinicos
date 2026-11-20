@@ -4,7 +4,8 @@ import math
 from flask import Blueprint, request, jsonify, g
 from extensions import db, get_ist_now
 from models import Bill, BillItem, Patient, Visit, VisitRefund, ProductMaster, InventoryBatch, InventoryHistory, User, Location
-from sqlalchemy import func
+from sqlalchemy import func, or_
+import re
 from utils import generate_invoice_id
 from .auth import require_auth, log_activity
 
@@ -14,6 +15,18 @@ billing = Blueprint('billing', __name__)
 # rather than cross-imported to avoid coupling the billing and visits
 # blueprints together).
 REFUND_MODES = ('visit_upi', 'billing_upi', 'cash')
+
+
+def _pack_multiplier(pack_size):
+    """Units per stored quantity, mirroring the frontend's getPackMultiplier
+    (billing page): '10s' / '1x15' -> 10 / 1; anything else -> 1. Only used
+    to word stock-shortage errors in the same count staff see on screen."""
+    pack = (pack_size or '').lower()
+    if 's' in pack or 'x' in pack:
+        m = re.search(r'(\d+)', pack)
+        if m and int(m.group(1)) > 1:
+            return int(m.group(1))
+    return 1
 
 @billing.route('/billing', methods=['POST'])
 @require_auth
@@ -141,12 +154,35 @@ def create_bill():
         
         total_calc_amount += billed_total
         
-        # Deduct from inventory batches (FIFO)
+        # Deduct from inventory batches (FIFO), using only THIS bill's clinic's
+        # stock. Legacy batches with no clinic (pre multi-location) are used
+        # last, after the clinic's own batches. Stock at other clinics is never
+        # touched -- move it here with a stock transfer first.
         remaining_to_deduct = qty_needed
         batches = InventoryBatch.query.filter(
             InventoryBatch.product_id == master_id,
-            InventoryBatch.quantity > 0
-        ).order_by(InventoryBatch.expiry_date.asc()).all()
+            InventoryBatch.quantity > 0,
+            or_(InventoryBatch.location_id == resolved_location_id,
+                InventoryBatch.location_id.is_(None)),
+        ).order_by(
+            InventoryBatch.location_id.is_(None).asc(),  # own clinic first
+            InventoryBatch.expiry_date.asc().nullslast(),
+            InventoryBatch.id.asc(),
+        ).with_for_update().all()
+
+        available = sum(float(b.quantity) for b in batches)
+        if qty_needed > available + 0.005:
+            db.session.rollback()
+            clinic = db.session.get(Location, resolved_location_id)
+            mult = _pack_multiplier(product_master.pack_size)
+            return jsonify({
+                'error': (
+                    f"Not enough stock of {product_master.item_name} at "
+                    f"{clinic.name if clinic else 'this clinic'}: "
+                    f"{round(available * mult)} available, {round(qty_needed * mult)} needed. "
+                    f"Transfer stock from another clinic first."
+                )
+            }), 400
         
         associated_batch_id = None
         associated_batch_number = "Auto-FIFO"

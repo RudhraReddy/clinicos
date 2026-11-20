@@ -13,8 +13,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, Menu, LayoutDashboard, CreditCard, Users, Eye } from "lucide-react"
+import { Search, Loader2, AlertCircle, FileText, Plus, Download, Upload, Columns, AlertTriangle, X, History, ChevronDown, ChevronRight, RotateCcw, Trash2, Menu, LayoutDashboard, CreditCard, Users, Eye, ArrowLeftRight } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { TransfersPanel } from "@/components/TransfersPanel"
+import { TransferStockDialog } from "@/components/TransferStockDialog"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
@@ -134,6 +136,7 @@ function AllChangesPanel() {
                                 <SelectItem value="SALE">Sales</SelectItem>
                                 <SelectItem value="ADJUSTMENT">Manual</SelectItem>
                                 <SelectItem value="PURCHASE">Invoice</SelectItem>
+                                <SelectItem value="TRANSFER">Transfers</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -161,7 +164,10 @@ function AllChangesPanel() {
                 } else if (filterType === 'ADJUSTMENT') {
                     sales = [];
                     // Keep anything that isn't a PURCHASE/Invoice
-                    manual = manual.filter((e: any) => e.type !== 'PURCHASE');
+                    manual = manual.filter((e: { type: string }) => e.type !== 'PURCHASE' && !e.type.startsWith('TRANSFER'));
+                } else if (filterType === 'TRANSFER') {
+                    sales = [];
+                    manual = manual.filter((e: { type: string }) => e.type.startsWith('TRANSFER'));
                 } else if (filterType === 'PURCHASE') {
                     sales = [];
                     // Keep only PURCHASE/Invoice
@@ -612,7 +618,8 @@ export default function InventoryPage() {
     const { appFontSize, expiryReminderMonths, defaultInventoryColumns } = useSettings()
     const { role } = useAuth()
     const { openMenu } = useMenu()
-    const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes' | 'history'>('inventory')
+    const [activeTab, setActiveTab] = useState<'inventory' | 'all-changes' | 'history' | 'transfers'>('inventory')
+    const [transferOpen, setTransferOpen] = useState(false)
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -830,7 +837,7 @@ export default function InventoryPage() {
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
-            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes' | 'history')} className="flex-1 flex flex-col overflow-hidden gap-4">
+            <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'inventory' | 'all-changes' | 'history' | 'transfers')} className="flex-1 flex flex-col overflow-hidden gap-4">
                 <div className="flex items-center justify-between shrink-0 gap-3 flex-wrap">
                     <div className="flex items-center gap-3 flex-wrap">
                         <button
@@ -866,6 +873,7 @@ export default function InventoryPage() {
                             <TabsTrigger value="inventory">Inventory</TabsTrigger>
                             <TabsTrigger value="all-changes">All Changes</TabsTrigger>
                             <TabsTrigger value="history">Invoices</TabsTrigger>
+                            <TabsTrigger value="transfers">Transfers</TabsTrigger>
                         </TabsList>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -928,6 +936,10 @@ export default function InventoryPage() {
 
                 <TabsContent value="history" className="flex-1 overflow-y-auto m-0">
                     <InvoiceHistoryPanel />
+                </TabsContent>
+
+                <TabsContent value="transfers" className="flex-1 overflow-y-auto m-0">
+                    <TransfersPanel onTransferred={loadData} />
                 </TabsContent>
 
                 <TabsContent value="inventory" className="flex-1 flex flex-col overflow-hidden gap-6 m-0">
@@ -998,6 +1010,12 @@ export default function InventoryPage() {
                                     </button>
                                 ))}
                             </div>
+                        )}
+                        {locations.length > 1 && (
+                            <Button variant="outline" size="sm" className="h-9" onClick={() => setTransferOpen(true)}>
+                                <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
+                                Transfer Stock
+                            </Button>
                         )}
                         {/* Quick Search */}
                         <div className="relative w-64">
@@ -1381,6 +1399,14 @@ export default function InventoryPage() {
             </Sheet>
                 </TabsContent>
             </Tabs>
+
+            <TransferStockDialog
+                open={transferOpen}
+                onOpenChange={setTransferOpen}
+                locations={locations}
+                defaultFromId={activeLocationId === 'all' ? null : activeLocationId}
+                onDone={loadData}
+            />
 
             {/* Export Dialog */}
             <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>

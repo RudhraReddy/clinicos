@@ -19,6 +19,53 @@ export interface Patient {
     next_review_date?: string | null;
 }
 
+// --- Stock transfers between clinics ---
+export interface TransferStockItem {
+    product_id: string
+    item_name: string
+    pack_size?: string | null
+    manufacturer?: string | null
+    quantity: number // stored units (packs) available at the source clinic
+    value: number    // quantity × MRP at the source clinic
+}
+
+export interface TransferPayload {
+    from_location_id: number | 'unassigned'
+    to_location_id: number
+    items: { product_id: string; quantity: number }[]
+    notes?: string
+}
+
+export interface TransferPlanLine {
+    product_id: string
+    item_name: string
+    pack_size?: string | null
+    quantity: number
+    available: number
+    value: number
+    portions: { batch_id: number; batch_number?: string | null; expiry_date?: string | null; mrp: number; quantity: number; value: number }[]
+}
+
+export interface TransferPlan {
+    lines: TransferPlanLine[]
+    errors: ({ product_id: string; item_name: string; pack_size?: string | null; requested: number; available: number } | string)[]
+    total_value: number
+}
+
+export interface StockTransferRecord {
+    transfer_number: string
+    from_location_id: number | null
+    from_location_name: string
+    to_location_id: number
+    to_location_name: string
+    total_value: number
+    notes?: string | null
+    created_at: string
+    username?: string | null
+    items: { product_id: string; item_name: string; pack_size?: string | null; quantity: number; value: number;
+        batches: { batch_number?: string | null; expiry_date?: string | null; mrp: number; quantity: number }[] }[]
+}
+
 // Backs the Dashboard's Review tab — patients grouped by next_review_date.
 export interface PatientReviewEntry {
     patient_id: string;
@@ -268,6 +315,14 @@ export const api = {
     // Patient APIs
     async getPatients(page = 1, limit = 50): Promise<Patient[]> {
         return fetchApi(`/api/patients?page=${page}&limit=${limit}`);
+    },
+
+    // Clears the patient's next_review_date, logging the outcome to the audit log.
+    async closePatientReview(patientId: string, outcome: 'reviewed' | 'no_show') {
+        return fetchApi(`/api/patients/${patientId}/review/close`, {
+            method: 'POST',
+            body: JSON.stringify({ outcome }),
+        })
     },
 
     async getPatientReviews(dateFrom?: string, dateTo?: string): Promise<PatientReviewsResponse> {
@@ -625,9 +680,28 @@ export const api = {
     },
 
     // Billing Search
-    async searchInventory(query: string): Promise<InventorySearchResult[]> {
+    // locationId (the bill's clinic) scopes in-stock counts to what that bill can use.
+    async searchInventory(query: string, locationId?: number | null): Promise<InventorySearchResult[]> {
         if (!query) return []
-        return fetchApi(`/api/inventory/search?q=${encodeURIComponent(query)}`)
+        const loc = locationId ? `&location_id=${locationId}` : ''
+        return fetchApi(`/api/inventory/search?q=${encodeURIComponent(query)}${loc}`)
+    },
+
+    // Stock transfers between clinics. Quantities are stored units (packs).
+    async searchTransferStock(fromLocationId: number | 'unassigned', query: string): Promise<TransferStockItem[]> {
+        return fetchApi(`/api/inventory/transfers/stock?location_id=${fromLocationId}&q=${encodeURIComponent(query)}`)
+    },
+    async previewTransfer(payload: TransferPayload): Promise<TransferPlan> {
+        return fetchApi(`/api/inventory/transfers/preview`, { method: 'POST', body: JSON.stringify(payload) })
+    },
+    async createTransfer(payload: TransferPayload): Promise<{ transfer_number: string; total_value: number }> {
+        return fetchApi(`/api/inventory/transfers`, { method: 'POST', body: JSON.stringify(payload) })
+    },
+    async getTransfers(locationId?: number): Promise<StockTransferRecord[]> {
+        return fetchApi(`/api/inventory/transfers${locationId ? `?location_id=${locationId}` : ''}`)
+    },
+    async hasUnassignedStock(): Promise<{ has_unassigned: boolean }> {
+        return fetchApi(`/api/inventory/transfers/has-unassigned`)
     },
 
     // Patient Images
