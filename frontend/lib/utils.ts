@@ -90,3 +90,9 @@ export function orderTodayVisits<T extends Pick<Visit, 'status' | 'visit_time' |
 
     return [...pending, ...done]
 }
+
+// Stock transfers move ITEMS only for now: no ₹ value is saved or "moved"
+// between clinics; qty × MRP is shown purely as an on-screen estimate. Set
+// true to bring back the value-tracking UI (−₹X / +₹X summary, "Transfer ₹X")
+// -- keep in sync with TRANSFER_VALUE_ENABLED in Backend_db/routes/transfers.py.
+export const TRANSFER_VALUE_ENABLED = false

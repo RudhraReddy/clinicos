@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowRight, ChevronDown, ChevronRight, Loader2, Plus } from "lucide-react"
 import { api, type Location, type StockTransferRecord } from "@/lib/api"
-import { batchQtyLabel, packMultiplier } from "@/lib/utils"
+import { batchQtyLabel, packMultiplier, TRANSFER_VALUE_ENABLED } from "@/lib/utils"
 import { TransferStockDialog } from "@/components/TransferStockDialog"
 
+// "Est." while transfers don't record value (TRANSFER_VALUE_ENABLED off).
+const valueLabel = TRANSFER_VALUE_ENABLED ? "" : "Est. "
 const rupees = (v: number) => `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // Inventory → Transfers tab: list of stock transfer slips (newest first),
@@ -80,7 +82,7 @@ export function TransfersPanel({ onTransferred }: { onTransferred?: () => void }
                                     </span>
                                 </CardTitle>
                                 <span className="text-sm text-muted-foreground">
-                                    {t.items.length} item{t.items.length !== 1 ? "s" : ""} · <span className="font-semibold text-foreground">{rupees(t.total_value)}</span>
+                                    {t.items.length} item{t.items.length !== 1 ? "s" : ""} · <span className="font-semibold text-foreground">{valueLabel}{rupees(t.total_value)}</span>
                                     {t.username ? ` · by ${t.username}` : ""}
                                 </span>
                             </div>
@@ -102,7 +104,7 @@ export function TransfersPanel({ onTransferred }: { onTransferred?: () => void }
                                                 </p>
                                             </div>
                                             <span className="shrink-0 tabular-nums">
-                                                {Math.round(i.quantity * mult)} · {rupees(i.value)}
+                                                {Math.round(i.quantity * mult)} · {valueLabel}{rupees(i.value)}
                                             </span>
                                         </div>
                                     )

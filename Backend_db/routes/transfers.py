@@ -6,6 +6,8 @@ same batch (same batch no / expiry / MRP / cost / purchase invoice) — merged
 into an existing identical batch at B, or a new copy of the batch. Because
 stock value everywhere is computed as batch MRP × quantity, the value moves
 with the units automatically: A loses qty × MRP, B gains exactly the same.
+Recording that value on the transfer itself is switched off for now -- see
+TRANSFER_VALUE_ENABLED below.
 
 Quantities are in stored units (packs, the same unit as
 InventoryBatch.quantity); the frontend converts from the displayed count.
@@ -24,6 +26,14 @@ from models import (
 from .auth import require_auth, log_activity
 
 transfers = Blueprint('transfers', __name__)
+
+# Value tracking switch. Transfers currently move ITEMS only: no ₹ value is
+# saved on transfer records or written to the audit log, and the frontend
+# shows qty × MRP purely as an on-screen estimate. Set True to go back to
+# recording the moved value (StockTransfer.total_value / StockTransferItem.value)
+# -- the code paths below are kept intact for that. Keep in sync with
+# TRANSFER_VALUE_ENABLED in frontend/lib/utils.ts.
+TRANSFER_VALUE_ENABLED = False
 
 # Stored quantities are Numeric(10, 2); anything below this is rounding noise.
 QTY_EPS = Decimal('0.005')
@@ -212,7 +222,7 @@ def create_transfer():
             transfer_number=_generate_transfer_number(),
             from_location_id=plan['from_location_id'],
             to_location_id=plan['to_location_id'],
-            total_value=_q2(plan['total_value']),
+            total_value=_q2(plan['total_value']) if TRANSFER_VALUE_ENABLED else None,
             notes=notes,
             user_id=user_id,
             username=username,
@@ -270,7 +280,7 @@ def create_transfer():
                     expiry_date=src.expiry_date,
                     mrp=src.mrp,
                     quantity=take,
-                    value=_q2(p['value']),
+                    value=_q2(p['value']) if TRANSFER_VALUE_ENABLED else None,
                 ))
                 db.session.add(InventoryHistory(
                     product_id=src.product_id, batch_id=src.id, change_amount=-take,
@@ -291,7 +301,8 @@ def create_transfer():
         resource_type='inventory',
         resource_id=transfer.transfer_number,
         resource_label=f'{from_name} → {to_name}',
-        details=f"{len(plan['lines'])} item(s), value ₹{plan['total_value']:.2f}",
+        details=(f"{len(plan['lines'])} item(s), value ₹{plan['total_value']:.2f}" if TRANSFER_VALUE_ENABLED
+                 else f"{len(plan['lines'])} item(s)"),
         user_id=user_id,
         username=username,
         ip_address=request.remote_addr,
@@ -300,6 +311,7 @@ def create_transfer():
     return jsonify({
         'message': 'Stock transferred',
         'transfer_number': transfer.transfer_number,
+        # Not stored when value tracking is off -- display-only estimate.
         'total_value': plan['total_value'],
     }), 201
 
@@ -326,7 +338,12 @@ def list_transfers():
                 'quantity': 0.0, 'value': 0.0, 'batches': [],
             })
             row['quantity'] += float(it.quantity)
-            row['value'] += float(it.value or 0)
+            # With value tracking off nothing is stored; show an estimate
+            # (qty × the batch MRP) instead.
+            if TRANSFER_VALUE_ENABLED and it.value is not None:
+                row['value'] += float(it.value)
+            else:
+                row['value'] += float(it.quantity) * float(it.mrp or 0)
             row['batches'].append({
                 'batch_number': it.batch_number,
                 'expiry_date': it.expiry_date.isoformat() if it.expiry_date else None,
@@ -343,7 +360,9 @@ def list_transfers():
             'from_location_name': _location_name(t.from_location_id, names),
             'to_location_id': t.to_location_id,
             'to_location_name': names.get(t.to_location_id),
-            'total_value': float(t.total_value or 0),
+            'total_value': (float(t.total_value or 0) if TRANSFER_VALUE_ENABLED
+                            else round(sum(r['value'] for r in per_product.values()), 2)),
+            'value_is_estimate': not TRANSFER_VALUE_ENABLED,
             'notes': t.notes,
             'created_at': t.created_at.isoformat() if t.created_at else None,
             'username': t.username,

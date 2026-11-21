@@ -11,7 +11,7 @@ import { toast } from "sonner"
 import {
     api, type Location, type TransferPayload, type TransferPlan, type TransferStockItem,
 } from "@/lib/api"
-import { batchQtyLabel, cn, packMultiplier } from "@/lib/utils"
+import { batchQtyLabel, cn, packMultiplier, TRANSFER_VALUE_ENABLED } from "@/lib/utils"
 
 type FromValue = string // location id as string, or "unassigned"
 
@@ -31,6 +31,8 @@ interface TransferStockDialogProps {
     onDone?: () => void
 }
 
+// Value is display-only while TRANSFER_VALUE_ENABLED is off -- labelled as an estimate.
+const valueLabel = TRANSFER_VALUE_ENABLED ? "" : "Est. "
 const rupees = (v: number) => `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function errorMessage(err: unknown, fallback: string) {
@@ -39,9 +41,10 @@ function errorMessage(err: unknown, fallback: string) {
     return message
 }
 
-// Move stock (and with it, its value) from one clinic to another. Staff pick
-// From/To, add items with a count; the backend preview shows exactly which
-// batches move (oldest expiry first) and the value leaving/arriving.
+// Move stock from one clinic to another. Staff pick From/To, add items with a
+// count; the backend preview shows exactly which batches move (oldest expiry
+// first). With TRANSFER_VALUE_ENABLED off only items move -- the ₹ figures are
+// an estimate for reference and are not saved.
 export function TransferStockDialog({ open, onOpenChange, locations, defaultFromId, onDone }: TransferStockDialogProps) {
     const [hasUnassigned, setHasUnassigned] = useState(false)
     const [from, setFrom] = useState<FromValue>("")
@@ -148,7 +151,9 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
         setSubmitting(true)
         try {
             const res = await api.createTransfer(payload)
-            toast.success(`Transfer ${res.transfer_number}: ${rupees(res.total_value)} moved from ${fromName} to ${toName}`)
+            toast.success(TRANSFER_VALUE_ENABLED
+                ? `Transfer ${res.transfer_number}: ${rupees(res.total_value)} moved from ${fromName} to ${toName}`
+                : `Transfer ${res.transfer_number}: items moved from ${fromName} to ${toName}`)
             onOpenChange(false)
             onDone?.()
         } catch (err) {
@@ -164,8 +169,9 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
                 <DialogHeader>
                     <DialogTitle>Transfer Stock</DialogTitle>
                     <DialogDescription>
-                        Move items from one clinic to another. Stock and its value leave the source clinic and are
-                        added to the destination, oldest expiry first.
+                        {TRANSFER_VALUE_ENABLED
+                            ? "Move items from one clinic to another. Stock and its value leave the source clinic and are added to the destination, oldest expiry first."
+                            : "Move items from one clinic to another, oldest expiry first. The value shown is an estimate (qty × MRP) for reference only."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -229,7 +235,7 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
                                                 {r.manufacturer && <span className="text-muted-foreground"> · {r.manufacturer}</span>}
                                             </span>
                                             <span className="text-xs text-muted-foreground shrink-0">
-                                                {added ? "Added" : `${Math.round(r.quantity * packMultiplier(r.pack_size))} in stock · ${rupees(r.value)}`}
+                                                {added ? "Added" : `${Math.round(r.quantity * packMultiplier(r.pack_size))} in stock · ${valueLabel}${rupees(r.value)}`}
                                             </span>
                                         </button>
                                     )
@@ -266,7 +272,7 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
                                                 className={cn("w-24", short && "border-destructive")}
                                             />
                                             <span className="w-28 text-right text-sm tabular-nums">
-                                                {line ? rupees(line.value) : "—"}
+                                                {line ? `${valueLabel}${rupees(line.value)}` : "—"}
                                             </span>
                                             <Button
                                                 type="button" variant="ghost" size="icon" className="h-8 w-8"
@@ -305,12 +311,19 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
 
                     {planError && <p className="text-sm text-destructive">{planError}</p>}
 
-                    {/* Value summary */}
-                    {plan && plan.lines.length > 0 && fromName && toName && (
+                    {/* Value summary: −₹X / +₹X per clinic (only when value tracking is on) */}
+                    {TRANSFER_VALUE_ENABLED && plan && plan.lines.length > 0 && fromName && toName && (
                         <div className="rounded-md bg-muted/50 p-3 text-sm grid grid-cols-1 sm:grid-cols-2 gap-1">
                             <span>{fromName}: <span className="font-semibold text-red-600 dark:text-red-400">−{rupees(plan.total_value)}</span></span>
                             <span>{toName}: <span className="font-semibold text-green-600 dark:text-green-400">+{rupees(plan.total_value)}</span></span>
                             <span className="text-xs text-muted-foreground sm:col-span-2">Value at MRP, same as the inventory stock value.</span>
+                        </div>
+                    )}
+                    {/* Estimate only (value tracking off): one display number, nothing saved */}
+                    {!TRANSFER_VALUE_ENABLED && plan && plan.lines.length > 0 && (
+                        <div className="rounded-md bg-muted/50 p-3 text-sm flex items-baseline justify-between gap-3 flex-wrap">
+                            <span>Estimated value of items: <span className="font-semibold">{rupees(plan.total_value)}</span></span>
+                            <span className="text-xs text-muted-foreground">qty × MRP, for reference only, not recorded</span>
                         </div>
                     )}
                 </div>
@@ -319,7 +332,7 @@ export function TransferStockDialog({ open, onOpenChange, locations, defaultFrom
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
                     <Button onClick={submit} disabled={!canSubmit}>
                         {(submitting || planning) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        {plan && plan.lines.length > 0 ? `Transfer ${rupees(plan.total_value)}` : "Transfer"}
+                        {TRANSFER_VALUE_ENABLED && plan && plan.lines.length > 0 ? `Transfer ${rupees(plan.total_value)}` : "Transfer"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
