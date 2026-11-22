@@ -479,10 +479,14 @@ export const api = {
         fieldMapping?: Record<string, string>,
         clinicMapping?: Record<string, number>,
         defaultMinStock?: number,
+        rowDecisions?: Record<string, string>,
     ) {
         const formData = new FormData()
         formData.append('file', file)
         formData.append('mode', mode)
+        if (rowDecisions && Object.keys(rowDecisions).length > 0) {
+            formData.append('row_decisions', JSON.stringify(rowDecisions))
+        }
         if (fieldMapping && Object.keys(fieldMapping).length > 0) {
             formData.append('field_mapping', JSON.stringify(fieldMapping))
         }
@@ -702,6 +706,29 @@ export const api = {
     },
     async hasUnassignedStock(): Promise<{ has_unassigned: boolean }> {
         return fetchApi(`/api/inventory/transfers/has-unassigned`)
+    },
+
+    // ── Duplicate items ──
+    async getDuplicateItems(): Promise<{ groups: DuplicateGroup[]; exact_groups: number; similar_groups: number }> {
+        return fetchApi(`/api/inventory/duplicates`)
+    },
+    async mergeDuplicateItems(keepId: string, mergeIds: string[]): Promise<{ message: string }> {
+        return fetchApi(`/api/inventory/duplicates/merge`, {
+            method: 'POST', body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+        })
+    },
+    async checkImportDuplicates(file: File, fieldMapping?: Record<string, string>): Promise<{ rows: ImportDuplicateRow[]; total_rows: number }> {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (fieldMapping && Object.keys(fieldMapping).length > 0) {
+            formData.append('field_mapping', JSON.stringify(fieldMapping))
+        }
+        const res = await fetch(`${API_BASE_URL}/api/inventory/import/check-duplicates`, {
+            method: 'POST', body: formData, credentials: 'include',
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error((data as { error?: string }).error || 'Duplicate check failed')
+        return data as { rows: ImportDuplicateRow[]; total_rows: number }
     },
 
     // Patient Images
@@ -1020,3 +1047,36 @@ export async function getActivityLog(filters: ActivityLogFilters = {}) {
 }
 
 export { ApiError };
+
+// ── Duplicate items ──
+export interface DuplicateItem {
+    id: string
+    item_name: string
+    pack_size?: string | null
+    manufacturer?: string | null
+    hsn_code?: string | null
+    category?: string | null
+    total_qty: number                                   // stored packs
+    stock_by_clinic: { location: string; quantity: number }[]
+    batch_count: number
+    bill_count: number
+}
+export interface DuplicateGroup {
+    match: 'exact' | 'similar'
+    items: DuplicateItem[]                              // most stock first
+}
+export interface ImportDuplicateMatch {
+    id: string
+    item_name: string
+    pack_size?: string | null
+    match: 'exact' | 'similar'
+}
+export interface ImportDuplicateRow {
+    row: number                                         // data-row index sent back in row_decisions
+    line: number                                        // spreadsheet line number (header = 1)
+    item_name: string
+    pack_size?: string | null
+    matches: ImportDuplicateMatch[]
+    same_as_row: { row: number; item_name: string; pack_size?: string | null; match: 'exact' | 'similar' } | null
+    suggestion: string                                  // "existing:<id>" | "row:<n>" | "new"
+}

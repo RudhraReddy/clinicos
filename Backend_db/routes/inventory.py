@@ -1084,6 +1084,15 @@ def import_inventory():
         clinic_mapping = {k: int(v) for k, v in clinic_mapping.items()}
     except Exception:
         clinic_mapping = {}
+    # Per-row choices from the duplicate review step
+    # (POST /inventory/import/check-duplicates): {"<row index>":
+    # "existing:<product id>" | "row:<earlier row index>" | "new"}.
+    try:
+        row_decisions = {str(k): str(v) for k, v in
+                         (_json.loads(request.form.get('row_decisions', '{}') or '{}')).items()}
+    except Exception:
+        row_decisions = {}
+    product_for_row = {}   # row index -> product used, for "row:<k>" decisions
 
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -1129,11 +1138,11 @@ def import_inventory():
                 elif h in loc_name_to_id:
                     clinic_cols[h] = loc_name_to_id[h]
 
-        for row in csv_input:
+        for row_idx, row in enumerate(csv_input):
             def get_val(keys):
                 for k in keys:
                     for exist_k in row.keys():
-                        if k.lower() in exist_k.lower(): return row[exist_k]
+                        if exist_k and k.lower() in exist_k.lower(): return row[exist_k]
                 return None
 
             # ── Field extraction (supports both old and new header names) ──
@@ -1145,8 +1154,16 @@ def import_inventory():
             pack_size = normalize_pack_size(get_val(['Pack Size', 'pack', 'packs', 'Pack']) or '')
             product_id_csv = (get_val(['Product ID']) or '').strip()
 
-            # Product lookup: by ID first (if provided), then by name+pack
-            if product_id_csv:
+            # Product lookup: a duplicate-review decision wins; otherwise by
+            # ID first (if provided), then by name+pack.
+            decision = row_decisions.get(str(row_idx), '')
+            if decision.startswith('existing:'):
+                item = db.session.get(ProductMaster, decision.split(':', 1)[1])
+            elif decision.startswith('row:'):
+                item = product_for_row.get(decision.split(':', 1)[1])
+            elif decision == 'new':
+                item = None
+            elif product_id_csv:
                 item = ProductMaster.query.get(product_id_csv)
             else:
                 name_q = ProductMaster.query.filter(func.lower(ProductMaster.item_name) == name.strip().lower())
@@ -1191,7 +1208,9 @@ def import_inventory():
                     pass
                 db.session.add(item)
                 db.session.flush()
+                product_for_row[str(row_idx)] = item
             else:
+                product_for_row[str(row_idx)] = item
                 # Update product master fields if provided in CSV
                 cat = get_val(['Category', 'cat'])
                 if cat: item.category = cat

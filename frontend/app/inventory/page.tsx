@@ -23,6 +23,7 @@ import { useMenu } from "@/components/layout/AppShell"
 import { cn, packMultiplier } from "@/lib/utils"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
 import { ImportInventoryDialog } from "@/components/ImportInventoryDialog"
+import { DuplicateItemsDialog } from "@/components/DuplicateItemsDialog"
 import { ViewBatchesDialog } from "@/components/ViewBatchesDialog"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { DataTableColumnFilter } from "@/components/DataTableColumnFilter"
@@ -878,6 +879,7 @@ export default function InventoryPage() {
                                         Import
                                     </Button>
                                 } onSuccess={loadData} />
+                                <DuplicateItemsDialog onMerged={loadData} />
                             </>
                         )}
                         <Popover>

@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
-import { api } from "@/lib/api"
+import { api, type ImportDuplicateRow } from "@/lib/api"
 import { useSettings } from "@/lib/settings_context"
 
 const KNOWN_FIELD_OPTIONS = [
@@ -26,7 +26,7 @@ interface ImportInventoryDialogProps {
     trigger?: React.ReactNode
 }
 
-type Step = 'pick' | 'mapping' | 'import' | 'done'
+type Step = 'pick' | 'mapping' | 'import' | 'review' | 'done'
 
 export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDialogProps) {
     const { defaultMinStock } = useSettings()
@@ -45,6 +45,10 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<{ message: string } | null>(null)
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
+    // Duplicate review: CSV rows that would create a new item although one
+    // that looks the same already exists (or appears earlier in the CSV).
+    const [dupRows, setDupRows] = useState<ImportDuplicateRow[]>([])
+    const [decisions, setDecisions] = useState<Record<string, string>>({})
 
     const reset = () => {
         setStep('pick')
@@ -56,6 +60,8 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
         setMode('update')
         setResult(null)
         setErrorMsg(null)
+        setDupRows([])
+        setDecisions({})
     }
 
     const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,15 +112,21 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
         setStep('import')
     }
 
+    // Step 1 of Import: check for duplicates first. If any rows look like an
+    // existing item, show the review step; otherwise import straight away.
     const handleImport = async () => {
         if (!file) return
         setSubmitting(true)
         setErrorMsg(null)
         try {
-            const data = await api.importInventory(file, mode, fieldMapping, clinicMapping, defaultMinStock)
-            setResult({ message: data.message || 'Imported successfully.' })
-            setStep('done')
-            onSuccess?.()
+            const check = await api.checkImportDuplicates(file, fieldMapping)
+            if (check.rows.length > 0) {
+                setDupRows(check.rows)
+                setDecisions(Object.fromEntries(check.rows.map(r => [String(r.row), r.suggestion])))
+                setStep('review')
+                return
+            }
+            await runImport({})
         } catch (err: unknown) {
             setErrorMsg(err instanceof Error ? err.message : 'Import failed')
         } finally {
@@ -122,10 +134,30 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
         }
     }
 
+    const handleConfirmReview = async () => {
+        setSubmitting(true)
+        setErrorMsg(null)
+        try {
+            await runImport(decisions)
+        } catch (err: unknown) {
+            setErrorMsg(err instanceof Error ? err.message : 'Import failed')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const runImport = async (rowDecisions: Record<string, string>) => {
+        if (!file) return
+        const data = await api.importInventory(file, mode, fieldMapping, clinicMapping, defaultMinStock, rowDecisions)
+        setResult({ message: data.message || 'Imported successfully.' })
+        setStep('done')
+        onSuccess?.()
+    }
+
     return (
         <Dialog open={open} onOpenChange={val => { setOpen(val); if (!val) setTimeout(reset, 300) }}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[500px] rounded-lg">
+            <DialogContent className={`w-[95vw] max-w-[95vw] rounded-lg ${step === 'review' ? 'sm:max-w-2xl' : 'sm:max-w-[500px]'}`}>
 
                 {step === 'done' && (
                     <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
@@ -248,6 +280,66 @@ export function ImportInventoryDialog({ onSuccess, trigger }: ImportInventoryDia
                         <DialogFooter>
                             <Button variant="ghost" onClick={() => setStep(parseResult ? 'mapping' : 'pick')}>Back</Button>
                             <Button onClick={handleImport} disabled={submitting}>
+                                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Import
+                            </Button>
+                        </DialogFooter>
+                    </>
+                )}
+
+                {step === 'review' && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Possible duplicate items</DialogTitle>
+                            <DialogDescription>
+                                {dupRows.length} row{dupRows.length !== 1 ? 's' : ''} in this CSV would create a new item, but a
+                                similar item already exists. Choose what each row should do. Nothing is saved until you
+                                click Import.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-2 space-y-3 max-h-[60vh] overflow-y-auto">
+                            {errorMsg && (
+                                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive flex items-center gap-2">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    {errorMsg}
+                                </div>
+                            )}
+                            {dupRows.map(r => (
+                                <div key={r.row} className="border rounded-md p-3 space-y-2">
+                                    <p className="text-sm">
+                                        <span className="text-muted-foreground">Line {r.line}:</span>{' '}
+                                        <span className="font-medium">{r.item_name}</span>
+                                        <span className="text-muted-foreground"> · {r.pack_size || 'no pack'}</span>
+                                    </p>
+                                    <Select
+                                        value={decisions[String(r.row)] || 'new'}
+                                        onValueChange={v => setDecisions(prev => ({ ...prev, [String(r.row)]: v }))}
+                                    >
+                                        <SelectTrigger className="h-9 text-sm" aria-label={`Action for line ${r.line}`}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {r.matches.map(m => (
+                                                <SelectItem key={m.id} value={`existing:${m.id}`}>
+                                                    Add to existing: {m.item_name} · {m.pack_size || 'no pack'}
+                                                    {m.match === 'exact' ? ' (same item)' : ' (similar name)'}
+                                                </SelectItem>
+                                            ))}
+                                            {r.same_as_row && (
+                                                <SelectItem value={`row:${r.same_as_row.row}`}>
+                                                    Same item as line {r.same_as_row.row + 2}: {r.same_as_row.item_name}
+                                                    {r.same_as_row.match === 'exact' ? ' (same item)' : ' (similar name)'}
+                                                </SelectItem>
+                                            )}
+                                            <SelectItem value="new">Create as a new item</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ))}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => { setStep('import'); setErrorMsg(null) }} disabled={submitting}>Back</Button>
+                            <Button onClick={handleConfirmReview} disabled={submitting}>
                                 {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Import
                             </Button>
