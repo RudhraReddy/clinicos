@@ -113,3 +113,9 @@ export function normalizePackSize(value: string): string {
     const m = value.trim().match(/^(\d+)(?:\.0+)?$/)
     return m ? `${parseInt(m[1], 10)}'s pack` : value
 }
+
+/** ₹ amount in Indian digit grouping, up to 2 decimals: 125000.5 → "₹1,25,000.50". */
+export function formatINR(amount: number | null | undefined): string {
+    const n = Number(amount || 0)
+    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`
+}

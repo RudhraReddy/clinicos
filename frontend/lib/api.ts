@@ -19,6 +19,92 @@ export interface Patient {
     next_review_date?: string | null;
 }
 
+// --- Editing a saved purchase invoice ---
+export interface InvoiceEditLine {
+    batch_id?: number            // existing line; omit for a new line
+    product_id?: string          // new line: an existing item
+    product_name?: string        // new line: item name (new item if no match)
+    pack_size?: string
+    qty: number | string         // paid qty (packs)
+    free: number | string
+    mrp: number | string
+    rate: number | string
+    gst: number | string
+    expiry: string               // MM/YY
+    batch_number: string
+}
+
+export interface InvoiceEditPayload {
+    header: {
+        invoice_number: string
+        vendor_name: string
+        gst_number: string
+        invoice_date: string | null
+        total_amount: number | string
+    }
+    lines: InvoiceEditLine[]
+    deleted_batch_ids: number[]
+}
+
+// --- Vendors ---
+export interface Vendor {
+    id: number
+    name: string
+    dl_number: string
+    gst_number: string
+    contact: string
+    notes: string
+    created_at?: string | null
+    aliases: string[]   // other spellings that link here (merged/old names)
+}
+
+export interface VendorListItem extends Vendor {
+    invoice_count: number
+    total_amount: number
+    unpaid_count: number
+    unpaid_amount: number
+    last_invoice_date: string | null
+}
+
+export interface VendorInvoice {
+    invoice_number: string
+    invoice_date: string | null
+    upload_date: string | null
+    total_amount: number
+    paid_date: string | null
+    payment_mode: string | null
+    location_name: string | null
+    vendor_name_on_invoice: string | null
+}
+
+export interface VendorItem {
+    product_id: string
+    item_name: string
+    pack_size: string
+    manufacturer: string
+    quantity: number      // packs bought, incl. free
+    free_quantity: number
+    invoice_count: number
+    last_date: string | null
+    last_rate: number | null
+    last_mrp: number | null
+}
+
+export interface VendorDetail {
+    vendor: Vendor
+    summary: { invoice_count: number; total_amount: number; unpaid_count: number; unpaid_amount: number; paid_amount: number }
+    invoices: VendorInvoice[]
+    items: VendorItem[]
+}
+
+export interface VendorDuplicateGroup {
+    same_gst: boolean
+    manual?: boolean   // picked by hand on the list, not a suggestion
+    vendors: (Vendor & { invoice_count: number })[]
+}
+
+export type VendorFields = Pick<Vendor, 'name' | 'dl_number' | 'gst_number' | 'contact' | 'notes'>
+
 // --- Stock transfers between clinics ---
 export interface TransferStockItem {
     product_id: string
@@ -534,9 +620,49 @@ export const api = {
         return fetchApi(`/api/inventory/vendors`);
     },
 
+    // Vendors page
+    async listVendors(): Promise<VendorListItem[]> {
+        return fetchApi('/api/vendors');
+    },
+
+    async getVendor(id: number | string): Promise<VendorDetail> {
+        return fetchApi(`/api/vendors/${id}`);
+    },
+
+    async createVendor(data: VendorFields): Promise<Vendor> {
+        return fetchApi('/api/vendors', { method: 'POST', body: JSON.stringify(data) });
+    },
+
+    async updateVendor(id: number, data: Partial<VendorFields>): Promise<Vendor> {
+        return fetchApi(`/api/vendors/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    },
+
+    async getVendorDuplicates(): Promise<{ groups: VendorDuplicateGroup[] }> {
+        return fetchApi('/api/vendors/duplicates');
+    },
+
+    async mergeVendors(keepId: number, mergeIds: number[]): Promise<{ message: string; vendor: Vendor }> {
+        return fetchApi('/api/vendors/merge', {
+            method: 'POST',
+            body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+        });
+    },
+
+    async deleteVendor(id: number): Promise<{ message: string }> {
+        return fetchApi(`/api/vendors/${id}`, { method: 'DELETE' });
+    },
+
     async getInvoices(locationId?: number): Promise<any[]> {
         const qs = locationId ? `?location_id=${locationId}` : ''
         return fetchApi(`/api/inventory/invoices${qs}`);
+    },
+
+    // Edit a saved purchase invoice (doctor/admin): header + lines.
+    async editInvoice(id: string, data: InvoiceEditPayload): Promise<{ message: string; invoice_number: string; changes: string[] }> {
+        return fetchApi(`/api/inventory/invoices/${encodeURIComponent(id)}/edit`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
     },
 
     async getInvoiceDetail(id: string): Promise<{ invoice: any; items: any[] }> {

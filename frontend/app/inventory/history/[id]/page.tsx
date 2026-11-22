@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu, Save, Loader2, Upload } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, IndianRupee, User, Download, Menu, Save, Loader2, Upload, Pencil } from "lucide-react"
+import { InvoiceEditDialog } from "@/components/InvoiceEditDialog"
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
 import { useMenu } from "@/components/layout/AppShell"
 import { useAuth } from "@/lib/auth_context"
@@ -40,6 +41,10 @@ export default function InvoiceDetailPage() {
     const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | ''>('')
     const [savingPayment, setSavingPayment] = useState(false)
 
+    const [editOpen, setEditOpen] = useState(false)
+    const [reloadKey, setReloadKey] = useState(0)
+    const canEdit = role === 'doctor' || role === 'admin'
+
     const [changingImage, setChangingImage] = useState(false)
     const [imageVersion, setImageVersion] = useState(0)
 
@@ -56,7 +61,7 @@ export default function InvoiceDetailPage() {
                 setLoading(false)
             })
         }
-    }, [invoiceId])
+    }, [invoiceId, reloadKey])
 
     const handleSavePayment = async () => {
         setSavingPayment(true)
@@ -168,6 +173,13 @@ export default function InvoiceDetailPage() {
                                         {invoice.has_image ? "Replace Image" : "Add Image"}
                                     </Button>
                                 </>
+                            )}
+
+                            {canEdit && (
+                                <Button variant="outline" className="w-full" onClick={() => setEditOpen(true)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit Invoice
+                                </Button>
                             )}
 
                             <Button variant="outline" className="w-full" onClick={() => window.location.href = `${API_BASE_URL}/api/inventory/invoices/${invoiceId}/export`}>
@@ -285,6 +297,22 @@ export default function InvoiceDetailPage() {
                     </Card>
                 </div>
             </div>
+
+            {canEdit && (
+                <InvoiceEditDialog
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    invoice={invoice}
+                    items={items}
+                    onSaved={newNo => {
+                        if (newNo !== invoice.invoice_number) {
+                            router.replace(`/inventory/history/${encodeURIComponent(newNo)}`)
+                        } else {
+                            setReloadKey(k => k + 1)
+                        }
+                    }}
+                />
+            )}
         </div>
     )
 }

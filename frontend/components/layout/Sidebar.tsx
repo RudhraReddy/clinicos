@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield, FileText, Receipt } from "lucide-react"
+import { LayoutDashboard, Users, Package, CreditCard, Stethoscope, Image as ImageIcon, BarChart2, LogOut, Shield, FileText, Receipt, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -14,6 +14,7 @@ const staffNavItems = [
     { title: "Dashboard", href: "/", icon: LayoutDashboard },
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Vendors", href: "/vendors", icon: Truck },
     { title: "Billing", href: "/billing", icon: CreditCard },
     { title: "Daily Summary", href: "/daily-summary", icon: Receipt },
 ]
@@ -22,6 +23,7 @@ const doctorNavItems = [
     { title: "Dashboard", href: "/doctor", icon: LayoutDashboard },
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Vendors", href: "/vendors", icon: Truck },
     { title: "Billing", href: "/billing", icon: CreditCard },
     { title: "Daily Summary", href: "/daily-summary", icon: Receipt },
     { title: "Gallery", href: "/gallery", icon: ImageIcon },
@@ -33,6 +35,7 @@ const adminNavItems = [
     { title: "Doctor View", href: "/doctor", icon: Stethoscope },
     { title: "Patients", href: "/patients", icon: Users },
     { title: "Inventory", href: "/inventory", icon: Package },
+    { title: "Vendors", href: "/vendors", icon: Truck },
     { title: "Add Invoice", href: "/inventory/invoice_edit?manual=true", icon: FileText },
     { title: "Billing", href: "/billing", icon: CreditCard },
     { title: "Daily Summary", href: "/daily-summary", icon: Receipt },

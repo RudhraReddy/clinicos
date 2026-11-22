@@ -35,6 +35,33 @@ class Location(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=get_ist_now)
 
+class Vendor(db.Model):
+    """A supplier that purchase invoices come from. `name_key` is the
+    normalised name (lowercase, letters/digits only) used to match an
+    invoice's typed vendor name to its vendor, so "S.S. Pharma" and
+    "ss pharma" are the same vendor."""
+    __tablename__ = 'vendors'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    name_key = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    dl_number = db.Column(db.String(100))
+    gst_number = db.Column(db.String(50))
+    contact = db.Column(db.String(200))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_ist_now)
+
+class VendorAlias(db.Model):
+    """Another spelling that means an existing vendor -- the name of a vendor
+    merged into it, or its own name before a rename. New invoices typed with
+    an alias link to that vendor instead of creating a new one."""
+    __tablename__ = 'vendor_aliases'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = db.Column(db.String(100))
+    name_key = db.Column(db.String(100), nullable=False, unique=True, index=True)
+
 class PurchaseInvoice(db.Model):
     """
     Tracks the source of inventory.
@@ -55,6 +82,9 @@ class PurchaseInvoice(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=True)
     paid_date = db.Column(db.Date, nullable=True) # When this invoice was paid to the vendor
     payment_mode = db.Column(db.String(20), nullable=True) # cash, upi
+    # Vendor this invoice is from. vendor_name above stays as typed on the
+    # invoice; renaming the vendor doesn't rewrite past invoices.
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=True, index=True)
 
 class ProductMaster(db.Model):
     """

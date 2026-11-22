@@ -1,7 +1,7 @@
 
 from flask import Blueprint, request, jsonify, send_file, g
 from extensions import db, get_ist_now
-from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem, User, StockTransferItem
+from models import ProductMaster, InventoryBatch, InventoryHistory, PurchaseInvoice, BillItem, User, StockTransferItem, Vendor
 from sqlalchemy import func, case
 import io
 import csv
@@ -9,6 +9,7 @@ import os
 
 from utils import parse_expiry_date, normalize_pack_size
 from .auth import require_auth, require_admin, require_doctor, log_activity
+from .vendors import get_or_create_vendor
 
 inventory = Blueprint('inventory', __name__)
 
@@ -1575,25 +1576,10 @@ def import_inventory():
 @inventory.route('/inventory/vendors', methods=['GET'])
 @require_auth
 def get_vendors():
-    """Distinct vendor names from past purchase invoices, for the invoice
-    entry form's type-ahead. Deduped case/whitespace-insensitively, keeping
-    the most recently used spelling and that invoice's GST number."""
-    rows = (
-        db.session.query(PurchaseInvoice.vendor_name, PurchaseInvoice.gst_number)
-        .filter(PurchaseInvoice.vendor_name.isnot(None))
-        .filter(func.trim(PurchaseInvoice.vendor_name) != '')
-        .order_by(PurchaseInvoice.upload_date.desc())
-        .all()
-    )
-    seen = {}
-    for name, gst in rows:
-        key = ' '.join(name.split()).lower()
-        if key not in seen:
-            seen[key] = {'vendor_name': ' '.join(name.split()), 'gst_number': gst or ''}
-        elif not seen[key]['gst_number'] and gst:
-            seen[key]['gst_number'] = gst
-    vendors = sorted(seen.values(), key=lambda v: v['vendor_name'].lower())
-    return jsonify(vendors), 200
+    """Vendor names for the invoice entry form's type-ahead, from the
+    Vendors list (every invoice's vendor is in it -- see routes/vendors.py)."""
+    rows = Vendor.query.order_by(func.lower(Vendor.name)).all()
+    return jsonify([{'vendor_name': v.name, 'gst_number': v.gst_number or ''} for v in rows]), 200
 
 @inventory.route('/inventory/invoices', methods=['GET'])
 @require_auth
@@ -1656,12 +1642,18 @@ def get_invoice_detail(invoice_number):
         if b.id in copies:
             continue
         product = ProductMaster.query.get(b.product_id)
+        initial = b.initial_quantity if b.initial_quantity else b.quantity
         items.append({
             'product_name': product.item_name if product else 'Unknown',
+            'product_id': b.product_id,
             'batch_id': b.id,
+            # How much of this line is still in stock / already sold or moved
+            # out -- the invoice editor can't take the quantity below `used`.
+            'remaining': float(b.quantity or 0),
+            'used': max(0.0, float(initial or 0) - float(b.quantity or 0)),
             'batch_number': b.batch_number,
-            'quantity': b.initial_quantity if b.initial_quantity else b.quantity,
-            'free_quantity': b.free_quantity or 0,
+            'quantity': float(initial or 0),
+            'free_quantity': float(b.free_quantity or 0),
             'mrp': float(b.mrp) if b.mrp else 0,
             'purchase_rate': float(b.purchase_rate) if b.purchase_rate else 0,
             'expiry_date': b.expiry_date.strftime('%m/%y') if b.expiry_date else None,
@@ -1681,7 +1673,9 @@ def get_invoice_detail(invoice_number):
             'upload_date': inv.upload_date.isoformat(),
             'paid_date': inv.paid_date.isoformat() if inv.paid_date else None,
             'payment_mode': inv.payment_mode,
-            'has_image': bool(inv.image_path)
+            'has_image': bool(inv.image_path),
+            'vendor_id': inv.vendor_id,
+            'location_id': inv.location_id,
         },
         'items': items
     }), 200
@@ -1799,6 +1793,9 @@ def save_invoice():
             upload_date=get_ist_now(),
             created_by_user_id=g.current_user.get('user_id'),
         )
+        vendor = get_or_create_vendor(new_inv.vendor_name, gst_no)
+        if vendor:
+            new_inv.vendor_id = vendor.id
         selected_location_id = data.get('location_id')
         if selected_location_id:
             try:

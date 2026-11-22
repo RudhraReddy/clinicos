@@ -12,5 +12,7 @@ from .locations import locations_bp
 from .daily_summary import daily_summary
 from .transfers import transfers
 from .duplicates import duplicates
+from .vendors import vendors
+from .invoice_edit import invoice_edit
 
-blueprints = [auth_bp, admin_bp, patients, inventory, visits, billing, images, upload_bp, ledger, locations_bp, daily_summary, transfers, duplicates]
+blueprints = [auth_bp, admin_bp, patients, inventory, visits, billing, images, upload_bp, ledger, locations_bp, daily_summary, transfers, duplicates, vendors, invoice_edit]

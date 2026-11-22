@@ -126,6 +126,11 @@ def _apply_migrations(db):
         # only rows that are still digits-only match.
         "UPDATE product_master SET pack_size = (TRIM(pack_size)::int)::text || '''s pack' "
         "WHERE pack_size ~ '^\\s*[0-9]+\\s*$' AND LENGTH(TRIM(pack_size)) <= 6",
+        # 2026-11-22: vendors -- each purchase invoice links to its vendor
+        # (vendors table itself is created by db.create_all()). Existing
+        # invoices are linked by routes.vendors.backfill_vendors().
+        "ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES vendors(id)",
+        "CREATE INDEX IF NOT EXISTS ix_purchase_invoices_vendor_id ON purchase_invoices (vendor_id)",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:
@@ -158,6 +163,8 @@ def create_app():
              app.register_blueprint(bp, url_prefix='/api')
         db.create_all()
         _apply_migrations(db)
+        from routes.vendors import backfill_vendors
+        backfill_vendors()
 
     return app
 
