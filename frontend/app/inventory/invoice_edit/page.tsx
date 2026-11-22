@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn, getTodayIST } from "@/lib/utils"
+import { cn, getTodayIST, normalizePackSize } from "@/lib/utils"
 import { useAuth } from "@/lib/auth_context"
 // import { ImagePreviewDialog } from "@/components/ImagePreviewDialog" // Actually I'll let the user add it or I add it separately to be safe with line numbers
 import { ImagePreviewDialog } from "@/components/ImagePreviewDialog"
@@ -458,7 +458,7 @@ export default function InvoiceEditPage() {
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.mfg} onChange={e => updateRow(i, 'mfg', e.target.value)} /></TableCell>
                                     {/* <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.dosage} onChange={e => updateRow(i, 'dosage', e.target.value)} /></TableCell> */}
                                     <TableCell>
-                                        <input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. 1x10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} />
+                                        <input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" placeholder="e.g. 10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} onBlur={e => { const v = normalizePackSize(e.target.value); if (v !== e.target.value) updateRow(i, 'pack', v) }} />
                                     </TableCell>
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.hsn} onChange={e => updateRow(i, 'hsn', e.target.value)} /></TableCell>
                                     <TableCell><input className="w-full h-full min-h-[34px] px-2 py-1 text-sm bg-transparent border-0 outline-none focus:bg-blue-50 dark:focus:bg-blue-950/30" value={row.batch} onChange={e => updateRow(i, 'batch', e.target.value)} /></TableCell>
@@ -540,7 +540,7 @@ export default function InvoiceEditPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Packs</label>
-                                    <Input className="h-9" placeholder="e.g. 1x10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} />
+                                    <Input className="h-9" placeholder="e.g. 10" value={row.pack} onChange={e => updateRow(i, 'pack', e.target.value)} onBlur={e => { const v = normalizePackSize(e.target.value); if (v !== e.target.value) updateRow(i, 'pack', v) }} />
                                 </div>
                             </div>
 

@@ -4,6 +4,7 @@ import string
 from extensions import get_ist_now
 from datetime import datetime
 import calendar
+import re
 
 def generate_unique_suffix(length=3):
     """Generates a suffix like XXX-XXX"""
@@ -42,3 +43,39 @@ def parse_expiry_date(date_str):
         except ValueError:
             continue
     return None
+
+
+_BARE_PACK_RE = re.compile(r'^\s*(\d+)(?:\.0+)?\s*$')
+
+
+def normalize_pack_size(value):
+    """A pack size that is just a whole number means "strip/pack of N":
+    "10" -> "10's pack" (also "10.0", which Excel can produce). Anything with
+    text or units ("10ml", "10 mg", "strip of 10", "1x10") is returned
+    stripped but otherwise unchanged. Keep in sync with normalizePackSize in
+    frontend/lib/utils.ts."""
+    if value is None:
+        return value
+    text = str(value).strip()
+    m = _BARE_PACK_RE.match(text)
+    if m:
+        return f"{int(m.group(1))}'s pack"
+    return text
+
+
+_MEASURE_RE = re.compile(r'\d\s*(ml|mg|mcg|gm|g|kg|l|ltr|iu)\b')
+
+
+def pack_multiplier(pack_size):
+    """Tablets per stored quantity (stock and MRP are stored per pack).
+    Mirrors packMultiplier in frontend/lib/utils.ts -- keep in sync.
+    "10's pack" / "strip of 10" -> 10, "10ml"/"10 mg" -> 1, anything else
+    -> 1. "AxB" forms like "1x10" are deliberately not supported (-> 1)."""
+    pack = (pack_size or '').lower()
+    if _MEASURE_RE.search(pack):
+        return 1
+    if 's' in pack:
+        m = re.search(r'(\d+)', pack)
+        if m and int(m.group(1)) > 1:
+            return int(m.group(1))
+    return 1

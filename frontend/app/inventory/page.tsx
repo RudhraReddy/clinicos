@@ -20,7 +20,7 @@ import { TransferStockDialog } from "@/components/TransferStockDialog"
 import { api, type InventoryItem, type InventoryHistoryEntry, type Location } from "@/lib/api"
 import { useAuth } from "@/lib/auth_context"
 import { useMenu } from "@/components/layout/AppShell"
-import { cn } from "@/lib/utils"
+import { cn, packMultiplier } from "@/lib/utils"
 import { EditInventoryDialog } from "@/components/EditInventoryDialog"
 import { ImportInventoryDialog } from "@/components/ImportInventoryDialog"
 import { ViewBatchesDialog } from "@/components/ViewBatchesDialog"
@@ -47,19 +47,8 @@ const parseDateOnly = (dateStr?: string | null) => {
     return new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`)
 }
 
-const getDisplayQuantity = (quantity: number, pack_size?: string) => {
-    const pack = pack_size?.toLowerCase() || ''
-    if (pack.includes('s') || pack.includes('x')) {
-        const match = pack.match(/(\d+)/)
-        if (match) {
-            const num = parseInt(match[0])
-            if (!isNaN(num) && num > 1) {
-                return Math.round(quantity * num)
-            }
-        }
-    }
-    return Math.round(quantity)
-}
+// Stored packs -> tablets shown (shared rule in lib/utils.ts).
+const getDisplayQuantity = (quantity: number, pack_size?: string) => Math.round(quantity * packMultiplier(pack_size))
 
 function AllChangesPanel() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

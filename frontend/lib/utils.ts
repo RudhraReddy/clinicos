@@ -10,16 +10,23 @@ export function getTodayIST(): string {
     return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
-// Units per stored inventory quantity: stock is stored in packs and shown as
-// a count ("10s" / "1x15" -> 10; anything else -> 1). Same rule as the
-// billing page's getPackMultiplier / inventory page's getDisplayQuantity.
+// Units (tablets) per stored inventory quantity: stock and MRP are stored per
+// pack and shown/billed per tablet. The ONE place this rule lives on the
+// frontend -- keep in sync with Backend_db/utils.py pack_multiplier.
+//   "10's pack" / "strip of 10" / "15 tabs" -> 10 / 10 / 15
+//   "10ml", "10 mg", "5 g", "100ml" -> 1 (a measured item is one unit)
+//   anything else (no number, "1", "box") -> 1
+// "AxB" forms like "1x10" are deliberately not supported (-> 1); a bare
+// number is normalised to "N's pack" on entry instead (normalizePackSize).
+const MEASURE_RE = /\d\s*(ml|mg|mcg|gm|g|kg|l|ltr|iu)\b/
 export function packMultiplier(packSize?: string | null): number {
-    const pack = packSize?.toLowerCase() || ""
-    if (pack.includes("s") || pack.includes("x")) {
-        const match = pack.match(/(\d+)/)
-        if (match) {
-            const num = parseInt(match[0])
-            if (!isNaN(num) && num > 1) return num
+    const pack = (packSize || "").toLowerCase()
+    if (MEASURE_RE.test(pack)) return 1
+    if (pack.includes("s")) {
+        const m = pack.match(/(\d+)/)
+        if (m) {
+            const num = parseInt(m[1], 10)
+            if (num > 1) return num
         }
     }
     return 1
@@ -96,3 +103,13 @@ export function orderTodayVisits<T extends Pick<Visit, 'status' | 'visit_time' |
 // true to bring back the value-tracking UI (−₹X / +₹X summary, "Transfer ₹X")
 // -- keep in sync with TRANSFER_VALUE_ENABLED in Backend_db/routes/transfers.py.
 export const TRANSFER_VALUE_ENABLED = false
+
+// A pack size that is just a whole number means "strip/pack of N": "10" ->
+// "10's pack" (also "10.0"). Anything with text or units ("10ml", "10 mg",
+// "strip of 10") is left as typed. Applied when the field loses focus; the
+// backend applies the same rule (Backend_db/utils.py normalize_pack_size),
+// which also covers CSV imports.
+export function normalizePackSize(value: string): string {
+    const m = value.trim().match(/^(\d+)(?:\.0+)?$/)
+    return m ? `${parseInt(m[1], 10)}'s pack` : value
+}

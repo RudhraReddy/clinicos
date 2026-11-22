@@ -7,7 +7,7 @@ import io
 import csv
 import os
 
-from utils import parse_expiry_date
+from utils import parse_expiry_date, normalize_pack_size
 from .auth import require_auth, require_admin, require_doctor, log_activity
 
 inventory = Blueprint('inventory', __name__)
@@ -523,7 +523,7 @@ def add_inventory_item():
         min_stock_override='min_stock_level' in data,
         manufacturer=data.get('supplier', ''),
         category=data.get('category', ''),
-        pack_size=data.get('pack_size', ''),
+        pack_size=normalize_pack_size(data.get('pack_size', '')),
         hsn_code=data.get('hsn_code', ''),
         created_by_user_id=g.current_user.get('user_id'),
     )
@@ -578,9 +578,9 @@ def update_inventory_item(id):
         if 'min_stock_override' not in changed_fields:
             changed_fields.append('min_stock_override')
     if 'pack_size' in data:
-        if item.pack_size != data['pack_size']:
+        if item.pack_size != normalize_pack_size(data['pack_size']):
             changed_fields.append('pack_size')
-        item.pack_size = data['pack_size']
+        item.pack_size = normalize_pack_size(data['pack_size'])
     if 'hsn_code' in data:
         if item.hsn_code != data['hsn_code']:
             changed_fields.append('hsn_code')
@@ -1141,7 +1141,8 @@ def import_inventory():
             if not name:
                 continue
 
-            pack_size = get_val(['Pack Size', 'pack', 'packs', 'Pack']) or ''
+            # A bare number ("20") means a strip/pack of 20 -> "20's pack".
+            pack_size = normalize_pack_size(get_val(['Pack Size', 'pack', 'packs', 'Pack']) or '')
             product_id_csv = (get_val(['Product ID']) or '').strip()
 
             # Product lookup: by ID first (if provided), then by name+pack
@@ -1207,6 +1208,9 @@ def import_inventory():
                 if formula: item.formula = formula
                 rack = get_val(['Rack Location', 'rack'])
                 if rack: item.rack_location = rack
+                # Pack size edited in the spreadsheet (item matched by ID).
+                if pack_size and item.pack_size != pack_size:
+                    item.pack_size = pack_size
                 pgst = get_val(['Product GST Rate', 'Product GST', 'gst_rate'])
                 if pgst:
                     try:
@@ -1794,7 +1798,7 @@ def save_invoice():
             if not p_name: continue
 
             p_mfg    = p.get('mfg', '').strip()
-            p_pack   = p.get('packs') or p.get('pack') or ''
+            p_pack   = normalize_pack_size(p.get('packs') or p.get('pack') or '')
             p_batch  = (p.get('batch') or p.get('batch_number') or '').strip() or None
             p_hsn    = p.get('hsn') or p.get('hsn_code') or ''
             p_formula = (p.get('formula') or '').strip()

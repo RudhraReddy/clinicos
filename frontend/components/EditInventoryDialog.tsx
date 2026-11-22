@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { api, InventoryItem, InventoryBatch } from "@/lib/api"
 import { toast } from "sonner"
+import { normalizePackSize, packMultiplier } from "@/lib/utils"
 import { useSettings } from "@/lib/settings_context"
 import { Pencil, Loader2, Save, Trash2, AlertCircle } from "lucide-react"
 
@@ -244,8 +245,9 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                     id="pack_size"
                                     value={formData.pack_size}
                                     onChange={(e) => setFormData({ ...formData, pack_size: e.target.value })}
+                                    onBlur={(e) => setFormData({ ...formData, pack_size: normalizePackSize(e.target.value) })}
                                     className="col-span-3"
-                                    placeholder="e.g. 1x10, 100ml"
+                                    placeholder="e.g. 10, 100ml"
                                 />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
@@ -313,31 +315,12 @@ export function EditInventoryDialog({ item, onSuccess }: EditInventoryDialogProp
                                                 type="number"
                                                 className="h-7 text-xs"
                                                 value={(() => {
-                                                    const pack = item.pack_size?.toLowerCase() || ''
-                                                    if (pack.includes('s') || pack.includes('x')) {
-                                                        const match = pack.match(/(\d+)/)
-                                                        if (match) {
-                                                            const num = parseInt(match[0])
-                                                            if (!isNaN(num) && num > 1) {
-                                                                return Math.round(batch.quantity * num)
-                                                            }
-                                                        }
-                                                    }
-                                                    return batch.quantity
+                                                    const mult = packMultiplier(item.pack_size)
+                                                    return mult > 1 ? Math.round(batch.quantity * mult) : batch.quantity
                                                 })()}
                                                 onChange={(e) => {
                                                     const inputVal = parseFloat(e.target.value) || 0
-                                                    const pack = item.pack_size?.toLowerCase() || ''
-                                                    let divisor = 1
-                                                    if (pack.includes('s') || pack.includes('x')) {
-                                                        const match = pack.match(/(\d+)/)
-                                                        if (match) {
-                                                            const num = parseInt(match[0])
-                                                            if (!isNaN(num) && num > 1) {
-                                                                divisor = num
-                                                            }
-                                                        }
-                                                    }
+                                                    const divisor = packMultiplier(item.pack_size)
                                                     updateBatch(batch.id, 'quantity', inputVal / divisor)
                                                 }}
                                             />

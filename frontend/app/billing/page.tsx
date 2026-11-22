@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { api, type Patient, type InventorySearchResult, type BillingHistoryEntry, type Visit, type Location, type RefundMode } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { cn, packMultiplier } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Search, Trash2, Printer, Settings, ChevronLeft, ChevronRight, Menu, Package, LayoutDashboard, Users, MapPin } from "lucide-react"
 import { useMenu } from "@/components/layout/AppShell"
@@ -63,19 +63,8 @@ export interface BillItem {
     manufacturer?: string;
 }
 
-const getPackMultiplier = (packSize?: string) => {
-    const pack = packSize?.toLowerCase() || ''
-    if (pack.includes('s') || pack.includes('x')) {
-        const match = pack.match(/(\d+)/)
-        if (match) {
-            const num = parseInt(match[0])
-            if (!isNaN(num) && num > 1) {
-                return num
-            }
-        }
-    }
-    return 1
-}
+// Tablets per pack -- shared rule in lib/utils.ts.
+const getPackMultiplier = (packSize?: string) => packMultiplier(packSize)
 
 function BillingContent() {
     const searchParams = useSearchParams()
@@ -527,7 +516,10 @@ function BillingContent() {
     }, [resolvedLocationId])
 
     return (
-        <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
+        <div className="flex flex-col gap-6 h-[calc(100vh-100px)] md:h-[calc(100vh-52px)] md:-mb-8">
+            {/* Height: fills the screen down to a small (12px) gap at the bottom on
+                md+. 52px = <main>'s 40px top padding + the gap; -mb-8 cancels
+                <main>'s md:pb-8 so the page itself doesn't scroll. */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden gap-4 min-h-0">
                 <div className="flex items-center gap-3 flex-wrap shrink-0">
                     <button
@@ -570,124 +562,12 @@ function BillingContent() {
                 <TabsContent value="new" className="flex-1 overflow-hidden m-0 flex flex-col gap-6 min-h-0">
                     <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
                         <CardContent className="p-6 flex flex-col gap-6 flex-1 overflow-hidden min-h-0">
-                            {/* Patient & Actions Row */}
-                            <div className="flex flex-col md:flex-row flex-wrap md:items-center justify-between gap-4 shrink-0">
-                                <div className="flex items-start gap-2 flex-wrap">
-                                    {walkInMode ? (
-                                        <>
-                                            <Input
-                                                autoFocus
-                                                placeholder="Walk-in customer name"
-                                                className="w-80 shrink-0 h-10"
-                                                value={walkInName}
-                                                onChange={(e) => setWalkInName(e.target.value)}
-                                                maxLength={100}
-                                            />
-                                            <Input
-                                                type="number"
-                                                placeholder="Age"
-                                                className="w-20 shrink-0 h-10"
-                                                min={0}
-                                                max={150}
-                                                value={walkInAge}
-                                                onChange={(e) => setWalkInAge(e.target.value)}
-                                            />
-                                            <Select value={walkInSex} onValueChange={setWalkInSex}>
-                                                <SelectTrigger className="w-28 shrink-0 h-10">
-                                                    <SelectValue placeholder="Sex" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Male">Male</SelectItem>
-                                                    <SelectItem value="Female">Female</SelectItem>
-                                                    <SelectItem value="Other">Other</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </>
-                                    ) : (
-                                        <div className="w-80 shrink-0">
-                                            <PatientSearch
-                                                selectedPatient={patient}
-                                                onSelect={(p) => {
-                                                    setPatient(p)
-                                                    setPatientId(p?.patient_id || "")
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                    <div className="shrink-0">
-                                        {(isLockedToVisit || !isAdminOrDoctor) ? (
-                                            <div className={cn(
-                                                "h-10 px-3 flex items-center gap-1.5 text-sm rounded-md border w-44",
-                                                noClinicAssigned
-                                                    ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-400"
-                                                    : "border-input bg-muted/40 text-muted-foreground"
-                                            )}>
-                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate">
-                                                    {isLockedToVisit
-                                                        ? (locationName(visitLocationId) || 'Unknown clinic')
-                                                        : noClinicAssigned
-                                                            ? 'No clinic assigned'
-                                                            : (locationName(frontdeskLocationId) || 'Unknown clinic')}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <Select
-                                                value={selectedLocationId ? selectedLocationId.toString() : ""}
-                                                onValueChange={(v) => setSelectedLocationId(parseInt(v))}
-                                            >
-                                                <SelectTrigger className="h-10 w-44">
-                                                    <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground shrink-0" />
-                                                    <SelectValue placeholder="Select clinic" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {locations.map(l => (
-                                                        <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="shrink-0 h-10 w-10"
-                                        title="Print draft invoice (no bill is created — nothing is saved)"
-                                        disabled={(walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0}
-                                        onClick={() => setDraftPreviewOpen(true)}
-                                    >
-                                        <Printer className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant={walkInMode ? "default" : "outline"}
-                                        className="shrink-0 h-10"
-                                        onClick={() => {
-                                            setWalkInMode(m => !m)
-                                            setPatient(null)
-                                            setPatientId("")
-                                            setWalkInName("")
-                                            setWalkInAge("")
-                                            setWalkInSex("")
-                                            setRefundLine(null)
-                                            setRefundDraftAmount("")
-                                            setRefundPayoutAmount("")
-                                            setRefundDraftMode("")
-                                        }}
-                                    >
-                                        Walk-in Bill
-                                    </Button>
-                                </div>
-                            </div>
-
+                            {/* Left: items | Right panel: patient/clinic/actions at the
+                                top, refund, then payment/discount/total at the bottom.
+                                Stacks (panel under the items) below lg. */}
+                            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-y-auto lg:overflow-hidden">
                             {/* Items */}
-                            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                                <div className="flex items-center justify-between mb-3 shrink-0 flex-wrap gap-2">
-                                    <h3 className="font-semibold text-base">Items</h3>
-                                </div>
+                            <div className="flex-1 flex flex-col overflow-hidden min-h-[320px] lg:min-h-0 min-w-0">
                                 <div className="flex-1 overflow-auto border rounded-md min-h-0">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-background z-10">
@@ -848,10 +728,124 @@ function BillingContent() {
                                 </div>
                             </div>
 
-                            {/* Refund | Payment | Total — three columns at the bottom of the card */}
-                            <div className="flex flex-col md:flex-row items-stretch justify-between gap-6 mt-4 shrink-0">
-                                {/* Left: Refund (relocated from the Items header) */}
-                                <div className="flex-1 min-w-[220px]">
+                            {/* Right panel: Refund (visit bills only) → Discount → Total →
+                                Payment (Cash / UPI) → Create Bill */}
+                            <div className="w-full lg:w-80 shrink-0 border rounded-md p-4 flex flex-col gap-4 lg:overflow-y-auto">
+                                {/* Panel top: Print + Walk-in → Patient (or walk-in
+                                    name / age / sex) → Clinic */}
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="shrink-0 h-10 w-10"
+                                            title="Print draft invoice (no bill is created — nothing is saved)"
+                                            disabled={(walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0}
+                                            onClick={() => setDraftPreviewOpen(true)}
+                                        >
+                                            <Printer className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={walkInMode ? "default" : "outline"}
+                                            className="flex-1 h-10"
+                                            onClick={() => {
+                                                setWalkInMode(m => !m)
+                                                setPatient(null)
+                                                setPatientId("")
+                                                setWalkInName("")
+                                                setWalkInAge("")
+                                                setWalkInSex("")
+                                                setRefundLine(null)
+                                                setRefundDraftAmount("")
+                                                setRefundPayoutAmount("")
+                                                setRefundDraftMode("")
+                                            }}
+                                        >
+                                            Walk-in Bill
+                                        </Button>
+                                    </div>
+                                    {walkInMode ? (
+                                        <>
+                                            <Input
+                                                autoFocus
+                                                placeholder="Walk-in customer name"
+                                                className="w-full h-10"
+                                                value={walkInName}
+                                                onChange={(e) => setWalkInName(e.target.value)}
+                                                maxLength={100}
+                                            />
+                                            <div className="grid grid-cols-2 gap-2">
+                                            <Input
+                                                type="number"
+                                                placeholder="Age"
+                                                className="w-full h-10"
+                                                min={0}
+                                                max={150}
+                                                value={walkInAge}
+                                                onChange={(e) => setWalkInAge(e.target.value)}
+                                            />
+                                            <Select value={walkInSex} onValueChange={setWalkInSex}>
+                                                <SelectTrigger className="w-full h-10">
+                                                    <SelectValue placeholder="Sex" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Male">Male</SelectItem>
+                                                    <SelectItem value="Female">Female</SelectItem>
+                                                    <SelectItem value="Other">Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="w-full">
+                                            <PatientSearch
+                                                selectedPatient={patient}
+                                                onSelect={(p) => {
+                                                    setPatient(p)
+                                                    setPatientId(p?.patient_id || "")
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    <div>
+                                        {(isLockedToVisit || !isAdminOrDoctor) ? (
+                                            <div className={cn(
+                                                "h-10 px-3 flex items-center gap-1.5 text-sm rounded-md border w-full",
+                                                noClinicAssigned
+                                                    ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-400"
+                                                    : "border-input bg-muted/40 text-muted-foreground"
+                                            )}>
+                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {isLockedToVisit
+                                                        ? (locationName(visitLocationId) || 'Unknown clinic')
+                                                        : noClinicAssigned
+                                                            ? 'No clinic assigned'
+                                                            : (locationName(frontdeskLocationId) || 'Unknown clinic')}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <Select
+                                                value={selectedLocationId ? selectedLocationId.toString() : ""}
+                                                onValueChange={(v) => setSelectedLocationId(parseInt(v))}
+                                            >
+                                                <SelectTrigger className="h-10 w-full">
+                                                    <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground shrink-0" />
+                                                    <SelectValue placeholder="Select clinic" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {locations.map(l => (
+                                                        <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Refund — only rendered when billing a visit */}
+                                <div className="empty:hidden py-4 border-y">
                                     {canShowRefundBlock && (
                                         <div className="space-y-1.5">
                                             <div className="flex items-center gap-1.5 text-sm">
@@ -928,11 +922,13 @@ function BillingContent() {
                                     )}
                                 </div>
 
-                                {/* Center: split payment entry — Cash + UPI must add up to
-                                    the total (±₹1 rounding tolerance); "Full amount" covers
-                                    the single-mode case without a separate toggle. */}
-                                <div className="flex-1 min-w-[240px] space-y-1.5">
-                                    <span className="text-sm text-muted-foreground">Payment</span>
+                                {/* Pinned to the bottom of the panel, in this order:
+                                    Cash paid → UPI paid → Discount → Subtotal → Total →
+                                    Create Bill. Cash + UPI must add up to the total (±₹1
+                                    rounding tolerance); "Full amount" covers the
+                                    single-mode case without a separate toggle. */}
+                                <div className="mt-auto flex flex-col gap-2">
+                                    <span className="text-sm font-medium">Paid</span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm w-9 shrink-0">Cash</span>
                                         <span className="text-sm text-muted-foreground">₹</span>
@@ -968,53 +964,57 @@ function BillingContent() {
                                             {paymentMatches ? "✓ Matches total" : `Remaining: ₹${paymentRemaining.toFixed(2)}`}
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Right: Discount + Total + Create Bill */}
-                                <div className="flex flex-col items-end gap-2 min-w-[260px]">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">Discount</span>
-                                        <div className="flex rounded-md border overflow-hidden">
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant={discountType === "percent" ? "default" : "ghost"}
-                                                className="rounded-none h-8 px-2.5"
-                                                onClick={() => setDiscountType("percent")}
-                                            >
-                                                %
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant={discountType === "flat" ? "default" : "ghost"}
-                                                className="rounded-none h-8 px-2.5"
-                                                onClick={() => setDiscountType("flat")}
-                                            >
-                                                ₹
-                                            </Button>
+                                    <div className="border-t pt-3 mt-1 flex flex-col gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground mr-auto">Discount</span>
+                                            <div className="flex rounded-md border overflow-hidden">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={discountType === "percent" ? "default" : "ghost"}
+                                                    className="rounded-none h-8 px-2.5"
+                                                    onClick={() => setDiscountType("percent")}
+                                                >
+                                                    %
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={discountType === "flat" ? "default" : "ghost"}
+                                                    className="rounded-none h-8 px-2.5"
+                                                    onClick={() => setDiscountType("flat")}
+                                                >
+                                                    ₹
+                                                </Button>
+                                            </div>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={discountType === "percent" ? 100 : subtotal}
+                                                value={discountValue}
+                                                onChange={(e) => setDiscountValue(e.target.value)}
+                                                placeholder="0"
+                                                className="w-24 h-8"
+                                            />
                                         </div>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={discountType === "percent" ? 100 : subtotal}
-                                            value={discountValue}
-                                            onChange={(e) => setDiscountValue(e.target.value)}
-                                            placeholder="0"
-                                            className="w-24 h-8"
-                                        />
+                                        <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                                            <span>Subtotal</span>
+                                            <span className="tabular-nums">₹{subtotal.toFixed(2)}</span>
+                                        </div>
+                                        {discountAmount > 0 && (
+                                            <div className="flex justify-between w-full text-sm text-muted-foreground">
+                                                <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
+                                                <span>−₹{discountAmount.toFixed(2)}</span>
+                                            </div>
+                                        )}
                                     </div>
-                                    {discountAmount > 0 && (
-                                        <div className="flex justify-between w-full text-sm text-muted-foreground">
-                                            <span>Discount{discountType === "percent" ? ` (${parsedDiscountValue}%)` : ""}</span>
-                                            <span>−₹{discountAmount.toFixed(2)}</span>
-                                        </div>
-                                    )}
-                                    <span className="text-lg font-bold">
-                                        Total: ₹{finalTotal.toFixed(2)}
-                                    </span>
+                                    <div className="flex items-baseline justify-between border-t pt-2">
+                                        <span className="text-base font-semibold">Total</span>
+                                        <span className="text-2xl font-bold tabular-nums">₹{finalTotal.toFixed(2)}</span>
+                                    </div>
                                     <Button
                                         size="lg"
+                                        className="w-full mt-1"
                                         disabled={submitting || (walkInMode ? !walkInName.trim() : !patientId) || billItems.length === 0 || hasInvalidQty || !resolvedLocationId || !paymentMatches}
                                         onClick={handleCreateBill}
                                     >
@@ -1022,6 +1022,7 @@ function BillingContent() {
                                         Create Bill
                                     </Button>
                                 </div>
+                            </div>
                             </div>
                         </CardContent>
                     </Card>

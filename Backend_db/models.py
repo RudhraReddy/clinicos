@@ -68,7 +68,7 @@ class ProductMaster(db.Model):
     item_name = db.Column(db.String(100), nullable=False, index=True)
     # dosage removed
     category = db.Column(db.String(50))
-    pack_size = db.Column(db.String(50)) # "Packs" - e.g., '1x10', '100ml'
+    pack_size = db.Column(db.String(50)) # "Packs" - e.g., "10's pack", '100ml' (bare "10" is saved as "10's pack")
     hsn_code = db.Column(db.String(20))
     # min_stock_level kept for alert logic
     min_stock_level = db.Column(db.Integer, default=10)

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table"
 import { Loader2, CalendarClock } from "lucide-react"
 import { api, type InventoryItem, type InventoryBatch } from "@/lib/api"
+import { packMultiplier } from "@/lib/utils"
 
 interface ViewBatchesDialogProps {
     item: InventoryItem
@@ -80,19 +81,7 @@ export function ViewBatchesDialog({ item }: ViewBatchesDialogProps) {
                                     </TableRow>
                                 ) : (
                                     batches.map((batch) => {
-                                        const getMultipliedQty = (qty: number, packSize?: string) => {
-                                            const pack = packSize?.toLowerCase() || ''
-                                            if (pack.includes('s') || pack.includes('x')) {
-                                                const match = pack.match(/(\d+)/)
-                                                if (match) {
-                                                    const num = parseInt(match[0])
-                                                    if (!isNaN(num) && num > 1) {
-                                                        return Math.round(qty * num)
-                                                    }
-                                                }
-                                            }
-                                            return Math.round(qty)
-                                        }
+                                        const getMultipliedQty = (qty: number, packSize?: string) => Math.round(qty * packMultiplier(packSize))
                                         return (
                                             <TableRow key={batch.id}>
                                                 <TableCell className="font-medium">

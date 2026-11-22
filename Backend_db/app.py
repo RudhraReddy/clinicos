@@ -120,6 +120,12 @@ def _apply_migrations(db):
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS next_review_date DATE",
         # 2026-09-14: invoice number for the standalone Visit Fee Receipt.
         "ALTER TABLE visits ADD COLUMN IF NOT EXISTS visit_fee_invoice_id VARCHAR(50)",
+        # 2026-11-22: a bare-number pack size means a strip/pack of N --
+        # "10" -> "10's pack" (same rule as utils.normalize_pack_size), so
+        # older items count tablets the same way as new entries. Idempotent:
+        # only rows that are still digits-only match.
+        "UPDATE product_master SET pack_size = (TRIM(pack_size)::int)::text || '''s pack' "
+        "WHERE pack_size ~ '^\\s*[0-9]+\\s*$' AND LENGTH(TRIM(pack_size)) <= 6",
     ]
     with db.engine.connect() as conn:
         for stmt in stmts:

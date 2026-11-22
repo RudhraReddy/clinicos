@@ -18,15 +18,10 @@ REFUND_MODES = ('visit_upi', 'billing_upi', 'cash')
 
 
 def _pack_multiplier(pack_size):
-    """Units per stored quantity, mirroring the frontend's getPackMultiplier
-    (billing page): '10s' / '1x15' -> 10 / 1; anything else -> 1. Only used
-    to word stock-shortage errors in the same count staff see on screen."""
-    pack = (pack_size or '').lower()
-    if 's' in pack or 'x' in pack:
-        m = re.search(r'(\d+)', pack)
-        if m and int(m.group(1)) > 1:
-            return int(m.group(1))
-    return 1
+    """Tablets per pack -- shared rule in utils.pack_multiplier. Only used to
+    word stock-shortage errors in the same count staff see on screen."""
+    from utils import pack_multiplier
+    return pack_multiplier(pack_size)
 
 @billing.route('/billing', methods=['POST'])
 @require_auth
